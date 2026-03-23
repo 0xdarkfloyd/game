@@ -14,6 +14,10 @@
                 <div class="info-panel">
                     <div id="turn" class="turn-label"></div>
                     <div id="status" class="status-label"></div>
+                    <div class="side-picker" role="group" aria-label="Choose side">
+                        <button id="side-red" type="button" class="side-button active" onclick="setHumanSide('r')">&#57d7;&#32005;&#20808;&#25163;</button>
+                        <button id="side-black" type="button" class="side-button" onclick="setHumanSide('b')">&#57d7;&#40657;&#24460;&#25163;</button>
+                    </div>
                 </div>
                 <div id="board" class="board" aria-label="Xiangqi board"></div>
                 <div class="action-row">

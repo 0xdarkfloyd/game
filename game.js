@@ -1,8 +1,48 @@
-const HUMAN_COLOR = 'r';
-const AI_COLOR = 'b';
+const RED_COLOR = 'r';
+const BLACK_COLOR = 'b';
 const MATE_SCORE = 900000;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const OPENING_BOOK = {
+    [`${RED_COLOR}|`]: [
+        { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u4e2d\u70ae' },
+        { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u8d77\u99ac\u5c40' },
+        { fromRow: 9, fromCol: 6, toRow: 7, toCol: 4, name: '\u98db\u76f8\u5c40' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u5c4f\u98a8\u99ac' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u5c4f\u98a8\u99ac' },
+        { fromRow: 2, fromCol: 1, toRow: 2, toCol: 4, name: '\u9806\u70ae' }
+    ],
+    [`${RED_COLOR}|7,7-7,4/0,1-2,2`]: [
+        { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u99ac\u4e8c\u9032\u4e09' },
+        { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53527\u90321' }
+    ],
+    [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
+        { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
+        { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,1-7,2`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53523\u90321' }
+    ],
+    [`${BLACK_COLOR}|9,7-7,6`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u8d77\u99ac\u5c0d\u5c4f\u98a8\u99ac' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u8d77\u99ac\u5c0d\u8d77\u99ac' }
+    ],
+    [`${BLACK_COLOR}|9,6-7,4`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u98db\u76f8\u5c0d\u5c4f\u98a8\u99ac' },
+        { fromRow: 2, fromCol: 7, toRow: 2, toCol: 4, name: '\u5217\u70ae' }
+    ],
+    [`${RED_COLOR}|9,7-7,6/0,1-2,2`]: [
+        { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u8d77\u99ac\u5f8c\u8f49\u4e2d\u70ae' },
+        { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u96d9\u99ac' }
+    ]
+};
 
 const PIECE_LABELS = {
     rR: '\u8eca',
@@ -57,15 +97,18 @@ const initialBoard = [
 const BOARD_SVG = buildBoardSvg();
 
 let board = cloneBoard(initialBoard);
-let currentPlayer = HUMAN_COLOR;
+let humanColor = RED_COLOR;
+let computerColor = BLACK_COLOR;
+let currentPlayer = RED_COLOR;
 let selectedCell = null;
 let validMoves = [];
 let lastMove = null;
 let gameActive = true;
 let aiThinking = false;
-let statusMessage = '\u4f60\u57f7\u7d05\u65b9\uff0c\u96fb\u8166\u57f7\u9ed1\u65b9\u3002';
+let statusMessage = '';
 let moveHistory = [];
 let moveLog = [];
+let moveSequence = [];
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -112,12 +155,43 @@ function cloneMoveLog(entries) {
     return entries.map(entry => ({ ...entry }));
 }
 
+function cloneMoveSequence(entries) {
+    return entries.slice();
+}
+
 function getFileNumber(col) {
     return 9 - col;
 }
 
 function formatNumber(color, value) {
-    return (color === 'r' ? RED_NUMERALS : BLACK_NUMERALS)[value];
+    return (color === RED_COLOR ? RED_NUMERALS : BLACK_NUMERALS)[value];
+}
+
+function getOpeningBookKey(color, historySequence) {
+    return `${color}|${historySequence.join('/')}`;
+}
+
+function getMoveKey(move) {
+    return `${move.fromRow},${move.fromCol}-${move.toRow},${move.toCol}`;
+}
+
+function getStartStatusMessage() {
+    return `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u65b9\uff08\u5148\u624b\uff09' : '\u4f60\u57f7\u9ed1\u65b9\uff08\u5f8c\u624b\uff09'}\uff0c${computerColor === RED_COLOR ? '\u96fb\u8166\u57f7\u7d05\u65b9' : '\u96fb\u8166\u57f7\u9ed1\u65b9'}\u3002`;
+}
+
+function updateSideButtons() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const redButton = document.getElementById('side-red');
+    const blackButton = document.getElementById('side-black');
+    if (!redButton || !blackButton) {
+        return;
+    }
+
+    redButton.classList.toggle('active', humanColor === RED_COLOR);
+    blackButton.classList.toggle('active', humanColor === BLACK_COLOR);
 }
 
 function sameMove(left, right) {
@@ -582,7 +656,7 @@ function evaluateBoard(activeBoard) {
 
             const baseScore = PIECE_VALUES[piece[1]] + getPositionBonus(piece, row, col);
             const mobility = getPseudoMoves(activeBoard, row, col).length * MOBILITY_WEIGHTS[piece[1]];
-            const sign = piece[0] === AI_COLOR ? 1 : -1;
+            const sign = piece[0] === computerColor ? 1 : -1;
 
             score += sign * (baseScore + mobility);
 
@@ -592,10 +666,10 @@ function evaluateBoard(activeBoard) {
         }
     }
 
-    if (isInCheck(activeBoard, HUMAN_COLOR)) {
+    if (isInCheck(activeBoard, humanColor)) {
         score += 55;
     }
-    if (isInCheck(activeBoard, AI_COLOR)) {
+    if (isInCheck(activeBoard, computerColor)) {
         score -= 55;
     }
 
@@ -604,7 +678,7 @@ function evaluateBoard(activeBoard) {
 
 function evaluateForColor(activeBoard, color) {
     const score = evaluateBoard(activeBoard);
-    return color === AI_COLOR ? score : -score;
+    return color === computerColor ? score : -score;
 }
 
 function scoreMove(activeBoard, move, ttMove) {
@@ -632,14 +706,33 @@ function orderMoves(activeBoard, moves, ttMove) {
         .sort((left, right) => scoreMove(activeBoard, right, ttMove) - scoreMove(activeBoard, left, ttMove));
 }
 
+function findOpeningBookMove(activeBoard, color, historySequence) {
+    const candidates = OPENING_BOOK[getOpeningBookKey(color, historySequence)];
+    if (!candidates || candidates.length === 0) {
+        return null;
+    }
+
+    const legalMoves = getAllLegalMoves(activeBoard, color);
+    const legalByKey = new Map(legalMoves.map(move => [getMoveKey(move), move]));
+
+    for (const candidate of candidates) {
+        const key = getMoveKey(candidate);
+        if (legalByKey.has(key)) {
+            return legalByKey.get(key);
+        }
+    }
+
+    return null;
+}
+
 function negamax(activeBoard, color, depth, alpha, beta) {
-    const redGeneral = findGeneral(activeBoard, HUMAN_COLOR);
-    const blackGeneral = findGeneral(activeBoard, AI_COLOR);
+    const redGeneral = findGeneral(activeBoard, RED_COLOR);
+    const blackGeneral = findGeneral(activeBoard, BLACK_COLOR);
     if (!redGeneral) {
-        return { score: color === AI_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
+        return { score: color === BLACK_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
     }
     if (!blackGeneral) {
-        return { score: color === HUMAN_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
+        return { score: color === RED_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
     }
 
     if (depth === 0) {
@@ -706,7 +799,12 @@ function chooseSearchDepth(activeBoard, legalMoves) {
     return 3;
 }
 
-function chooseComputerMove(activeBoard, color = AI_COLOR) {
+function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
+    const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
+    if (bookMove) {
+        return bookMove;
+    }
+
     const legalMoves = getAllLegalMoves(activeBoard, color);
     if (legalMoves.length === 0) {
         return null;
@@ -782,7 +880,7 @@ function formatMoveNotation(activeBoard, move) {
 }
 
 function appendMoveLog(notation, color) {
-    if (color === HUMAN_COLOR) {
+    if (color === RED_COLOR) {
         moveLog.push({ red: notation, black: '' });
         return;
     }
@@ -796,14 +894,14 @@ function appendMoveLog(notation, color) {
 }
 
 function getGameState(activeBoard, sideToMove) {
-    const redGeneral = findGeneral(activeBoard, HUMAN_COLOR);
-    const blackGeneral = findGeneral(activeBoard, AI_COLOR);
+    const redGeneral = findGeneral(activeBoard, RED_COLOR);
+    const blackGeneral = findGeneral(activeBoard, BLACK_COLOR);
 
     if (!redGeneral) {
-        return { winner: AI_COLOR, message: '\u9ed1\u65b9\u52dd\uff1a\u7d05\u5e25\u88ab\u5403\u3002' };
+        return { winner: BLACK_COLOR, message: '\u9ed1\u65b9\u52dd\uff1a\u7d05\u5e25\u88ab\u5403\u3002' };
     }
     if (!blackGeneral) {
-        return { winner: HUMAN_COLOR, message: '\u7d05\u65b9\u52dd\uff1a\u9ed1\u5c07\u88ab\u5403\u3002' };
+        return { winner: RED_COLOR, message: '\u7d05\u65b9\u52dd\uff1a\u9ed1\u5c07\u88ab\u5403\u3002' };
     }
 
     const legalMoves = getAllLegalMoves(activeBoard, sideToMove);
@@ -1020,7 +1118,8 @@ function snapshotState() {
         gameActive,
         aiThinking,
         statusMessage,
-        moveLog: cloneMoveLog(moveLog)
+        moveLog: cloneMoveLog(moveLog),
+        moveSequence: cloneMoveSequence(moveSequence)
     };
 }
 
@@ -1032,9 +1131,11 @@ function restoreState(snapshot) {
     aiThinking = snapshot.aiThinking;
     statusMessage = snapshot.statusMessage;
     moveLog = cloneMoveLog(snapshot.moveLog || []);
+    moveSequence = cloneMoveSequence(snapshot.moveSequence || []);
     clearSelection();
     createBoard();
     renderMoveLog();
+    updateSideButtons();
     updateStatus();
 }
 
@@ -1073,15 +1174,15 @@ function finalizeMove() {
 
     statusMessage = isInCheck(board, currentPlayer)
         ? `${colorName(currentPlayer)}\u88ab\u5c07\u8ecd\u3002`
-        : currentPlayer === HUMAN_COLOR
-            ? '\u4f60\u57f7\u7d05\u65b9\uff0c\u96fb\u8166\u57f7\u9ed1\u65b9\u3002'
-            : '\u9ed1\u65b9\u6b63\u5728\u627e\u6b65\u3002';
+        : currentPlayer === humanColor
+            ? getStartStatusMessage()
+            : `${colorName(computerColor)}\u6b63\u5728\u627e\u6b65\u3002`;
 
     createBoard();
     renderMoveLog();
     updateStatus();
 
-    if (gameActive && currentPlayer === AI_COLOR) {
+    if (gameActive && currentPlayer === computerColor) {
         aiThinking = true;
         updateStatus();
         if (typeof window !== 'undefined') {
@@ -1093,6 +1194,7 @@ function finalizeMove() {
 function performMove(move) {
     moveHistory.push(snapshotState());
     appendMoveLog(formatMoveNotation(board, move), currentPlayer);
+    moveSequence.push(getMoveKey(move));
     board = applyMoveToBoard(board, move);
     lastMove = move;
     currentPlayer = otherColor(currentPlayer);
@@ -1101,13 +1203,13 @@ function performMove(move) {
 }
 
 function handleCellClick(row, col) {
-    if (!gameActive || aiThinking || currentPlayer !== HUMAN_COLOR) {
+    if (!gameActive || aiThinking || currentPlayer !== humanColor) {
         return;
     }
 
     const piece = board[row][col];
     if (!selectedCell) {
-        if (piece && piece[0] === HUMAN_COLOR) {
+        if (piece && piece[0] === humanColor) {
             selectPiece(row, col);
         }
         return;
@@ -1119,7 +1221,7 @@ function handleCellClick(row, col) {
         return;
     }
 
-    if (piece && piece[0] === HUMAN_COLOR) {
+    if (piece && piece[0] === humanColor) {
         selectPiece(row, col);
         return;
     }
@@ -1129,13 +1231,13 @@ function handleCellClick(row, col) {
 }
 
 function computerMove() {
-    if (!gameActive || currentPlayer !== AI_COLOR) {
+    if (!gameActive || currentPlayer !== computerColor) {
         aiThinking = false;
         updateStatus();
         return;
     }
 
-    const move = chooseComputerMove(board, AI_COLOR);
+    const move = chooseComputerMove(board, computerColor, moveSequence);
     aiThinking = false;
 
     if (!move) {
@@ -1151,7 +1253,7 @@ function undoMove() {
         return;
     }
 
-    let steps = currentPlayer === HUMAN_COLOR ? 2 : 1;
+    let steps = currentPlayer === humanColor ? 2 : 1;
     steps = Math.min(steps, moveHistory.length);
 
     let snapshot = null;
@@ -1165,9 +1267,19 @@ function undoMove() {
     }
 }
 
+function setHumanSide(color) {
+    if (color !== RED_COLOR && color !== BLACK_COLOR) {
+        return;
+    }
+
+    humanColor = color;
+    computerColor = otherColor(color);
+    resetGame();
+}
+
 function resetGame() {
     board = cloneBoard(initialBoard);
-    currentPlayer = HUMAN_COLOR;
+    currentPlayer = RED_COLOR;
     selectedCell = null;
     validMoves = [];
     lastMove = null;
@@ -1175,22 +1287,31 @@ function resetGame() {
     aiThinking = false;
     moveHistory = [];
     moveLog = [];
-    statusMessage = '\u4f60\u57f7\u7d05\u65b9\uff0c\u96fb\u8166\u57f7\u9ed1\u65b9\u3002';
+    moveSequence = [];
+    statusMessage = getStartStatusMessage();
     createBoard();
     renderMoveLog();
+    updateSideButtons();
     updateStatus();
+
+    if (currentPlayer === computerColor && typeof window !== 'undefined') {
+        aiThinking = true;
+        updateStatus();
+        window.setTimeout(computerMove, 100);
+    }
 }
 
 if (typeof window !== 'undefined') {
     window.resetGame = resetGame;
     window.undoMove = undoMove;
+    window.setHumanSide = setHumanSide;
     resetGame();
 }
 
 if (typeof module !== 'undefined') {
     module.exports = {
-        AI_COLOR,
-        HUMAN_COLOR,
+        BLACK_COLOR,
+        RED_COLOR,
         initialBoard,
         applyMoveToBoard,
         chooseComputerMove,
@@ -1198,7 +1319,9 @@ if (typeof module !== 'undefined') {
         createMove,
         evaluateBoard,
         findGeneral,
+        findOpeningBookMove,
         formatMoveNotation,
+        getMoveKey,
         getAllLegalMoves,
         getGameState,
         getLegalMovesForPiece,
@@ -1206,6 +1329,7 @@ if (typeof module !== 'undefined') {
         isInCheck,
         otherColor,
         countAttackersOnSquare,
+        setHumanSide,
         undoMove
     };
 }

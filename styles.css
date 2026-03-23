@@ -58,6 +58,36 @@ h1 {
     font-size: 15px;
 }
 
+.side-picker {
+    display: inline-flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(120, 53, 15, 0.08);
+}
+
+.side-button {
+    padding: 9px 16px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #7c2d12;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: none;
+}
+
+.side-button:hover {
+    background: rgba(120, 53, 15, 0.12);
+}
+
+.side-button.active {
+    background: #9a3412;
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(122, 45, 18, 0.18);
+}
+
 .board {
     width: min(100%, 640px);
     aspect-ratio: 9 / 10;
