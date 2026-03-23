@@ -1076,11 +1076,13 @@ function getOpeningMoveBonus(move) {
     }
 
     if (move.piece[1] === 'R' && move.fromRow === homeRow && move.fromRow === move.toRow) {
-        bonus += 18;
+        bonus += 28;
     }
 
     if (move.piece[1] === 'C' && move.fromRow === cannonRow && move.fromRow === move.toRow) {
-        bonus += 14;
+        if (move.toCol === 4) {
+            bonus += 20;
+        }
     }
 
     if ((move.piece[1] === 'A' || move.piece[1] === 'E') && moveSequence.length <= 4) {
@@ -1148,6 +1150,40 @@ function getHorseRetreatPenalty(move) {
     return penalty;
 }
 
+function getCannonTempoPenalty(activeBoard, historySequence, move, color) {
+    if (move.piece[1] !== 'C' || move.captured) {
+        return 0;
+    }
+
+    const plyCount = historySequence?.length || moveSequence.length;
+    if (plyCount > 18) {
+        return 0;
+    }
+
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    const baseRow = color === RED_COLOR ? 7 : 2;
+    const retreating = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+    let penalty = 0;
+
+    if (move.fromRow === baseRow && move.toRow !== baseRow) {
+        penalty += 18 + undevelopedMajors * 8;
+    }
+
+    if (move.toRow === baseRow && move.fromRow !== baseRow) {
+        penalty += 26 + undevelopedMajors * 10;
+    }
+
+    if (move.fromRow === move.toRow && move.toCol !== 4) {
+        penalty += 12 + undevelopedMajors * 6;
+    }
+
+    if (retreating) {
+        penalty += 18;
+    }
+
+    return penalty;
+}
+
 function countUndevelopedMajors(activeBoard, color) {
     const homeRow = color === RED_COLOR ? 9 : 0;
     let count = 0;
@@ -1209,12 +1245,16 @@ function getRepeatedPieceTempoPenalty(activeBoard, historySequence, move, color)
         return 0;
     }
 
-    const lastSideMove = parseMoveKey(sideMoves[sideMoves.length - 1]);
-    if (lastSideMove.toRow !== move.fromRow || lastSideMove.toCol !== move.fromCol) {
+    const recentMatches = sideMoves
+        .slice(-3)
+        .map(parseMoveKey)
+        .filter(lastMove => lastMove.toRow === move.fromRow && lastMove.toCol === move.fromCol);
+
+    if (recentMatches.length === 0) {
         return 0;
     }
 
-    let penalty = 22;
+    let penalty = 18 + recentMatches.length * 10;
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
     penalty += undevelopedMajors * 10;
 
@@ -1298,6 +1338,7 @@ function scoreMove(activeBoard, move, ttMove, historySequence = moveSequence) {
     score += getCaptureUrgencyBonus(move);
     score -= getRecentMovePenalty(historySequence, move, move.piece[0]);
     score -= getHorseRetreatPenalty(move);
+    score -= getCannonTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getOpeningTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getRepeatedPieceTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getCannonShufflePenalty(historySequence, move, move.piece[0]);
