@@ -126,6 +126,15 @@ const PIECE_VALUES = {
     S: 110
 };
 
+const PHASED_PIECE_VALUES = {
+    R: { opening: 940, endgame: 900 },
+    H: { opening: 410, endgame: 470 },
+    E: { opening: 230, endgame: 200 },
+    A: { opening: 230, endgame: 205 },
+    C: { opening: 500, endgame: 390 },
+    S: { opening: 100, endgame: 150 }
+};
+
 const MOBILITY_WEIGHTS = {
     R: 5,
     H: 8,
@@ -835,6 +844,20 @@ function getOpeningPhase(counts) {
     return Math.max(0, Math.min(1, force / 26));
 }
 
+function getPieceValueByPhase(type, openingPhase) {
+    if (type === 'G') {
+        return PIECE_VALUES.G;
+    }
+
+    const phased = PHASED_PIECE_VALUES[type];
+    if (!phased) {
+        return PIECE_VALUES[type];
+    }
+
+    const value = phased.endgame + (phased.opening - phased.endgame) * openingPhase;
+    return Math.round(value);
+}
+
 function evaluateGeneralSafety(activeBoard, color, counts, openingPhase) {
     const general = findGeneral(activeBoard, color);
     if (!general) {
@@ -939,7 +962,7 @@ function evaluateBoard(activeBoard) {
                 continue;
             }
 
-            const baseScore = PIECE_VALUES[piece[1]] + getPositionBonus(piece, row, col);
+            const baseScore = getPieceValueByPhase(piece[1], openingPhase) + getPositionBonus(piece, row, col);
             const mobility = getPseudoMoves(activeBoard, row, col).length * MOBILITY_WEIGHTS[piece[1]];
             const sign = piece[0] === computerColor ? 1 : -1;
 
@@ -1126,6 +1149,43 @@ function getOpeningTempoPenalty(activeBoard, historySequence, move, color) {
     return 0;
 }
 
+function getRepeatedPieceTempoPenalty(activeBoard, historySequence, move, color) {
+    const plyCount = historySequence?.length || moveSequence.length;
+    if (plyCount > 20 || move.captured) {
+        return 0;
+    }
+
+    const isRedTurn = color === RED_COLOR;
+    const sideMoves = historySequence?.filter((_, index) => (index % 2 === 0) === isRedTurn) || [];
+    if (sideMoves.length === 0) {
+        return 0;
+    }
+
+    const lastSideMove = parseMoveKey(sideMoves[sideMoves.length - 1]);
+    if (lastSideMove.toRow !== move.fromRow || lastSideMove.toCol !== move.fromCol) {
+        return 0;
+    }
+
+    let penalty = 22;
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    penalty += undevelopedMajors * 10;
+
+    if (move.piece[1] === 'R' || move.piece[1] === 'H' || move.piece[1] === 'C') {
+        penalty += 18;
+    }
+
+    if (move.fromRow === move.toRow || move.fromCol === move.toCol) {
+        penalty += 8;
+    }
+
+    const retreating = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+    if (retreating) {
+        penalty += 14;
+    }
+
+    return penalty;
+}
+
 function getCannonShufflePenalty(historySequence, move, color) {
     if (move.piece[1] !== 'C' || move.captured || move.fromRow !== move.toRow) {
         return 0;
@@ -1191,6 +1251,7 @@ function scoreMove(activeBoard, move, ttMove, historySequence = moveSequence) {
     score -= getRecentMovePenalty(historySequence, move, move.piece[0]);
     score -= getHorseRetreatPenalty(move);
     score -= getOpeningTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
+    score -= getRepeatedPieceTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getCannonShufflePenalty(historySequence, move, move.piece[0]);
     return score;
 }
