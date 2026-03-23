@@ -977,6 +977,8 @@ function evaluateDevelopment(activeBoard, color, openingPhase) {
             if (piece[1] === 'C') {
                 const deepRaid = color === RED_COLOR ? row <= 3 : row >= 6;
                 const crossedRiver = color === RED_COLOR ? row <= 4 : row >= 5;
+                const enemyHomeRow = color === RED_COLOR ? 0 : 9;
+                const wingRaid = col <= 1 || col >= 7;
 
                 if (crossedRiver) {
                     score -= Math.round(6 + openingPhase * 8);
@@ -984,6 +986,14 @@ function evaluateDevelopment(activeBoard, color, openingPhase) {
 
                 if (deepRaid) {
                     score -= Math.round(20 + openingPhase * 18 + undevelopedMajors * 8);
+                }
+
+                if (wingRaid && deepRaid) {
+                    score -= Math.round(10 + openingPhase * 14 + undevelopedMajors * 6);
+                }
+
+                if (row === enemyHomeRow && wingRaid) {
+                    score -= Math.round(18 + openingPhase * 18 + undevelopedMajors * 10);
                 }
 
                 if (undevelopedMajors >= 2 && row !== (color === RED_COLOR ? 7 : 2) && col !== 4) {
@@ -1184,6 +1194,47 @@ function getCannonTempoPenalty(activeBoard, historySequence, move, color) {
     return penalty;
 }
 
+function getPrematureCannonRaidPenalty(activeBoard, historySequence, move, color) {
+    if (move.piece[1] !== 'C' || !move.captured) {
+        return 0;
+    }
+
+    const plyCount = historySequence?.length || moveSequence.length;
+    if (plyCount > 16) {
+        return 0;
+    }
+
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    const enemyColor = otherColor(color);
+    const enemyHomeRow = enemyColor === RED_COLOR ? 9 : 0;
+    const deepRaid = color === RED_COLOR ? move.toRow <= 3 : move.toRow >= 6;
+    const wingRaid = move.toCol <= 1 || move.toCol >= 7;
+    let penalty = 0;
+
+    if (deepRaid) {
+        penalty += 38 + undevelopedMajors * 14;
+    }
+
+    if (wingRaid) {
+        penalty += 24 + undevelopedMajors * 10;
+    }
+
+    if (move.captured[1] === 'H') {
+        penalty += 34 + undevelopedMajors * 8;
+    }
+
+    if (move.toRow === enemyHomeRow && wingRaid) {
+        penalty += 34;
+
+        const cornerCol = move.toCol <= 1 ? 0 : 8;
+        if (activeBoard[enemyHomeRow][cornerCol] === `${enemyColor}R`) {
+            penalty += 42;
+        }
+    }
+
+    return penalty;
+}
+
 function countUndevelopedMajors(activeBoard, color) {
     const homeRow = color === RED_COLOR ? 9 : 0;
     let count = 0;
@@ -1339,6 +1390,7 @@ function scoreMove(activeBoard, move, ttMove, historySequence = moveSequence) {
     score -= getRecentMovePenalty(historySequence, move, move.piece[0]);
     score -= getHorseRetreatPenalty(move);
     score -= getCannonTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
+    score -= getPrematureCannonRaidPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getOpeningTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getRepeatedPieceTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
     score -= getCannonShufflePenalty(historySequence, move, move.piece[0]);
