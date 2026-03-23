@@ -1,17 +1,8 @@
 const HUMAN_COLOR = 'r';
 const AI_COLOR = 'b';
 const MATE_SCORE = 900000;
-const SEARCH_ABORT = Symbol('search-abort');
-
-const AI_SETTINGS = {
-    busyTimeMs: 220,
-    normalTimeMs: 320,
-    endgameTimeMs: 450,
-    minDepth: 2,
-    normalMaxDepth: 5,
-    endgameMaxDepth: 6,
-    quiescenceDepth: 3
-};
+const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
+const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 const PIECE_LABELS = {
     rR: '\u8eca',
@@ -73,6 +64,8 @@ let lastMove = null;
 let gameActive = true;
 let aiThinking = false;
 let statusMessage = '\u4f60\u57f7\u7d05\u65b9\uff0c\u96fb\u8166\u57f7\u9ed1\u65b9\u3002';
+let moveHistory = [];
+let moveLog = [];
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -101,8 +94,30 @@ function hasCrossedRiver(color, row) {
     return color === 'r' ? row <= 4 : row >= 5;
 }
 
-function getNow() {
-    return typeof performance !== 'undefined' ? performance.now() : Date.now();
+function countPieces(activeBoard) {
+    let count = 0;
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            if (activeBoard[row][col]) {
+                count++;
+            }
+        }
+    }
+
+    return count;
+}
+
+function cloneMoveLog(entries) {
+    return entries.map(entry => ({ ...entry }));
+}
+
+function getFileNumber(col) {
+    return 9 - col;
+}
+
+function formatNumber(color, value) {
+    return (color === 'r' ? RED_NUMERALS : BLACK_NUMERALS)[value];
 }
 
 function sameMove(left, right) {
@@ -111,12 +126,6 @@ function sameMove(left, right) {
         left.fromCol === right.fromCol &&
         left.toRow === right.toRow &&
         left.toCol === right.toCol;
-}
-
-function serializeBoard(activeBoard) {
-    return activeBoard
-        .map(row => row.map(cell => cell || '__').join(''))
-        .join('/');
 }
 
 function createMove(activeBoard, fromRow, fromCol, toRow, toCol) {
@@ -452,6 +461,28 @@ function isSquareAttacked(activeBoard, row, col, attackerColor) {
     return false;
 }
 
+function countAttackersOnSquare(activeBoard, row, col, attackerColor) {
+    let count = 0;
+    let leastValue = Infinity;
+
+    for (let scanRow = 0; scanRow < 10; scanRow++) {
+        for (let scanCol = 0; scanCol < 9; scanCol++) {
+            const piece = activeBoard[scanRow][scanCol];
+            if (piece && piece[0] === attackerColor) {
+                if (pieceThreatensSquare(activeBoard, scanRow, scanCol, row, col)) {
+                    count++;
+                    leastValue = Math.min(leastValue, PIECE_VALUES[piece[1]]);
+                }
+            }
+        }
+    }
+
+    return {
+        count,
+        leastValue: count > 0 ? leastValue : 0
+    };
+}
+
 function isInCheck(activeBoard, color) {
     const general = findGeneral(activeBoard, color);
     if (!general) {
@@ -576,11 +607,6 @@ function evaluateForColor(activeBoard, color) {
     return color === AI_COLOR ? score : -score;
 }
 
-function moveCausesCheck(activeBoard, move) {
-    const nextBoard = applyMoveToBoard(activeBoard, move);
-    return isInCheck(nextBoard, otherColor(move.piece[0]));
-}
-
 function scoreMove(activeBoard, move, ttMove) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -596,10 +622,6 @@ function scoreMove(activeBoard, move, ttMove) {
     if (move.piece[1] === 'S') {
         score += 12;
     }
-    if (moveCausesCheck(activeBoard, move)) {
-        score += 80;
-    }
-
     score += Math.max(0, 5 - Math.abs(4 - move.toCol)) * 6;
     return score;
 }
@@ -610,80 +632,7 @@ function orderMoves(activeBoard, moves, ttMove) {
         .sort((left, right) => scoreMove(activeBoard, right, ttMove) - scoreMove(activeBoard, left, ttMove));
 }
 
-function checkDeadline(deadline) {
-    if (getNow() > deadline) {
-        throw SEARCH_ABORT;
-    }
-}
-
-function getTranspositionEntry(transpositionTable, activeBoard, color) {
-    return transpositionTable.get(`${serializeBoard(activeBoard)}|${color}`);
-}
-
-function setTranspositionEntry(transpositionTable, activeBoard, color, entry) {
-    transpositionTable.set(`${serializeBoard(activeBoard)}|${color}`, entry);
-}
-
-function quiescenceSearch(activeBoard, color, alpha, beta, deadline, transpositionTable, depthLeft) {
-    checkDeadline(deadline);
-
-    let standPat = evaluateForColor(activeBoard, color);
-    const cached = getTranspositionEntry(transpositionTable, activeBoard, `${color}-q-${depthLeft}`);
-    if (cached && cached.depth >= depthLeft) {
-        standPat = cached.score;
-    }
-
-    if (standPat >= beta) {
-        return { score: standPat };
-    }
-
-    if (alpha < standPat) {
-        alpha = standPat;
-    }
-
-    if (depthLeft <= 0) {
-        return { score: standPat };
-    }
-
-    const tacticalMoves = orderMoves(activeBoard, getCapturingMoves(activeBoard, color));
-    let bestScore = standPat;
-
-    for (const move of tacticalMoves) {
-        const nextBoard = applyMoveToBoard(activeBoard, move);
-        const result = quiescenceSearch(
-            nextBoard,
-            otherColor(color),
-            -beta,
-            -alpha,
-            deadline,
-            transpositionTable,
-            depthLeft - 1
-        );
-        const score = -result.score;
-
-        if (score > bestScore) {
-            bestScore = score;
-        }
-        if (score > alpha) {
-            alpha = score;
-        }
-        if (alpha >= beta) {
-            break;
-        }
-    }
-
-    setTranspositionEntry(transpositionTable, activeBoard, `${color}-q-${depthLeft}`, {
-        depth: depthLeft,
-        score: bestScore,
-        flag: 'exact'
-    });
-
-    return { score: bestScore };
-}
-
-function negamax(activeBoard, color, depth, alpha, beta, deadline, transpositionTable) {
-    checkDeadline(deadline);
-
+function negamax(activeBoard, color, depth, alpha, beta) {
     const redGeneral = findGeneral(activeBoard, HUMAN_COLOR);
     const blackGeneral = findGeneral(activeBoard, AI_COLOR);
     if (!redGeneral) {
@@ -693,53 +642,31 @@ function negamax(activeBoard, color, depth, alpha, beta, deadline, transposition
         return { score: color === HUMAN_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
     }
 
-    const alphaOriginal = alpha;
-    const transposition = getTranspositionEntry(transpositionTable, activeBoard, color);
-    if (transposition && transposition.depth >= depth) {
-        if (transposition.flag === 'exact') {
-            return { score: transposition.score, bestMove: transposition.bestMove };
-        }
-        if (transposition.flag === 'lower') {
-            alpha = Math.max(alpha, transposition.score);
-        } else if (transposition.flag === 'upper') {
-            beta = Math.min(beta, transposition.score);
-        }
-        if (alpha >= beta) {
-            return { score: transposition.score, bestMove: transposition.bestMove };
-        }
-    }
-
     if (depth === 0) {
-        return quiescenceSearch(
-            activeBoard,
-            color,
-            alpha,
-            beta,
-            deadline,
-            transpositionTable,
-            AI_SETTINGS.quiescenceDepth
-        );
+        return { score: evaluateForColor(activeBoard, color) };
     }
 
-    const legalMoves = orderMoves(activeBoard, getAllLegalMoves(activeBoard, color), transposition?.bestMove);
+    const legalMoves = orderMoves(activeBoard, getAllLegalMoves(activeBoard, color));
     if (legalMoves.length === 0) {
         return { score: isInCheck(activeBoard, color) ? -MATE_SCORE - depth : -3000 - depth };
     }
 
-    let bestMove = legalMoves[0];
+    const pieceCount = countPieces(activeBoard);
+    let moveLimit = legalMoves.length;
+
+    if (pieceCount >= 24) {
+        moveLimit = depth >= 2 ? 14 : 18;
+    } else if (pieceCount >= 16) {
+        moveLimit = depth >= 3 ? 16 : legalMoves.length;
+    }
+
+    const candidateMoves = legalMoves.slice(0, moveLimit);
+    let bestMove = candidateMoves[0];
     let bestScore = -Infinity;
 
-    for (const move of legalMoves) {
+    for (const move of candidateMoves) {
         const nextBoard = applyMoveToBoard(activeBoard, move);
-        const result = negamax(
-            nextBoard,
-            otherColor(color),
-            depth - 1,
-            -beta,
-            -alpha,
-            deadline,
-            transpositionTable
-        );
+        const result = negamax(nextBoard, otherColor(color), depth - 1, -beta, -alpha);
         const score = -result.score;
 
         if (score > bestScore) {
@@ -754,44 +681,29 @@ function negamax(activeBoard, color, depth, alpha, beta, deadline, transposition
         }
     }
 
-    let flag = 'exact';
-    if (bestScore <= alphaOriginal) {
-        flag = 'upper';
-    } else if (bestScore >= beta) {
-        flag = 'lower';
-    }
-
-    setTranspositionEntry(transpositionTable, activeBoard, color, {
-        depth,
-        score: bestScore,
-        bestMove,
-        flag
-    });
-
     return { score: bestScore, bestMove };
 }
 
-function chooseSearchProfile(activeBoard, legalMoves) {
-    const pieceCount = activeBoard.flat().filter(Boolean).length;
-
-    if (legalMoves.length > 30) {
-        return {
-            timeLimitMs: AI_SETTINGS.busyTimeMs,
-            maxDepth: 4
-        };
-    }
+function chooseSearchDepth(activeBoard, legalMoves) {
+    const pieceCount = countPieces(activeBoard);
 
     if (pieceCount <= 12) {
-        return {
-            timeLimitMs: AI_SETTINGS.endgameTimeMs,
-            maxDepth: AI_SETTINGS.endgameMaxDepth
-        };
+        return 4;
     }
 
-    return {
-        timeLimitMs: AI_SETTINGS.normalTimeMs,
-        maxDepth: AI_SETTINGS.normalMaxDepth
-    };
+    if (legalMoves.length >= 36 && pieceCount >= 24) {
+        return 2;
+    }
+
+    if (pieceCount <= 22) {
+        return 4;
+    }
+
+    if (pieceCount <= 28) {
+        return 3;
+    }
+
+    return 3;
 }
 
 function chooseComputerMove(activeBoard, color = AI_COLOR) {
@@ -800,39 +712,87 @@ function chooseComputerMove(activeBoard, color = AI_COLOR) {
         return null;
     }
 
-    const searchProfile = chooseSearchProfile(activeBoard, legalMoves);
-    const deadline = getNow() + searchProfile.timeLimitMs;
-    const transpositionTable = new Map();
-    let bestMove = orderMoves(activeBoard, legalMoves)[0];
-    let bestScore = -Infinity;
+    const depth = chooseSearchDepth(activeBoard, legalMoves);
+    const result = negamax(activeBoard, color, depth, -Infinity, Infinity);
+    return result.bestMove || orderMoves(activeBoard, legalMoves)[0];
+}
 
-    for (let depth = AI_SETTINGS.minDepth; depth <= searchProfile.maxDepth; depth++) {
-        try {
-            const result = negamax(
-                activeBoard,
-                color,
-                depth,
-                -Infinity,
-                Infinity,
-                deadline,
-                transpositionTable
-            );
-            if (result.bestMove) {
-                bestMove = result.bestMove;
-                bestScore = result.score;
-            }
-            if (Math.abs(bestScore) >= MATE_SCORE - 1000) {
-                break;
-            }
-        } catch (error) {
-            if (error !== SEARCH_ABORT) {
-                throw error;
-            }
-            break;
+function getPiecePrefix(activeBoard, piece, row, col) {
+    const color = piece[0];
+    const peerRows = [];
+
+    for (let scanRow = 0; scanRow < 10; scanRow++) {
+        if (activeBoard[scanRow][col] === piece) {
+            peerRows.push(scanRow);
         }
     }
 
-    return bestMove;
+    if (peerRows.length <= 1) {
+        return '';
+    }
+
+    peerRows.sort((left, right) => color === 'r' ? left - right : right - left);
+    const index = peerRows.indexOf(row);
+
+    if (peerRows.length === 2) {
+        return index === 0 ? '\u524d' : '\u5f8c';
+    }
+
+    if (peerRows.length === 3) {
+        return ['\u524d', '\u4e2d', '\u5f8c'][index] || '';
+    }
+
+    return formatNumber(color, index + 1);
+}
+
+function getMoveAction(color, move) {
+    if (move.fromCol === move.toCol) {
+        const forward = color === 'r' ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+        return forward ? '\u9032' : '\u9000';
+    }
+
+    if (move.fromRow === move.toRow) {
+        return '\u5e73';
+    }
+
+    const forward = color === 'r' ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+    return forward ? '\u9032' : '\u9000';
+}
+
+function getMoveTarget(color, pieceType, move) {
+    if (move.fromRow === move.toRow || pieceType === 'H' || pieceType === 'E' || pieceType === 'A') {
+        return formatNumber(color, getFileNumber(move.toCol));
+    }
+
+    return formatNumber(color, Math.abs(move.toRow - move.fromRow));
+}
+
+function formatMoveNotation(activeBoard, move) {
+    const piece = move.piece;
+    const color = piece[0];
+    const pieceName = PIECE_LABELS[piece];
+    const prefix = getPiecePrefix(activeBoard, piece, move.fromRow, move.fromCol);
+    const source = prefix || `${pieceName}${formatNumber(color, getFileNumber(move.fromCol))}`;
+    const action = getMoveAction(color, move);
+    const target = getMoveTarget(color, piece[1], move);
+
+    return prefix
+        ? `${prefix}${pieceName}${action}${target}`
+        : `${source}${action}${target}`;
+}
+
+function appendMoveLog(notation, color) {
+    if (color === HUMAN_COLOR) {
+        moveLog.push({ red: notation, black: '' });
+        return;
+    }
+
+    if (moveLog.length === 0 || moveLog[moveLog.length - 1].black) {
+        moveLog.push({ red: '', black: notation });
+        return;
+    }
+
+    moveLog[moveLog.length - 1].black = notation;
 }
 
 function getGameState(activeBoard, sideToMove) {
@@ -999,6 +959,48 @@ function createBoard() {
     }
 }
 
+function renderMoveLog() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const moveLogElement = document.getElementById('move-log');
+    if (!moveLogElement) {
+        return;
+    }
+
+    if (moveLog.length === 0) {
+        moveLogElement.innerHTML = '<div class="move-log-empty">\u5c0d\u5c40\u5c1a\u672a\u958b\u59cb\u8a18\u8b5c\u3002</div>';
+        return;
+    }
+
+    moveLogElement.innerHTML = '';
+
+    moveLog.forEach((entry, index) => {
+        const rowElement = document.createElement('div');
+        rowElement.className = 'move-row';
+
+        const indexElement = document.createElement('div');
+        indexElement.className = 'move-index';
+        indexElement.textContent = `${index + 1}.`;
+
+        const redElement = document.createElement('div');
+        redElement.className = `move-entry${entry.red ? '' : ' empty'}`;
+        redElement.textContent = entry.red || '--';
+
+        const blackElement = document.createElement('div');
+        blackElement.className = `move-entry${entry.black ? '' : ' empty'}`;
+        blackElement.textContent = entry.black || '--';
+
+        rowElement.appendChild(indexElement);
+        rowElement.appendChild(redElement);
+        rowElement.appendChild(blackElement);
+        moveLogElement.appendChild(rowElement);
+    });
+
+    moveLogElement.scrollTop = moveLogElement.scrollHeight;
+}
+
 function clearSelection() {
     selectedCell = null;
     validMoves = [];
@@ -1008,6 +1010,32 @@ function selectPiece(row, col) {
     selectedCell = { row, col };
     validMoves = getLegalMovesForPiece(board, row, col);
     createBoard();
+}
+
+function snapshotState() {
+    return {
+        board: cloneBoard(board),
+        currentPlayer,
+        lastMove: lastMove ? { ...lastMove } : null,
+        gameActive,
+        aiThinking,
+        statusMessage,
+        moveLog: cloneMoveLog(moveLog)
+    };
+}
+
+function restoreState(snapshot) {
+    board = cloneBoard(snapshot.board);
+    currentPlayer = snapshot.currentPlayer;
+    lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
+    gameActive = snapshot.gameActive;
+    aiThinking = snapshot.aiThinking;
+    statusMessage = snapshot.statusMessage;
+    moveLog = cloneMoveLog(snapshot.moveLog || []);
+    clearSelection();
+    createBoard();
+    renderMoveLog();
+    updateStatus();
 }
 
 function updateStatus() {
@@ -1035,6 +1063,7 @@ function finalizeMove() {
         aiThinking = false;
         statusMessage = gameState.message;
         createBoard();
+        renderMoveLog();
         updateStatus();
         if (typeof window !== 'undefined') {
             window.setTimeout(() => window.alert(gameState.message), 20);
@@ -1049,6 +1078,7 @@ function finalizeMove() {
             : '\u9ed1\u65b9\u6b63\u5728\u627e\u6b65\u3002';
 
     createBoard();
+    renderMoveLog();
     updateStatus();
 
     if (gameActive && currentPlayer === AI_COLOR) {
@@ -1061,6 +1091,8 @@ function finalizeMove() {
 }
 
 function performMove(move) {
+    moveHistory.push(snapshotState());
+    appendMoveLog(formatMoveNotation(board, move), currentPlayer);
     board = applyMoveToBoard(board, move);
     lastMove = move;
     currentPlayer = otherColor(currentPlayer);
@@ -1114,6 +1146,25 @@ function computerMove() {
     performMove(move);
 }
 
+function undoMove() {
+    if (aiThinking || moveHistory.length === 0) {
+        return;
+    }
+
+    let steps = currentPlayer === HUMAN_COLOR ? 2 : 1;
+    steps = Math.min(steps, moveHistory.length);
+
+    let snapshot = null;
+    while (steps > 0) {
+        snapshot = moveHistory.pop();
+        steps--;
+    }
+
+    if (snapshot) {
+        restoreState(snapshot);
+    }
+}
+
 function resetGame() {
     board = cloneBoard(initialBoard);
     currentPlayer = HUMAN_COLOR;
@@ -1122,13 +1173,17 @@ function resetGame() {
     lastMove = null;
     gameActive = true;
     aiThinking = false;
+    moveHistory = [];
+    moveLog = [];
     statusMessage = '\u4f60\u57f7\u7d05\u65b9\uff0c\u96fb\u8166\u57f7\u9ed1\u65b9\u3002';
     createBoard();
+    renderMoveLog();
     updateStatus();
 }
 
 if (typeof window !== 'undefined') {
     window.resetGame = resetGame;
+    window.undoMove = undoMove;
     resetGame();
 }
 
@@ -1143,11 +1198,14 @@ if (typeof module !== 'undefined') {
         createMove,
         evaluateBoard,
         findGeneral,
+        formatMoveNotation,
         getAllLegalMoves,
         getGameState,
         getLegalMovesForPiece,
         hasCrossedRiver,
         isInCheck,
-        otherColor
+        otherColor,
+        countAttackersOnSquare,
+        undoMove
     };
 }

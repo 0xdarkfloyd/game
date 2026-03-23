@@ -9,12 +9,23 @@
 <body>
     <div class="game-container">
         <h1>&#20013;&#22283;&#35937;&#26827;</h1>
-        <div class="info-panel">
-            <div id="turn" class="turn-label"></div>
-            <div id="status" class="status-label"></div>
+        <div class="game-layout">
+            <section class="board-column">
+                <div class="info-panel">
+                    <div id="turn" class="turn-label"></div>
+                    <div id="status" class="status-label"></div>
+                </div>
+                <div id="board" class="board" aria-label="Xiangqi board"></div>
+                <div class="action-row">
+                    <button type="button" class="secondary-button" onclick="undoMove()">&#24724;&#26827;</button>
+                    <button type="button" onclick="resetGame()">&#37325;&#26032;&#38283;&#22987;</button>
+                </div>
+            </section>
+            <aside class="history-panel" aria-label="Move log">
+                <h2 class="history-title">&#26827;&#35676;</h2>
+                <div id="move-log" class="move-log"></div>
+            </aside>
         </div>
-        <div id="board" class="board" aria-label="Xiangqi board"></div>
-        <button type="button" onclick="resetGame()">&#37325;&#26032;&#38283;&#22987;</button>
     </div>
     <script src="game.js"></script>
 </body>
