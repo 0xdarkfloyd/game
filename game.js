@@ -362,7 +362,11 @@ function getAiWorker() {
     }
 
     if (!aiWorker) {
-        aiWorker = new Worker('ai-worker.js');
+        try {
+            aiWorker = new Worker('ai-worker.js');
+        } catch (error) {
+            aiWorker = null;
+        }
     }
 
     return aiWorker;
@@ -375,7 +379,9 @@ function requestComputerMove(activeBoard, color, historySequence, positionKeys) 
         || null;
 
     if (!worker) {
-        return Promise.resolve(chooseComputerMove(activeBoard, color, historySequence, positionKeys));
+        return new Promise(resolve => {
+            window.setTimeout(() => resolve(fallbackMove), 0);
+        });
     }
 
     const requestId = ++aiWorkerRequestId;
@@ -418,15 +424,20 @@ function requestComputerMove(activeBoard, color, historySequence, positionKeys) 
         timeoutId = window.setTimeout(() => {
             stopAiWorker();
             finish(null);
-        }, 1500);
+        }, 1000);
 
-        worker.postMessage({
-            requestId,
-            board: activeBoard,
-            color,
-            historySequence,
-            positionKeys
-        });
+        try {
+            worker.postMessage({
+                requestId,
+                board: activeBoard,
+                color,
+                historySequence,
+                positionKeys
+            });
+        } catch (error) {
+            stopAiWorker();
+            finish(null);
+        }
     });
 }
 
@@ -2428,6 +2439,14 @@ function computerMove() {
             }
 
             performMove(move);
+        })
+        .catch(() => {
+            if (turnToken !== aiTurnToken) {
+                return;
+            }
+
+            aiThinking = false;
+            updateStatus();
         });
 }
 
