@@ -1,6 +1,9 @@
 const RED_COLOR = 'r';
 const BLACK_COLOR = 'b';
 const MATE_SCORE = 900000;
+const QUIESCENCE_DEPTH = 3;
+const AI_THINK_DELAY_MS = 260;
+const MOVE_ANIMATION_MS = 220;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -22,6 +25,10 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53527\u90321' }
     ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,4-5,4`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
     [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
         { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' }
@@ -29,6 +36,10 @@ const OPENING_BOOK = {
     [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,1-7,2`]: [
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
         { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53523\u90321' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/6,4-5,4`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' }
     ],
     [`${BLACK_COLOR}|9,7-7,6`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u8d77\u99ac\u5c0d\u5c4f\u98a8\u99ac' },
@@ -109,6 +120,9 @@ let statusMessage = '';
 let moveHistory = [];
 let moveLog = [];
 let moveSequence = [];
+let pendingAnimatedMove = null;
+let audioContext = null;
+const transpositionTable = new Map();
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -192,6 +206,80 @@ function updateSideButtons() {
 
     redButton.classList.toggle('active', humanColor === RED_COLOR);
     blackButton.classList.toggle('active', humanColor === BLACK_COLOR);
+}
+
+function getBoardKey(activeBoard, color) {
+    return `${color}|${activeBoard.map(row => row.map(cell => cell || '__').join('')).join('/')}`;
+}
+
+function getPieceTransform(shiftX = 0, shiftY = 0) {
+    const translate = `translate(calc(-50% + ${shiftX}px), calc(-50% + ${shiftY}px))`;
+    return humanColor === BLACK_COLOR ? `${translate} rotate(180deg)` : translate;
+}
+
+function ensureAudioContext() {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) {
+        return null;
+    }
+
+    if (!audioContext) {
+        audioContext = new AudioCtor();
+    }
+
+    if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+    }
+
+    return audioContext;
+}
+
+function playTone(frequency, duration, type, gainValue, startAt = 0) {
+    const context = ensureAudioContext();
+    if (!context) {
+        return;
+    }
+
+    const now = context.currentTime + startAt;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.02);
+}
+
+function playMoveSound(move) {
+    if (move.captured) {
+        playTone(196, 0.14, 'triangle', 0.07);
+        playTone(156, 0.18, 'square', 0.035, 0.03);
+        return;
+    }
+
+    playTone(330, 0.08, 'triangle', 0.05);
+    playTone(440, 0.06, 'sine', 0.02, 0.04);
+}
+
+function playCheckSound() {
+    playTone(587, 0.12, 'sawtooth', 0.045);
+    playTone(784, 0.18, 'triangle', 0.03, 0.05);
+}
+
+function playWinSound() {
+    playTone(523, 0.12, 'triangle', 0.04);
+    playTone(659, 0.14, 'triangle', 0.04, 0.08);
+    playTone(784, 0.22, 'triangle', 0.05, 0.16);
 }
 
 function sameMove(left, right) {
@@ -681,6 +769,26 @@ function evaluateForColor(activeBoard, color) {
     return color === computerColor ? score : -score;
 }
 
+function getSearchMoveLimit(pieceCount, depth, tacticalOnly = false) {
+    if (tacticalOnly) {
+        return pieceCount >= 24 ? 10 : 14;
+    }
+
+    if (pieceCount >= 28) {
+        return depth >= 3 ? 12 : 16;
+    }
+
+    if (pieceCount >= 22) {
+        return depth >= 4 ? 14 : 18;
+    }
+
+    if (pieceCount >= 16) {
+        return depth >= 4 ? 16 : 22;
+    }
+
+    return 28;
+}
+
 function scoreMove(activeBoard, move, ttMove) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -725,7 +833,51 @@ function findOpeningBookMove(activeBoard, color, historySequence) {
     return null;
 }
 
+function quiescence(activeBoard, color, alpha, beta, depth) {
+    const standPat = evaluateForColor(activeBoard, color);
+    if (standPat >= beta || depth === 0) {
+        return { score: standPat };
+    }
+
+    if (standPat > alpha) {
+        alpha = standPat;
+    }
+
+    const inCheck = isInCheck(activeBoard, color);
+    const tacticalMoves = orderMoves(
+        activeBoard,
+        getAllLegalMoves(activeBoard, color).filter(move => inCheck || move.captured)
+    ).slice(0, getSearchMoveLimit(countPieces(activeBoard), depth, true));
+
+    if (tacticalMoves.length === 0) {
+        return {
+            score: inCheck ? -MATE_SCORE - depth : standPat
+        };
+    }
+
+    let bestScore = standPat;
+
+    for (const move of tacticalMoves) {
+        const nextBoard = applyMoveToBoard(activeBoard, move);
+        const result = quiescence(nextBoard, otherColor(color), -beta, -alpha, depth - 1);
+        const score = -result.score;
+
+        if (score > bestScore) {
+            bestScore = score;
+        }
+        if (score > alpha) {
+            alpha = score;
+        }
+        if (alpha >= beta) {
+            break;
+        }
+    }
+
+    return { score: bestScore };
+}
+
 function negamax(activeBoard, color, depth, alpha, beta) {
+    const originalAlpha = alpha;
     const redGeneral = findGeneral(activeBoard, RED_COLOR);
     const blackGeneral = findGeneral(activeBoard, BLACK_COLOR);
     if (!redGeneral) {
@@ -735,25 +887,33 @@ function negamax(activeBoard, color, depth, alpha, beta) {
         return { score: color === RED_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
     }
 
-    if (depth === 0) {
-        return { score: evaluateForColor(activeBoard, color) };
+    const ttKey = getBoardKey(activeBoard, color);
+    const cached = transpositionTable.get(ttKey);
+    if (cached && cached.depth >= depth) {
+        if (cached.flag === 'exact') {
+            return { score: cached.score, bestMove: cached.bestMove };
+        }
+        if (cached.flag === 'lower') {
+            alpha = Math.max(alpha, cached.score);
+        } else if (cached.flag === 'upper') {
+            beta = Math.min(beta, cached.score);
+        }
+        if (alpha >= beta) {
+            return { score: cached.score, bestMove: cached.bestMove };
+        }
     }
 
-    const legalMoves = orderMoves(activeBoard, getAllLegalMoves(activeBoard, color));
+    if (depth === 0) {
+        return quiescence(activeBoard, color, alpha, beta, QUIESCENCE_DEPTH);
+    }
+
+    const legalMoves = orderMoves(activeBoard, getAllLegalMoves(activeBoard, color), cached?.bestMove);
     if (legalMoves.length === 0) {
         return { score: isInCheck(activeBoard, color) ? -MATE_SCORE - depth : -3000 - depth };
     }
 
     const pieceCount = countPieces(activeBoard);
-    let moveLimit = legalMoves.length;
-
-    if (pieceCount >= 24) {
-        moveLimit = depth >= 2 ? 14 : 18;
-    } else if (pieceCount >= 16) {
-        moveLimit = depth >= 3 ? 16 : legalMoves.length;
-    }
-
-    const candidateMoves = legalMoves.slice(0, moveLimit);
+    const candidateMoves = legalMoves.slice(0, getSearchMoveLimit(pieceCount, depth));
     let bestMove = candidateMoves[0];
     let bestScore = -Infinity;
 
@@ -774,29 +934,35 @@ function negamax(activeBoard, color, depth, alpha, beta) {
         }
     }
 
+    let flag = 'exact';
+    if (bestScore <= originalAlpha) {
+        flag = 'upper';
+    } else if (bestScore >= beta) {
+        flag = 'lower';
+    }
+
+    transpositionTable.set(ttKey, {
+        depth,
+        score: bestScore,
+        bestMove,
+        flag
+    });
+
     return { score: bestScore, bestMove };
 }
 
 function chooseSearchDepth(activeBoard, legalMoves) {
     const pieceCount = countPieces(activeBoard);
 
-    if (pieceCount <= 12) {
-        return 4;
-    }
-
-    if (legalMoves.length >= 36 && pieceCount >= 24) {
-        return 2;
-    }
-
-    if (pieceCount <= 22) {
-        return 4;
-    }
-
-    if (pieceCount <= 28) {
+    if (pieceCount >= 28 || legalMoves.length >= 34) {
         return 3;
     }
 
-    return 3;
+    if (pieceCount >= 18) {
+        return 4;
+    }
+
+    return 5;
 }
 
 function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
@@ -808,6 +974,10 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
     const legalMoves = getAllLegalMoves(activeBoard, color);
     if (legalMoves.length === 0) {
         return null;
+    }
+
+    if (transpositionTable.size > 25000) {
+        transpositionTable.clear();
     }
 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
@@ -1056,6 +1226,47 @@ function createBoard() {
             gridElement.appendChild(cell);
         }
     }
+
+    animatePendingMove(boardElement);
+}
+
+function animatePendingMove(boardElement) {
+    if (typeof window === 'undefined' || !pendingAnimatedMove) {
+        return;
+    }
+
+    const move = pendingAnimatedMove;
+    pendingAnimatedMove = null;
+
+    const fromCell = boardElement.querySelector(`.cell[data-row="${move.fromRow}"][data-col="${move.fromCol}"]`);
+    const toCell = boardElement.querySelector(`.cell[data-row="${move.toRow}"][data-col="${move.toCol}"]`);
+    const pieceElement = toCell ? toCell.querySelector('.piece') : null;
+    if (!fromCell || !toCell || !pieceElement) {
+        playMoveSound(move);
+        return;
+    }
+
+    const fromRect = fromCell.getBoundingClientRect();
+    const toRect = toCell.getBoundingClientRect();
+    const shiftX = fromRect.left - toRect.left;
+    const shiftY = fromRect.top - toRect.top;
+
+    pieceElement.style.transition = 'none';
+    pieceElement.style.transform = getPieceTransform(shiftX, shiftY);
+    pieceElement.style.zIndex = '4';
+
+    window.requestAnimationFrame(() => {
+        pieceElement.style.transition = `transform ${MOVE_ANIMATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        pieceElement.style.transform = getPieceTransform();
+    });
+
+    playMoveSound(move);
+
+    window.setTimeout(() => {
+        pieceElement.style.transition = '';
+        pieceElement.style.transform = '';
+        pieceElement.style.zIndex = '';
+    }, MOVE_ANIMATION_MS + 40);
 }
 
 function renderMoveLog() {
@@ -1133,6 +1344,7 @@ function restoreState(snapshot) {
     statusMessage = snapshot.statusMessage;
     moveLog = cloneMoveLog(snapshot.moveLog || []);
     moveSequence = cloneMoveSequence(snapshot.moveSequence || []);
+    pendingAnimatedMove = null;
     clearSelection();
     createBoard();
     renderMoveLog();
@@ -1167,6 +1379,7 @@ function finalizeMove() {
         createBoard();
         renderMoveLog();
         updateStatus();
+        playWinSound();
         if (typeof window !== 'undefined') {
             window.setTimeout(() => window.alert(gameState.message), 20);
         }
@@ -1183,11 +1396,15 @@ function finalizeMove() {
     renderMoveLog();
     updateStatus();
 
+    if (isInCheck(board, currentPlayer)) {
+        playCheckSound();
+    }
+
     if (gameActive && currentPlayer === computerColor) {
         aiThinking = true;
         updateStatus();
         if (typeof window !== 'undefined') {
-            window.setTimeout(computerMove, 100);
+            window.setTimeout(computerMove, AI_THINK_DELAY_MS);
         }
     }
 }
@@ -1196,6 +1413,7 @@ function performMove(move) {
     moveHistory.push(snapshotState());
     appendMoveLog(formatMoveNotation(board, move), currentPlayer);
     moveSequence.push(getMoveKey(move));
+    pendingAnimatedMove = { ...move };
     board = applyMoveToBoard(board, move);
     lastMove = move;
     currentPlayer = otherColor(currentPlayer);
@@ -1289,6 +1507,8 @@ function resetGame() {
     moveHistory = [];
     moveLog = [];
     moveSequence = [];
+    pendingAnimatedMove = null;
+    transpositionTable.clear();
     statusMessage = getStartStatusMessage();
     createBoard();
     renderMoveLog();
@@ -1298,7 +1518,7 @@ function resetGame() {
     if (currentPlayer === computerColor && typeof window !== 'undefined') {
         aiThinking = true;
         updateStatus();
-        window.setTimeout(computerMove, 100);
+        window.setTimeout(computerMove, AI_THINK_DELAY_MS);
     }
 }
 
