@@ -19,6 +19,20 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u5c4f\u98a8\u99ac' },
         { fromRow: 2, fromCol: 1, toRow: 2, toCol: 4, name: '\u9806\u70ae' }
     ],
+    [`${BLACK_COLOR}|7,1-7,4`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' }
+    ],
+    [`${RED_COLOR}|7,1-7,4/0,1-2,2`]: [
+        { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
+        { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
+        { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,1-2,2/9,1-7,2`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' }
+    ],
     [`${RED_COLOR}|7,7-7,4/0,1-2,2`]: [
         { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u99ac\u4e8c\u9032\u4e09' },
         { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' },
@@ -219,6 +233,13 @@ function getOpeningBookKey(color, historySequence) {
 
 function getMoveKey(move) {
     return `${move.fromRow},${move.fromCol}-${move.toRow},${move.toCol}`;
+}
+
+function parseMoveKey(moveKey) {
+    const [fromPart, toPart] = moveKey.split('-');
+    const [fromRow, fromCol] = fromPart.split(',').map(Number);
+    const [toRow, toCol] = toPart.split(',').map(Number);
+    return { fromRow, fromCol, toRow, toCol };
 }
 
 function getStartStatusMessage() {
@@ -1056,6 +1077,79 @@ function getHorseRetreatPenalty(move) {
     return penalty;
 }
 
+function countUndevelopedMajors(activeBoard, color) {
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    let count = 0;
+
+    if (activeBoard[homeRow][1] === `${color}H`) {
+        count++;
+    }
+    if (activeBoard[homeRow][7] === `${color}H`) {
+        count++;
+    }
+    if (activeBoard[homeRow][0] === `${color}R`) {
+        count++;
+    }
+    if (activeBoard[homeRow][8] === `${color}R`) {
+        count++;
+    }
+
+    return count;
+}
+
+function getOpeningTempoPenalty(activeBoard, historySequence, move, color) {
+    const plyCount = historySequence?.length || moveSequence.length;
+    if (plyCount > 16 || move.captured) {
+        return 0;
+    }
+
+    if (move.piece[1] === 'C' && move.fromRow === move.toRow) {
+        let penalty = 18;
+        const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+
+        if (move.toCol !== 4) {
+            penalty += 18;
+        }
+
+        if (Math.abs(move.toCol - move.fromCol) <= 1) {
+            penalty += 10;
+        }
+
+        if (move.fromCol === 4 && move.toCol !== 4) {
+            penalty += 28;
+        }
+
+        penalty += undevelopedMajors * 8;
+        return penalty;
+    }
+
+    return 0;
+}
+
+function getCannonShufflePenalty(historySequence, move, color) {
+    if (move.piece[1] !== 'C' || move.captured || move.fromRow !== move.toRow) {
+        return 0;
+    }
+
+    const openingPenalty = (historySequence?.length || moveSequence.length) <= 14 ? 24 : 10;
+    if (!historySequence || historySequence.length < 2) {
+        return openingPenalty;
+    }
+
+    const isRedTurn = color === RED_COLOR;
+    const sideMoves = historySequence.filter((_, index) => (index % 2 === 0) === isRedTurn);
+    if (sideMoves.length === 0) {
+        return openingPenalty;
+    }
+
+    const lastSideMove = parseMoveKey(sideMoves[sideMoves.length - 1]);
+    if (lastSideMove.toRow === move.fromRow && lastSideMove.toCol === move.fromCol) {
+        return openingPenalty + 28;
+    }
+
+    return openingPenalty;
+}
+
 function getCaptureUrgencyBonus(move) {
     if (!move.captured) {
         return 0;
@@ -1096,6 +1190,8 @@ function scoreMove(activeBoard, move, ttMove, historySequence = moveSequence) {
     score += getCaptureUrgencyBonus(move);
     score -= getRecentMovePenalty(historySequence, move, move.piece[0]);
     score -= getHorseRetreatPenalty(move);
+    score -= getOpeningTempoPenalty(activeBoard, historySequence, move, move.piece[0]);
+    score -= getCannonShufflePenalty(historySequence, move, move.piece[0]);
     return score;
 }
 
