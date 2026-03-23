@@ -1050,8 +1050,92 @@ function isPerpetualCheckViolation(activeBoard, move, color, history = positionH
     return false;
 }
 
-function filterPlayableMoves(activeBoard, color, moves, history = positionHistory) {
-    return moves.filter(move => !isPerpetualCheckViolation(activeBoard, move, color, history));
+function getThreatenedTargetKeys(activeBoard, row, col) {
+    const piece = activeBoard[row][col];
+    if (!piece) {
+        return [];
+    }
+
+    const color = piece[0];
+    const targets = [];
+
+    for (let targetRow = 0; targetRow < 10; targetRow++) {
+        for (let targetCol = 0; targetCol < 9; targetCol++) {
+            const target = activeBoard[targetRow][targetCol];
+            if (!target || target[0] === color || target[1] === 'G') {
+                continue;
+            }
+
+            if (pieceThreatensSquare(activeBoard, row, col, targetRow, targetCol)) {
+                targets.push(`${targetRow},${targetCol}`);
+            }
+        }
+    }
+
+    return targets;
+}
+
+function isExactReverseMove(previousMove, move) {
+    return previousMove &&
+        previousMove.fromRow === move.toRow &&
+        previousMove.fromCol === move.toCol &&
+        previousMove.toRow === move.fromRow &&
+        previousMove.toCol === move.fromCol;
+}
+
+function isPerpetualChaseViolation(activeBoard, move, color, history = positionHistory, historySequence = moveSequence) {
+    if (!history || history.length < 4 || !historySequence || historySequence.length < 2 || move.captured) {
+        return false;
+    }
+
+    const nextBoard = applyMoveToBoard(activeBoard, move);
+    const opponent = otherColor(color);
+    const nextKey = getBoardKey(nextBoard, opponent);
+    let occurrences = 0;
+
+    for (const key of history) {
+        if (key === nextKey) {
+            occurrences++;
+            if (occurrences >= 1) {
+                break;
+            }
+        }
+    }
+
+    if (occurrences < 1) {
+        return false;
+    }
+
+    const sideMoves = historySequence.filter((_, index) => (index % 2 === 0) === (color === RED_COLOR));
+    if (sideMoves.length === 0) {
+        return false;
+    }
+
+    const previousMove = parseMoveKey(sideMoves[sideMoves.length - 1]);
+    if (!isExactReverseMove(previousMove, move)) {
+        return false;
+    }
+
+    const currentTargets = getThreatenedTargetKeys(nextBoard, move.toRow, move.toCol);
+    if (currentTargets.length > 0) {
+        return true;
+    }
+
+    const opponentMoves = historySequence.filter((_, index) => (index % 2 === 0) === (opponent === RED_COLOR));
+    if (opponentMoves.length < 2) {
+        return false;
+    }
+
+    const lastOpponentMove = parseMoveKey(opponentMoves[opponentMoves.length - 1]);
+    const previousOpponentMove = parseMoveKey(opponentMoves[opponentMoves.length - 2]);
+    return isExactReverseMove(previousOpponentMove, lastOpponentMove);
+}
+
+function filterPlayableMoves(activeBoard, color, moves, history = positionHistory, historySequence = moveSequence) {
+    return moves.filter(move =>
+        !isPerpetualCheckViolation(activeBoard, move, color, history) &&
+        !isPerpetualChaseViolation(activeBoard, move, color, history, historySequence)
+    );
 }
 
 function findOpeningBookMove(activeBoard, color, historySequence) {
@@ -1214,11 +1298,13 @@ function chooseSearchDepth(activeBoard, legalMoves) {
 
 function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
     const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
-    if (bookMove && !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory)) {
+    if (bookMove &&
+        !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory) &&
+        !isPerpetualChaseViolation(activeBoard, bookMove, color, positionHistory, historySequence)) {
         return bookMove;
     }
 
-    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory);
+    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
     if (legalMoves.length === 0) {
         return null;
     }
@@ -1322,7 +1408,7 @@ function getGameState(activeBoard, sideToMove) {
     }
 
     const rawLegalMoves = getAllLegalMoves(activeBoard, sideToMove);
-    const legalMoves = filterPlayableMoves(activeBoard, sideToMove, rawLegalMoves, positionHistory);
+    const legalMoves = filterPlayableMoves(activeBoard, sideToMove, rawLegalMoves, positionHistory, moveSequence);
     if (legalMoves.length > 0) {
         return null;
     }
@@ -1330,7 +1416,7 @@ function getGameState(activeBoard, sideToMove) {
     if (rawLegalMoves.length > 0) {
         return {
             winner: otherColor(sideToMove),
-            message: `${colorName(otherColor(sideToMove))}\u52dd\uff1a${colorName(sideToMove)}\u9577\u5c07\u7981\u624b\u3002`
+            message: `${colorName(otherColor(sideToMove))}\u52dd\uff1a${colorName(sideToMove)}\u9577\u5c07/\u9577\u6349\u7981\u624b\u3002`
         };
     }
 
@@ -1573,7 +1659,7 @@ function clearSelection() {
 
 function selectPiece(row, col) {
     selectedCell = { row, col };
-    validMoves = filterPlayableMoves(board, board[row][col][0], getLegalMovesForPiece(board, row, col), positionHistory);
+    validMoves = filterPlayableMoves(board, board[row][col][0], getLegalMovesForPiece(board, row, col), positionHistory, moveSequence);
     createBoard();
 }
 
