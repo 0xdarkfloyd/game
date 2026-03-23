@@ -5,7 +5,9 @@ const SEARCH_ABORT = Symbol('search-abort');
 const QUIESCENCE_DEPTH = 3;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
-const NODE_CHECK_INTERVAL = 32;
+const NODE_CHECK_INTERVAL = 1;
+const MAIN_THREAD_FALLBACK_CANDIDATES = 10;
+const MAIN_THREAD_FALLBACK_REPLIES = 8;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -377,10 +379,22 @@ function requestComputerMove(activeBoard, color, historySequence, positionKeys) 
     const fallbackMove = findOpeningBookMove(activeBoard, color, historySequence)
         || filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionKeys)[0]
         || null;
+    const runMainThreadFallback = () => {
+        try {
+            return chooseComputerMoveLite(
+                activeBoard,
+                color,
+                historySequence,
+                positionKeys
+            ) || fallbackMove;
+        } catch (error) {
+            return fallbackMove;
+        }
+    };
 
     if (!worker) {
         return new Promise(resolve => {
-            window.setTimeout(() => resolve(fallbackMove), 0);
+            window.setTimeout(() => resolve(runMainThreadFallback()), 0);
         });
     }
 
@@ -416,14 +430,14 @@ function requestComputerMove(activeBoard, color, historySequence, positionKeys) 
 
         const onError = () => {
             stopAiWorker();
-            finish(null);
+            finish(runMainThreadFallback());
         };
 
         worker.addEventListener('message', onMessage);
         worker.addEventListener('error', onError);
         timeoutId = window.setTimeout(() => {
             stopAiWorker();
-            finish(null);
+            finish(runMainThreadFallback());
         }, 1000);
 
         try {
@@ -436,7 +450,7 @@ function requestComputerMove(activeBoard, color, historySequence, positionKeys) 
             });
         } catch (error) {
             stopAiWorker();
-            finish(null);
+            finish(runMainThreadFallback());
         }
     });
 }
@@ -1886,7 +1900,91 @@ function chooseSearchDepth(activeBoard, legalMoves) {
     return 5;
 }
 
-function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence, positionKeys = positionHistory) {
+function scoreLiteMove(move) {
+    const capturedValue = move.captured ? PIECE_VALUES[move.captured[1]] : 0;
+    const moverValue = PIECE_VALUES[move.piece[1]];
+    let score = capturedValue * 12 - moverValue;
+
+    if (move.captured && move.captured[1] === 'G') {
+        score += MATE_SCORE;
+    }
+
+    if (move.piece[1] === 'H' || move.piece[1] === 'R') {
+        score += 14;
+    }
+
+    if (move.piece[1] === 'C' && !move.captured && move.fromRow === move.toRow && move.toCol !== 4) {
+        score -= 28;
+    }
+
+    score += Math.max(0, 5 - Math.abs(4 - move.toCol)) * 5;
+    return score;
+}
+
+function chooseComputerMoveLite(activeBoard, color = computerColor, historySequence = moveSequence, positionKeys = positionHistory) {
+    const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
+    if (bookMove && !isPerpetualCheckViolation(activeBoard, bookMove, color, positionKeys)) {
+        return bookMove;
+    }
+
+    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionKeys);
+    if (legalMoves.length === 0) {
+        return null;
+    }
+
+    const orderedMoves = legalMoves
+        .slice()
+        .sort((left, right) => scoreLiteMove(right) - scoreLiteMove(left))
+        .slice(0, MAIN_THREAD_FALLBACK_CANDIDATES);
+
+    let bestMove = orderedMoves[0];
+    let bestScore = -Infinity;
+
+    for (const move of orderedMoves) {
+        const nextBoard = applyMoveToBoard(activeBoard, move);
+        let score = evaluateForColor(nextBoard, color);
+
+        if (isInCheck(nextBoard, otherColor(color))) {
+            score += 42;
+        }
+
+        const enemyMoves = getAllLegalMoves(nextBoard, otherColor(color));
+        if (enemyMoves.length === 0) {
+            return move;
+        }
+
+        const replyCandidates = enemyMoves
+            .slice()
+            .sort((left, right) => scoreLiteMove(right) - scoreLiteMove(left))
+            .slice(0, MAIN_THREAD_FALLBACK_REPLIES);
+
+        let worstReply = Infinity;
+
+        for (const reply of replyCandidates) {
+            const replyBoard = applyMoveToBoard(nextBoard, reply);
+            let replyScore = evaluateForColor(replyBoard, color);
+
+            if (isInCheck(replyBoard, color)) {
+                replyScore -= 48;
+            }
+
+            if (replyScore < worstReply) {
+                worstReply = replyScore;
+            }
+        }
+
+        score = Math.min(score, worstReply);
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+        }
+    }
+
+    return bestMove;
+}
+
+function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence, positionKeys = positionHistory, options = {}) {
     const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
     if (bookMove && !isPerpetualCheckViolation(activeBoard, bookMove, color, positionKeys)) {
         return bookMove;
@@ -1901,10 +1999,12 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
         transpositionTable.clear();
     }
 
-    const depth = chooseSearchDepth(activeBoard, legalMoves);
+    const depthCap = options.depthCap ?? Infinity;
+    const depth = Math.min(chooseSearchDepth(activeBoard, legalMoves), depthCap);
     const pieceCount = countPieces(activeBoard);
     const extensionBudget = pieceCount <= 18 ? 2 : 1;
-    const timeLimit = getSearchTimeLimit(activeBoard, legalMoves);
+    const maxTime = options.maxTime ?? Infinity;
+    const timeLimit = Math.min(getSearchTimeLimit(activeBoard, legalMoves), maxTime);
     const fallbackMove = orderMoves(activeBoard, legalMoves, null, historySequence)[0];
     let bestMove = fallbackMove;
     let bestResult = null;
