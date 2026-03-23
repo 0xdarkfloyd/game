@@ -1,26 +1,135 @@
-const RED_AT_TOP = true;
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国象棋 - Chinese Chess</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
 
-// Compute forward direction based on RED_AT_TOP
-const forwardDirection = RED_AT_TOP ? 1 : -1;
+        .game-container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+        }
 
-// River crossing logic
-const riverCrossing = RED_AT_TOP ? 5 : 4;
+        h1 {
+            text-align: center;
+            color: #333;
+            margin: 0 0 20px 0;
+        }
 
-// Palace rows based on RED_AT_TOP
-const palaceRows = RED_AT_TOP ? [0, 1] : [7, 6];
+        .info {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #555;
+        }
 
-// Elephant home-side bounds
-const elephantHomeSideBounds = RED_AT_TOP ? [0, 2] : [7, 5];
+        #board {
+            background: #f0d9a0;
+            border: 3px solid #8b4513;
+            padding: 20px;
+            display: inline-block;
+        }
 
-// Logic to update pawn movement
-const updatePawnMovement = (pawn) => {
-    if (RED_AT_TOP) {
-        // Logic for red pawns moving down
-        pawn.position.y += forwardDirection;
-    } else {
-        // Logic for black pawns moving up
-        pawn.position.y -= forwardDirection;
-    }
-};
+        .row {
+            display: flex;
+        }
 
-// Additional game logic can be added here.
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #8b4513;
+            position: relative;
+            cursor: pointer;
+            background: #f0d9a0;
+        }
+
+        .cell:hover {
+            background: #e6d199;
+        }
+
+        .cell.selected {
+            background: #ffd700 !important;
+        }
+
+        .cell.valid-move {
+            background: #90ee90 !important;
+        }
+
+        .piece {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            border: 2px solid;
+        }
+
+        .piece.red {
+            background: #ff6b6b;
+            color: white;
+            border-color: #c92a2a;
+        }
+
+        .piece.black {
+            background: #2c2c2c;
+            color: white;
+            border-color: #000;
+        }
+
+        .river {
+            border-top: 2px solid #4682b4;
+            border-bottom: 2px solid #4682b4;
+        }
+
+        button {
+            display: block;
+            margin: 15px auto;
+            padding: 10px 30px;
+            font-size: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎮 中国象棋 Chinese Chess 🎮</h1>
+        <div class="info">
+            <span id="turn">红方回合 (Red's Turn)</span>
+        </div>
+        <div id="board"></div>
+        <button onclick="resetGame()">重新开始 New Game</button>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
