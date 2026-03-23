@@ -5,7 +5,7 @@ const SEARCH_ABORT = Symbol('search-abort');
 const QUIESCENCE_DEPTH = 3;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
-const NODE_CHECK_INTERVAL = 256;
+const NODE_CHECK_INTERVAL = 32;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -253,14 +253,14 @@ function getSearchTimeLimit(activeBoard, legalMoves) {
     const pieceCount = countPieces(activeBoard);
 
     if (legalMoves.length >= 36 || pieceCount >= 28) {
-        return 240;
+        return 120;
     }
 
     if (pieceCount >= 20) {
-        return 320;
+        return 180;
     }
 
-    return 420;
+    return 260;
 }
 
 function getBoardKey(activeBoard, color) {
@@ -1034,6 +1034,48 @@ function getRecentMovePenalty(historySequence, move, color) {
     return penalty;
 }
 
+function getHorseRetreatPenalty(move) {
+    if (move.piece[1] !== 'H' || move.captured) {
+        return 0;
+    }
+
+    const retreating = move.piece[0] === RED_COLOR
+        ? move.toRow > move.fromRow
+        : move.toRow < move.fromRow;
+
+    if (!retreating) {
+        return 0;
+    }
+
+    let penalty = 34;
+    const homeBand = move.piece[0] === RED_COLOR ? move.toRow >= 7 : move.toRow <= 2;
+    if (homeBand) {
+        penalty += 18;
+    }
+
+    return penalty;
+}
+
+function getCaptureUrgencyBonus(move) {
+    if (!move.captured) {
+        return 0;
+    }
+
+    const capturedValue = PIECE_VALUES[move.captured[1]];
+    const moverValue = PIECE_VALUES[move.piece[1]];
+    let bonus = Math.round(capturedValue * 0.35);
+
+    if (capturedValue >= moverValue) {
+        bonus += 26;
+    }
+
+    if (move.captured[1] === 'S') {
+        bonus += 12;
+    }
+
+    return bonus;
+}
+
 function scoreMove(activeBoard, move, ttMove, historySequence = moveSequence) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -1051,7 +1093,9 @@ function scoreMove(activeBoard, move, ttMove, historySequence = moveSequence) {
     }
     score += Math.max(0, 5 - Math.abs(4 - move.toCol)) * 6;
     score += getOpeningMoveBonus(move);
+    score += getCaptureUrgencyBonus(move);
     score -= getRecentMovePenalty(historySequence, move, move.piece[0]);
+    score -= getHorseRetreatPenalty(move);
     return score;
 }
 
@@ -1381,27 +1425,7 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
     }
 
     const orderedMoves = orderMoves(activeBoard, legalMoves, bestResult?.bestMove || bestMove, historySequence);
-
-    if (historySequence.length < 10 || pieceCount <= 18 || getNow() + 40 >= searchDeadline) {
-        return bestMove || orderedMoves[0];
-    }
-
-    try {
-        return chooseVerifiedRootMove(
-            activeBoard,
-            color,
-            historySequence,
-            orderedMoves,
-            depth,
-            bestMove || orderedMoves[0],
-            extensionBudget
-        );
-    } catch (error) {
-        if (error !== SEARCH_ABORT) {
-            throw error;
-        }
-        return bestMove || orderedMoves[0];
-    }
+    return bestMove || orderedMoves[0];
 }
 
 function getPiecePrefix(activeBoard, piece, row, col) {
