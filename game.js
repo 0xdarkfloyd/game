@@ -1017,6 +1017,7 @@ function createBoard() {
     }
 
     const boardElement = document.getElementById('board');
+    boardElement.classList.toggle('flipped', humanColor === BLACK_COLOR);
     boardElement.innerHTML = BOARD_SVG;
     const gridElement = boardElement.querySelector('.board-grid');
 
