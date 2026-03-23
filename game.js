@@ -693,28 +693,6 @@ function isSquareAttacked(activeBoard, row, col, attackerColor) {
     return false;
 }
 
-function countAttackersOnSquare(activeBoard, row, col, attackerColor) {
-    let count = 0;
-    let leastValue = Infinity;
-
-    for (let scanRow = 0; scanRow < 10; scanRow++) {
-        for (let scanCol = 0; scanCol < 9; scanCol++) {
-            const piece = activeBoard[scanRow][scanCol];
-            if (piece && piece[0] === attackerColor) {
-                if (pieceThreatensSquare(activeBoard, scanRow, scanCol, row, col)) {
-                    count++;
-                    leastValue = Math.min(leastValue, PIECE_VALUES[piece[1]]);
-                }
-            }
-        }
-    }
-
-    return {
-        count,
-        leastValue: count > 0 ? leastValue : 0
-    };
-}
-
 function isInCheck(activeBoard, color) {
     const general = findGeneral(activeBoard, color);
     if (!general) {
@@ -1668,7 +1646,6 @@ if (typeof module !== 'undefined') {
         hasCrossedRiver,
         isInCheck,
         otherColor,
-        countAttackersOnSquare,
         setHumanSide,
         undoMove
     };
