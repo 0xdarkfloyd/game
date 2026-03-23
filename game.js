@@ -37,6 +37,10 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
         { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
     ],
+    [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/6,6-5,6`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
+    ],
     [`${BLACK_COLOR}|7,7-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u5c4f\u98a8\u99ac' },
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u5c4f\u98a8\u99ac' },
@@ -51,6 +55,22 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u5c4f\u98a8\u99ac' },
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,1-7,2`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6/3,2-4,2`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
+    [`${RED_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6/3,2-4,2/9,8-9,7`]: [
+        { fromRow: 9, fromCol: 7, toRow: 3, toCol: 7, name: '\u76f4\u8eca\u904e\u6cb3' },
+        { fromRow: 6, fromCol: 4, toRow: 5, toCol: 4, name: '\u4e2d\u5175\u9032\u4e00' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6/3,2-4,2/9,8-9,7/9,7-3,7`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 0, fromCol: 4, toRow: 1, toCol: 4, name: '\u5c07\u9580\u7a69\u5b88' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,8-9,7`]: [
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' },
@@ -81,6 +101,14 @@ const OPENING_BOOK = {
         { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u8d77\u99ac\u8f49\u4e2d\u70ae' },
         { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u96d9\u99ac' }
+    ],
+    [`${BLACK_COLOR}|6,6-5,6/0,1-2,2/9,7-7,6`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|6,6-5,6/0,1-2,2/9,1-7,2`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
     ],
     [`${BLACK_COLOR}|9,6-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u98db\u76f8\u5c0d\u5c4f\u98a8\u99ac' },
@@ -809,6 +837,9 @@ function evaluateBoard(activeBoard) {
         score -= 55;
     }
 
+    score += evaluateOpeningDevelopment(activeBoard, computerColor);
+    score -= evaluateOpeningDevelopment(activeBoard, humanColor);
+
     return score;
 }
 
@@ -837,6 +868,136 @@ function getSearchMoveLimit(pieceCount, depth, tacticalOnly = false) {
     return 28;
 }
 
+function countUndevelopedMajors(activeBoard, color) {
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    let count = 0;
+
+    if (activeBoard[homeRow][0] === `${color}R`) {
+        count++;
+    }
+    if (activeBoard[homeRow][8] === `${color}R`) {
+        count++;
+    }
+    if (activeBoard[homeRow][1] === `${color}H`) {
+        count++;
+    }
+    if (activeBoard[homeRow][7] === `${color}H`) {
+        count++;
+    }
+
+    return count;
+}
+
+function evaluateOpeningDevelopment(activeBoard, color) {
+    const pieceCount = countPieces(activeBoard);
+    if (pieceCount < 24) {
+        return 0;
+    }
+
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const soldierRow = color === RED_COLOR ? 6 : 3;
+    const cannonRow = color === RED_COLOR ? 7 : 2;
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    let score = -undevelopedMajors * 14;
+
+    const general = findGeneral(activeBoard, color);
+    if (general && (general.row !== homeRow || general.col !== 4)) {
+        score -= 44;
+    }
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = activeBoard[row][col];
+            if (!piece || piece[0] !== color) {
+                continue;
+            }
+
+            if (piece[1] === 'H' && row !== homeRow) {
+                score += 18;
+            }
+
+            if (piece[1] === 'R' && !(row === homeRow && (col === 0 || col === 8))) {
+                score += 12;
+            }
+
+            if (piece[1] === 'C' && row === cannonRow && col === 4) {
+                score += 12;
+            }
+
+            if ((piece[1] === 'A' || piece[1] === 'E') && undevelopedMajors >= 3 && row !== homeRow) {
+                score -= 18;
+            }
+
+            if (piece[1] === 'S' && row !== soldierRow) {
+                if (col === 4) {
+                    score += undevelopedMajors >= 3 ? -6 : 3;
+                } else {
+                    score -= undevelopedMajors >= 2 ? 10 : 4;
+                }
+
+                if ((col === 0 || col === 8) && undevelopedMajors >= 2) {
+                    score -= 6;
+                }
+            }
+
+            if (piece[1] === 'C' && row !== cannonRow && undevelopedMajors >= 2) {
+                score -= 10;
+            }
+        }
+    }
+
+    return score;
+}
+
+function getOpeningMoveBonus(activeBoard, move) {
+    if (countPieces(activeBoard) < 24) {
+        return 0;
+    }
+
+    const color = move.piece[0];
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const soldierRow = color === RED_COLOR ? 6 : 3;
+    const cannonRow = color === RED_COLOR ? 7 : 2;
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    let score = 0;
+
+    if (move.piece[1] === 'H' && move.fromRow === homeRow) {
+        score += 30;
+    }
+
+    if (move.piece[1] === 'R' && move.fromRow === homeRow) {
+        score += 20;
+    }
+
+    if (move.piece[1] === 'C' && move.fromRow === cannonRow && move.toRow === cannonRow && move.toCol === 4) {
+        score += 24;
+    }
+
+    if (move.piece[1] === 'S') {
+        if (move.fromRow === soldierRow && move.fromCol === 4) {
+            score += undevelopedMajors >= 3 ? -8 : 8;
+        } else if (move.fromRow === soldierRow) {
+            score -= undevelopedMajors >= 3 ? 18 : 10;
+        } else {
+            score -= undevelopedMajors >= 2 ? 22 : 10;
+        }
+    }
+
+    if ((move.piece[1] === 'A' || move.piece[1] === 'E') && undevelopedMajors >= 3) {
+        score -= 32;
+    }
+
+    if (move.piece[1] === 'G') {
+        score -= 60;
+    }
+
+    if (move.piece[1] === 'C' && !move.captured && move.fromRow === cannonRow && move.toRow !== cannonRow && undevelopedMajors >= 2) {
+        score -= 30;
+    }
+
+    return score;
+}
+
 function scoreMove(activeBoard, move, ttMove) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -853,6 +1014,7 @@ function scoreMove(activeBoard, move, ttMove) {
         score += 12;
     }
     score += Math.max(0, 5 - Math.abs(4 - move.toCol)) * 6;
+    score += getOpeningMoveBonus(activeBoard, move);
     return score;
 }
 
