@@ -205,6 +205,9 @@ let audioContext = null;
 const transpositionTable = new Map();
 let searchDeadline = Infinity;
 let searchNodeCounter = 0;
+let aiWorker = null;
+let aiTurnToken = 0;
+let aiWorkerRequestId = 0;
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -275,6 +278,22 @@ function getMoveKey(move) {
     return `${move.fromRow},${move.fromCol}-${move.toRow},${move.toCol}`;
 }
 
+function mirrorCol(col) {
+    return 8 - col;
+}
+
+function mirrorMoveDescriptor(move) {
+    return {
+        ...move,
+        fromCol: mirrorCol(move.fromCol),
+        toCol: mirrorCol(move.toCol)
+    };
+}
+
+function mirrorMoveKey(moveKey) {
+    return getMoveKey(mirrorMoveDescriptor(parseMoveKey(moveKey)));
+}
+
 function parseMoveKey(moveKey) {
     const [fromPart, toPart] = moveKey.split('-');
     const [fromRow, fromCol] = fromPart.split(',').map(Number);
@@ -326,6 +345,89 @@ function getSearchTimeLimit(activeBoard, legalMoves) {
 
 function getBoardKey(activeBoard, color) {
     return `${color}|${activeBoard.map(row => row.map(cell => cell || '__').join('')).join('/')}`;
+}
+
+function stopAiWorker() {
+    if (!aiWorker) {
+        return;
+    }
+
+    aiWorker.terminate();
+    aiWorker = null;
+}
+
+function getAiWorker() {
+    if (typeof Worker === 'undefined') {
+        return null;
+    }
+
+    if (!aiWorker) {
+        aiWorker = new Worker('ai-worker.js');
+    }
+
+    return aiWorker;
+}
+
+function requestComputerMove(activeBoard, color, historySequence, positionKeys) {
+    const worker = getAiWorker();
+    const fallbackMove = findOpeningBookMove(activeBoard, color, historySequence)
+        || filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionKeys)[0]
+        || null;
+
+    if (!worker) {
+        return Promise.resolve(chooseComputerMove(activeBoard, color, historySequence, positionKeys));
+    }
+
+    const requestId = ++aiWorkerRequestId;
+
+    return new Promise(resolve => {
+        let settled = false;
+        let timeoutId = null;
+
+        const cleanup = () => {
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+            }
+            worker.removeEventListener('message', onMessage);
+            worker.removeEventListener('error', onError);
+        };
+
+        const finish = move => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            resolve(move || fallbackMove);
+        };
+
+        const onMessage = event => {
+            if (!event.data || event.data.requestId !== requestId) {
+                return;
+            }
+            finish(event.data.move || null);
+        };
+
+        const onError = () => {
+            stopAiWorker();
+            finish(null);
+        };
+
+        worker.addEventListener('message', onMessage);
+        worker.addEventListener('error', onError);
+        timeoutId = window.setTimeout(() => {
+            stopAiWorker();
+            finish(null);
+        }, 1500);
+
+        worker.postMessage({
+            requestId,
+            board: activeBoard,
+            color,
+            historySequence,
+            positionKeys
+        });
+    });
 }
 
 function getPieceTransform(shiftX = 0, shiftY = 0) {
@@ -1493,16 +1595,23 @@ function orderMoves(activeBoard, moves, ttMove, historySequence = moveSequence) 
 }
 
 function findOpeningBookMove(activeBoard, color, historySequence) {
-    const candidates = OPENING_BOOK[getOpeningBookKey(color, historySequence)];
-    if (!candidates || candidates.length === 0) {
-        return null;
-    }
-
     const legalMoves = getAllLegalMoves(activeBoard, color);
     const legalByKey = new Map(legalMoves.map(move => [getMoveKey(move), move]));
+    const directCandidates = OPENING_BOOK[getOpeningBookKey(color, historySequence)] || [];
 
-    for (const candidate of candidates) {
+    for (const candidate of directCandidates) {
         const key = getMoveKey(candidate);
+        if (legalByKey.has(key)) {
+            return legalByKey.get(key);
+        }
+    }
+
+    const mirroredSequence = historySequence.map(mirrorMoveKey);
+    const mirroredCandidates = OPENING_BOOK[getOpeningBookKey(color, mirroredSequence)] || [];
+
+    for (const candidate of mirroredCandidates) {
+        const mirroredCandidate = mirrorMoveDescriptor(candidate);
+        const key = getMoveKey(mirroredCandidate);
         if (legalByKey.has(key)) {
             return legalByKey.get(key);
         }
@@ -2175,6 +2284,8 @@ function snapshotState() {
 }
 
 function restoreState(snapshot) {
+    aiTurnToken++;
+    stopAiWorker();
     board = cloneBoard(snapshot.board);
     currentPlayer = snapshot.currentPlayer;
     lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
@@ -2297,15 +2408,27 @@ function computerMove() {
         return;
     }
 
-    const move = chooseComputerMove(board, computerColor, moveSequence, positionHistory);
-    aiThinking = false;
+    const turnToken = ++aiTurnToken;
+    requestComputerMove(cloneBoard(board), computerColor, cloneMoveSequence(moveSequence), clonePositionHistory(positionHistory))
+        .then(move => {
+            if (turnToken !== aiTurnToken) {
+                return;
+            }
 
-    if (!move) {
-        finalizeMove();
-        return;
-    }
+            aiThinking = false;
 
-    performMove(move);
+            if (!gameActive || currentPlayer !== computerColor) {
+                updateStatus();
+                return;
+            }
+
+            if (!move) {
+                finalizeMove();
+                return;
+            }
+
+            performMove(move);
+        });
 }
 
 function undoMove() {
@@ -2338,6 +2461,8 @@ function setHumanSide(color) {
 }
 
 function resetGame() {
+    aiTurnToken++;
+    stopAiWorker();
     board = cloneBoard(initialBoard);
     currentPlayer = RED_COLOR;
     selectedCell = null;
