@@ -131,18 +131,18 @@
     </div>
 
     <script>
-        // Initial board setup
+        // Initial board setup (Option 1): Red starts at the bottom and moves up.
         const initialBoard = [
-            ['r車', 'r馬', 'r象', 'r士', 'r将', 'r士', 'r象', 'r馬', 'r車'],
+            ['r车', 'r马', 'r相', 'r仕', 'r帅', 'r仕', 'r相', 'r马', 'r车'],
             ['', '', '', '', '', '', '', '', ''],
-            ['', 'r炮', '', '', '', '', '', 'r炮', ''],
-            ['r兵', '', 'r兵', '', 'r兵', '', 'r兵', '', 'r兵'],
+            ['', 'r砲', '', '', '', '', '', 'r砲', ''],
+            ['r卒', '', 'r卒', '', 'r卒', '', 'r卒', '', 'r卒'],
             ['', '', '', '', '', '', '', '', ''],
             ['', '', '', '', '', '', '', '', ''],
-            ['b卒', '', 'b卒', '', 'b卒', '', 'b卒', '', 'b卒'],
-            ['', 'b砲', '', '', '', '', '', 'b砲', ''],
+            ['b兵', '', 'b兵', '', 'b兵', '', 'b兵', '', 'b兵'],
+            ['', 'b炮', '', '', '', '', '', 'b炮', ''],
             ['', '', '', '', '', '', '', '', ''],
-            ['b车', 'b马', 'b相', 'b仕', 'b帅', 'b仕', 'b相', 'b马', 'b车']
+            ['b车', 'b马', 'b相', 'b士', 'b将', 'b士', 'b相', 'b马', 'b车']
         ];
 
         let board = JSON.parse(JSON.stringify(initialBoard));
@@ -151,8 +151,8 @@
         let validMoves = [];
 
         const pieceNames = {
-            '車': '車', '车': '车', '馬': '馬', '马': '马',
-            '象': '象', '相': '相', '士': '士', '仕': '仕',
+            '车': '车', '车': '车', '马': '马', '马': '马',
+            '相': '相', '相': '相', '士': '士', '士': '士',
             '将': '将', '帅': '帅', '炮': '炮', '砲': '砲',
             '兵': '兵', '卒': '卒'
         };
@@ -180,6 +180,8 @@
                         const pieceElement = document.createElement('div');
                         pieceElement.className = 'piece ' + (piece[0] === 'r' ? 'red' : 'black');
                         pieceElement.textContent = piece.substring(1);
+                        // Ensure clicks always go to the cell handler
+                        pieceElement.style.pointerEvents = 'none';
                         cell.appendChild(pieceElement);
                     }
 
@@ -267,7 +269,7 @@
             const moves = [];
 
             switch (pieceType) {
-                case '車':
+                case '车':
                 case '车':
                     // Rook moves (horizontal and vertical)
                     for (let direction of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
@@ -288,7 +290,7 @@
                     }
                     break;
 
-                case '馬':
+                case '马':
                 case '马':
                     // Horse moves
                     const horseMoves = [
@@ -310,11 +312,12 @@
                     }
                     break;
 
-                case '象':
                 case '相':
+                case '象':
                     // Elephant moves (stays on own side)
-                    const maxRow = color === 'r' ? 4 : 10;
-                    const minRow = color === 'r' ? 0 : 5;
+                    // Red is at bottom (rows 5-9), Black is at top (rows 0-4)
+                    const minRow = color === 'r' ? 5 : 0;
+                    const maxRow = color === 'r' ? 10 : 5;
                     const elephantMoves = [[2, 2], [2, -2], [-2, 2], [-2, -2]];
                     for (let [dr, dc] of elephantMoves) {
                         const newRow = row + dr;
@@ -334,7 +337,7 @@
                 case '士':
                 case '仕':
                     // Advisor moves (within palace)
-                    const palaceRows = color === 'r' ? [0, 1, 2] : [7, 8, 9];
+                    const palaceRows = color === 'r' ? [7, 8, 9] : [0, 1, 2];
                     const palaceCols = [3, 4, 5];
                     const advisorMoves = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
                     for (let [dr, dc] of advisorMoves) {
@@ -352,7 +355,7 @@
                 case '将':
                 case '帅':
                     // General moves (within palace)
-                    const genPalaceRows = color === 'r' ? [0, 1, 2] : [7, 8, 9];
+                    const genPalaceRows = color === 'r' ? [7, 8, 9] : [0, 1, 2];
                     const genPalaceCols = [3, 4, 5];
                     const generalMoves = [[0, 1], [0, -1], [1, 0], [-1, 0]];
                     for (let [dr, dc] of generalMoves) {
@@ -399,8 +402,10 @@
                 case '兵':
                 case '卒':
                     // Soldier moves
-                    const forward = color === 'r' ? 1 : -1;
-                    const crossedRiver = color === 'r' ? row > 4 : row < 5;
+                    // Red moves up (toward row 0), Black moves down (toward row 9)
+                    const forward = color === 'r' ? -1 : 1;
+                    // Crossed the river once Red is on rows 0-4, Black is on rows 5-9
+                    const crossedRiver = color === 'r' ? row < 5 : row > 4;
 
                     // Forward move
                     if (row + forward >= 0 && row + forward < 10) {
