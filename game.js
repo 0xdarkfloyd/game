@@ -19,25 +19,53 @@ const OPENING_BOOK = {
     ],
     [`${RED_COLOR}|7,7-7,4/0,1-2,2`]: [
         { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u99ac\u4e8c\u9032\u4e09' },
-        { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' }
+        { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' },
+        { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' },
+        { fromRow: 9, fromCol: 8, toRow: 9, toCol: 7, name: '\u8eca\u4e00\u5e73\u4e8c' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6`]: [
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53527\u90321' }
     ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,6-5,6`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,4-5,4`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,8-9,7`]: [
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
     ],
     [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
-        { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' }
+        { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' },
+        { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' },
+        { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,1-7,2`]: [
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
         { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53523\u90321' }
     ],
+    [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/6,6-5,6`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' }
+    ],
     [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/6,4-5,4`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,0-9,1`]: [
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' }
     ],
@@ -704,11 +732,11 @@ function getPositionBonus(piece, row, col) {
 
     if (type === 'S') {
         const progress = color === 'r' ? 9 - row : row;
-        let bonus = progress * 12;
+        let bonus = progress * 10;
         if (hasCrossedRiver(color, row)) {
-            bonus += 26;
+            bonus += 18;
         }
-        bonus += Math.max(0, 10 - centerDistance * 2);
+        bonus += Math.max(0, 8 - centerDistance * 2);
         return bonus;
     }
 
@@ -732,8 +760,129 @@ function getPositionBonus(piece, row, col) {
     return 0;
 }
 
+function buildPieceCounts(activeBoard) {
+    const counts = {
+        r: { R: 0, H: 0, E: 0, A: 0, G: 0, C: 0, S: 0 },
+        b: { R: 0, H: 0, E: 0, A: 0, G: 0, C: 0, S: 0 }
+    };
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = activeBoard[row][col];
+            if (piece) {
+                counts[piece[0]][piece[1]]++;
+            }
+        }
+    }
+
+    return counts;
+}
+
+function getOpeningPhase(counts) {
+    const force =
+        (counts.r.R + counts.b.R) * 4 +
+        (counts.r.H + counts.b.H + counts.r.C + counts.b.C) * 2 +
+        (counts.r.S + counts.b.S);
+
+    return Math.max(0, Math.min(1, force / 26));
+}
+
+function evaluateGeneralSafety(activeBoard, color, counts, openingPhase) {
+    const general = findGeneral(activeBoard, color);
+    if (!general) {
+        return -MATE_SCORE;
+    }
+
+    const guards = counts[color].A;
+    const elephants = counts[color].E;
+    const attackers = countAttackersOnSquare(activeBoard, general.row, general.col, otherColor(color));
+    const forward = color === RED_COLOR ? -1 : 1;
+    const frontRow = general.row + forward;
+    let score = Math.round((guards * 20 + elephants * 16 + (general.col === 4 ? 10 : 0)) * (0.45 + openingPhase * 0.8));
+
+    if (isInsideBoard(frontRow, general.col) && !activeBoard[frontRow][general.col]) {
+        score -= Math.round(8 + openingPhase * 18);
+    }
+
+    score -= attackers.count * Math.round(18 + openingPhase * 24);
+    return score;
+}
+
+function evaluateLinePressure(activeBoard, color) {
+    const enemyGeneral = findGeneral(activeBoard, otherColor(color));
+    if (!enemyGeneral) {
+        return 0;
+    }
+
+    let score = 0;
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = activeBoard[row][col];
+            if (!piece || piece[0] !== color) {
+                continue;
+            }
+
+            if (piece[1] !== 'R' && piece[1] !== 'C') {
+                continue;
+            }
+
+            if (col === enemyGeneral.col) {
+                const between = countPiecesBetween(activeBoard, row, col, enemyGeneral.row, enemyGeneral.col);
+                if (piece[1] === 'R' && between === 0) {
+                    score += 28;
+                } else if (piece[1] === 'C' && between === 1) {
+                    score += 24;
+                }
+            } else if (row === enemyGeneral.row) {
+                const between = countPiecesBetween(activeBoard, row, col, enemyGeneral.row, enemyGeneral.col);
+                if (piece[1] === 'R' && between === 0) {
+                    score += 12;
+                } else if (piece[1] === 'C' && between === 1) {
+                    score += 10;
+                }
+            }
+        }
+    }
+
+    return score;
+}
+
+function evaluateSoldierStructure(activeBoard, color, counts, openingPhase) {
+    let score = 0;
+    const endgameFactor = 1 - openingPhase;
+    const enemyDefense = counts[otherColor(color)].A + counts[otherColor(color)].E;
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            if (activeBoard[row][col] !== `${color}S`) {
+                continue;
+            }
+
+            if (hasCrossedRiver(color, row)) {
+                score += Math.round(8 + endgameFactor * 14);
+            }
+
+            const deepAdvance = color === RED_COLOR ? row <= 3 : row >= 6;
+            if (deepAdvance) {
+                score += Math.round(6 + endgameFactor * (14 + (4 - enemyDefense) * 3));
+            }
+
+            const left = col > 0 && activeBoard[row][col - 1] === `${color}S`;
+            const right = col < 8 && activeBoard[row][col + 1] === `${color}S`;
+            if (left || right) {
+                score += Math.round(4 + endgameFactor * 6);
+            }
+        }
+    }
+
+    return score;
+}
+
 function evaluateBoard(activeBoard) {
     let score = 0;
+    const counts = buildPieceCounts(activeBoard);
+    const openingPhase = getOpeningPhase(counts);
 
     for (let row = 0; row < 10; row++) {
         for (let col = 0; col < 9; col++) {
@@ -747,12 +896,15 @@ function evaluateBoard(activeBoard) {
             const sign = piece[0] === computerColor ? 1 : -1;
 
             score += sign * (baseScore + mobility);
-
-            if (piece[1] === 'S' && hasCrossedRiver(piece[0], row)) {
-                score += sign * 18;
-            }
         }
     }
+
+    score += evaluateLinePressure(activeBoard, computerColor);
+    score -= evaluateLinePressure(activeBoard, humanColor);
+    score += evaluateGeneralSafety(activeBoard, computerColor, counts, openingPhase);
+    score -= evaluateGeneralSafety(activeBoard, humanColor, counts, openingPhase);
+    score += evaluateSoldierStructure(activeBoard, computerColor, counts, openingPhase);
+    score -= evaluateSoldierStructure(activeBoard, humanColor, counts, openingPhase);
 
     if (isInCheck(activeBoard, humanColor)) {
         score += 55;
@@ -789,6 +941,40 @@ function getSearchMoveLimit(pieceCount, depth, tacticalOnly = false) {
     return 28;
 }
 
+function getOpeningMoveBonus(move) {
+    if (moveSequence.length >= 10) {
+        return 0;
+    }
+
+    const color = move.piece[0];
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const cannonRow = color === RED_COLOR ? 7 : 2;
+    const deepRaid = color === RED_COLOR ? move.toRow <= 2 : move.toRow >= 7;
+    let bonus = 0;
+
+    if (move.piece[1] === 'H' && move.fromRow === homeRow) {
+        bonus += 30;
+    }
+
+    if (move.piece[1] === 'R' && move.fromRow === homeRow && move.fromRow === move.toRow) {
+        bonus += 18;
+    }
+
+    if (move.piece[1] === 'C' && move.fromRow === cannonRow && move.fromRow === move.toRow) {
+        bonus += 14;
+    }
+
+    if ((move.piece[1] === 'A' || move.piece[1] === 'E') && moveSequence.length <= 4) {
+        bonus -= 24;
+    }
+
+    if (move.piece[1] === 'C' && move.captured && deepRaid && moveSequence.length <= 6) {
+        bonus -= 140;
+    }
+
+    return bonus;
+}
+
 function scoreMove(activeBoard, move, ttMove) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -802,9 +988,10 @@ function scoreMove(activeBoard, move, ttMove) {
         score += MATE_SCORE;
     }
     if (move.piece[1] === 'S') {
-        score += 12;
+        score += 6;
     }
     score += Math.max(0, 5 - Math.abs(4 - move.toCol)) * 6;
+    score += getOpeningMoveBonus(move);
     return score;
 }
 
@@ -876,7 +1063,23 @@ function quiescence(activeBoard, color, alpha, beta, depth) {
     return { score: bestScore };
 }
 
-function negamax(activeBoard, color, depth, alpha, beta) {
+function shouldExtendSearch(activeBoard, nextBoard, move, color, depth, pieceCount, extensionBudget) {
+    if (extensionBudget <= 0 || depth <= 0) {
+        return 0;
+    }
+
+    if (isInCheck(nextBoard, otherColor(color)) && (pieceCount <= 18 || depth <= 1)) {
+        return 1;
+    }
+
+    if (pieceCount <= 14 && move.captured && PIECE_VALUES[move.captured[1]] >= PIECE_VALUES.H) {
+        return 1;
+    }
+
+    return 0;
+}
+
+function negamax(activeBoard, color, depth, alpha, beta, ply = 0, extensionBudget = 1) {
     const originalAlpha = alpha;
     const redGeneral = findGeneral(activeBoard, RED_COLOR);
     const blackGeneral = findGeneral(activeBoard, BLACK_COLOR);
@@ -913,13 +1116,26 @@ function negamax(activeBoard, color, depth, alpha, beta) {
     }
 
     const pieceCount = countPieces(activeBoard);
-    const candidateMoves = legalMoves.slice(0, getSearchMoveLimit(pieceCount, depth));
+    const baseMoveLimit = getSearchMoveLimit(pieceCount, depth);
+    const moveLimit = ply === 0
+        ? (pieceCount <= 16 ? legalMoves.length : Math.min(legalMoves.length, baseMoveLimit + 8))
+        : baseMoveLimit;
+    const candidateMoves = legalMoves.slice(0, moveLimit);
     let bestMove = candidateMoves[0];
     let bestScore = -Infinity;
 
     for (const move of candidateMoves) {
         const nextBoard = applyMoveToBoard(activeBoard, move);
-        const result = negamax(nextBoard, otherColor(color), depth - 1, -beta, -alpha);
+        const extension = shouldExtendSearch(activeBoard, nextBoard, move, color, depth - 1, pieceCount, extensionBudget);
+        const result = negamax(
+            nextBoard,
+            otherColor(color),
+            depth - 1 + extension,
+            -beta,
+            -alpha,
+            ply + 1,
+            extensionBudget - extension
+        );
         const score = -result.score;
 
         if (score > bestScore) {
@@ -981,7 +1197,8 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
     }
 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
-    const result = negamax(activeBoard, color, depth, -Infinity, Infinity);
+    const extensionBudget = countPieces(activeBoard) <= 18 ? 2 : 1;
+    const result = negamax(activeBoard, color, depth, -Infinity, Infinity, 0, extensionBudget);
     return result.bestMove || orderMoves(activeBoard, legalMoves)[0];
 }
 
