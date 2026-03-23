@@ -14,6 +14,16 @@ const OPENING_BOOK = {
         { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u8d77\u99ac\u5c40' },
         { fromRow: 9, fromCol: 6, toRow: 7, toCol: 4, name: '\u98db\u76f8\u5c40' }
     ],
+    [`${BLACK_COLOR}|6,2-5,2`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u99ac8\u90327' },
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u99ac2\u90323' },
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53527\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,6-5,6`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u99ac2\u90323' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u99ac8\u90327' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53523\u90321' }
+    ],
     [`${BLACK_COLOR}|7,7-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u5c4f\u98a8\u99ac' },
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u5c4f\u98a8\u99ac' },
@@ -173,6 +183,7 @@ let statusMessage = '';
 let moveHistory = [];
 let moveLog = [];
 let moveSequence = [];
+let positionHistory = [];
 let pendingAnimatedMove = null;
 let audioContext = null;
 const transpositionTable = new Map();
@@ -225,6 +236,10 @@ function cloneMoveLog(entries) {
 }
 
 function cloneMoveSequence(entries) {
+    return entries.slice();
+}
+
+function clonePositionHistory(entries) {
     return entries.slice();
 }
 
@@ -764,6 +779,35 @@ function getAllLegalMoves(activeBoard, color) {
     return allMoves;
 }
 
+function isPerpetualCheckViolation(activeBoard, move, color, history = positionHistory) {
+    if (!history || history.length < 4) {
+        return false;
+    }
+
+    const nextBoard = applyMoveToBoard(activeBoard, move);
+    const opponent = otherColor(color);
+    if (!isInCheck(nextBoard, opponent)) {
+        return false;
+    }
+
+    const nextKey = getBoardKey(nextBoard, opponent);
+    let occurrences = 0;
+    for (const key of history) {
+        if (key === nextKey) {
+            occurrences++;
+            if (occurrences >= 2) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function filterPlayableMoves(activeBoard, color, moves, history = positionHistory) {
+    return moves.filter(move => !isPerpetualCheckViolation(activeBoard, move, color, history));
+}
+
 function getCapturingMoves(activeBoard, color) {
     const tacticalMoves = [];
     for (let row = 0; row < 10; row++) {
@@ -996,6 +1040,17 @@ function evaluateDevelopment(activeBoard, color, openingPhase) {
                     score -= Math.round(18 + openingPhase * 18 + undevelopedMajors * 10);
                 }
 
+                if (openingPhase > 0.35 && (deepRaid || row === enemyHomeRow)) {
+                    const attackers = countAttackersOnSquare(activeBoard, row, col, otherColor(color));
+                    const defenders = countAttackersOnSquare(activeBoard, row, col, color);
+
+                    if (attackers.count > defenders.count) {
+                        score -= Math.round(70 + openingPhase * 80 + undevelopedMajors * 14);
+                    } else if (attackers.count > 0 && defenders.count === 0) {
+                        score -= Math.round(48 + openingPhase * 60 + undevelopedMajors * 10);
+                    }
+                }
+
                 if (undevelopedMajors >= 2 && row !== (color === RED_COLOR ? 7 : 2) && col !== 4) {
                     score -= Math.round(10 + openingPhase * 10);
                 }
@@ -1209,27 +1264,46 @@ function getPrematureCannonRaidPenalty(activeBoard, historySequence, move, color
     const enemyHomeRow = enemyColor === RED_COLOR ? 9 : 0;
     const deepRaid = color === RED_COLOR ? move.toRow <= 3 : move.toRow >= 6;
     const wingRaid = move.toCol <= 1 || move.toCol >= 7;
+    const capturedValue = PIECE_VALUES[move.captured[1]];
     let penalty = 0;
 
     if (deepRaid) {
-        penalty += 38 + undevelopedMajors * 14;
+        penalty += 90 + undevelopedMajors * 24;
     }
 
     if (wingRaid) {
-        penalty += 24 + undevelopedMajors * 10;
+        penalty += 70 + undevelopedMajors * 18;
     }
 
     if (move.captured[1] === 'H') {
-        penalty += 34 + undevelopedMajors * 8;
+        penalty += 110 + undevelopedMajors * 20;
     }
 
     if (move.toRow === enemyHomeRow && wingRaid) {
-        penalty += 34;
+        penalty += 160;
 
         const cornerCol = move.toCol <= 1 ? 0 : 8;
         if (activeBoard[enemyHomeRow][cornerCol] === `${enemyColor}R`) {
-            penalty += 42;
+            penalty += 180;
         }
+    }
+
+    if (deepRaid && wingRaid) {
+        penalty += Math.round(capturedValue * 4.5);
+    }
+
+    if (move.captured[1] === 'H' && move.toRow === enemyHomeRow && wingRaid && undevelopedMajors >= 2) {
+        penalty += capturedValue * 8;
+    }
+
+    const nextBoard = applyMoveToBoard(activeBoard, move);
+    const attackers = countAttackersOnSquare(nextBoard, move.toRow, move.toCol, enemyColor);
+    const defenders = countAttackersOnSquare(nextBoard, move.toRow, move.toCol, color);
+
+    if (attackers.count > defenders.count) {
+        penalty += 320 + undevelopedMajors * 36 + capturedValue * 2;
+    } else if (attackers.count > 0 && defenders.count === 0) {
+        penalty += 220 + undevelopedMajors * 28 + capturedValue;
     }
 
     return penalty;
@@ -1677,13 +1751,13 @@ function chooseSearchDepth(activeBoard, legalMoves) {
     return 5;
 }
 
-function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
+function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence, positionKeys = positionHistory) {
     const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
-    if (bookMove) {
+    if (bookMove && !isPerpetualCheckViolation(activeBoard, bookMove, color, positionKeys)) {
         return bookMove;
     }
 
-    const legalMoves = getAllLegalMoves(activeBoard, color);
+    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionKeys);
     if (legalMoves.length === 0) {
         return null;
     }
@@ -1815,9 +1889,17 @@ function getGameState(activeBoard, sideToMove) {
         return { winner: RED_COLOR, message: '\u7d05\u65b9\u52dd\uff1a\u9ed1\u5c07\u88ab\u5403\u3002' };
     }
 
-    const legalMoves = getAllLegalMoves(activeBoard, sideToMove);
+    const rawLegalMoves = getAllLegalMoves(activeBoard, sideToMove);
+    const legalMoves = filterPlayableMoves(activeBoard, sideToMove, rawLegalMoves, positionHistory);
     if (legalMoves.length > 0) {
         return null;
+    }
+
+    if (rawLegalMoves.length > 0) {
+        return {
+            winner: otherColor(sideToMove),
+            message: `${colorName(otherColor(sideToMove))}\u52dd\uff1a${colorName(sideToMove)}\u9577\u5c07\u7981\u624b\u3002`
+        };
     }
 
     if (isInCheck(activeBoard, sideToMove)) {
@@ -2059,7 +2141,7 @@ function clearSelection() {
 
 function selectPiece(row, col) {
     selectedCell = { row, col };
-    validMoves = getLegalMovesForPiece(board, row, col);
+    validMoves = filterPlayableMoves(board, board[row][col][0], getLegalMovesForPiece(board, row, col), positionHistory);
     createBoard();
 }
 
@@ -2072,7 +2154,8 @@ function snapshotState() {
         aiThinking,
         statusMessage,
         moveLog: cloneMoveLog(moveLog),
-        moveSequence: cloneMoveSequence(moveSequence)
+        moveSequence: cloneMoveSequence(moveSequence),
+        positionHistory: clonePositionHistory(positionHistory)
     };
 }
 
@@ -2085,6 +2168,7 @@ function restoreState(snapshot) {
     statusMessage = snapshot.statusMessage;
     moveLog = cloneMoveLog(snapshot.moveLog || []);
     moveSequence = cloneMoveSequence(snapshot.moveSequence || []);
+    positionHistory = clonePositionHistory(snapshot.positionHistory || []);
     pendingAnimatedMove = null;
     clearSelection();
     createBoard();
@@ -2158,6 +2242,7 @@ function performMove(move) {
     board = applyMoveToBoard(board, move);
     lastMove = move;
     currentPlayer = otherColor(currentPlayer);
+    positionHistory.push(getBoardKey(board, currentPlayer));
     clearSelection();
     finalizeMove();
 }
@@ -2197,7 +2282,7 @@ function computerMove() {
         return;
     }
 
-    const move = chooseComputerMove(board, computerColor, moveSequence);
+    const move = chooseComputerMove(board, computerColor, moveSequence, positionHistory);
     aiThinking = false;
 
     if (!move) {
@@ -2248,6 +2333,7 @@ function resetGame() {
     moveHistory = [];
     moveLog = [];
     moveSequence = [];
+    positionHistory = [getBoardKey(board, currentPlayer)];
     pendingAnimatedMove = null;
     transpositionTable.clear();
     statusMessage = getStartStatusMessage();
