@@ -43,6 +43,22 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' }
     ],
+    [`${BLACK_COLOR}|7,1-7,4/0,1-2,2/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,1-2,2/6,6-5,6`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,1-2,2/6,4-5,4`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,1-2,2/9,8-9,7`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
+    ],
     [`${RED_COLOR}|7,7-7,4/0,1-2,2`]: [
         { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u99ac\u4e8c\u9032\u4e09' },
         { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' },
@@ -1296,14 +1312,13 @@ function getPrematureCannonRaidPenalty(activeBoard, historySequence, move, color
         penalty += capturedValue * 8;
     }
 
-    const nextBoard = applyMoveToBoard(activeBoard, move);
-    const attackers = countAttackersOnSquare(nextBoard, move.toRow, move.toCol, enemyColor);
-    const defenders = countAttackersOnSquare(nextBoard, move.toRow, move.toCol, color);
+    const enemySupporters = countAttackersOnSquare(activeBoard, move.toRow, move.toCol, enemyColor);
+    const localSupport = countAttackersOnSquare(activeBoard, move.fromRow, move.fromCol, color);
 
-    if (attackers.count > defenders.count) {
-        penalty += 320 + undevelopedMajors * 36 + capturedValue * 2;
-    } else if (attackers.count > 0 && defenders.count === 0) {
+    if (enemySupporters.count >= 2 && localSupport.count === 0) {
         penalty += 220 + undevelopedMajors * 28 + capturedValue;
+    } else if (enemySupporters.count > 0 && localSupport.count === 0) {
+        penalty += 120 + undevelopedMajors * 16;
     }
 
     return penalty;
