@@ -299,7 +299,7 @@ const pieceValues = {
     '象': 2, '相': 2,
     '士': 2, '仕': 2,
     '兵': 1, '卒': 1,
-    '将': 1000, '帅': 1000
+    '将': 6000, '帅': 6000
 };
 
 function getPieceValue(piece) {
@@ -308,135 +308,213 @@ function getPieceValue(piece) {
     return pieceValues[pieceType] || 0;
 }
 
-function simulateMove(fromRow, fromCol, toRow, toCol) {
-    // Create a copy of the board for simulation
-    const tempBoard = board.map(row => [...row]);
-    const capturedPiece = tempBoard[toRow][toCol];
-    tempBoard[toRow][toCol] = tempBoard[fromRow][fromCol];
-    tempBoard[fromRow][fromCol] = '';
-    return { board: tempBoard, capturedPiece };
+function copyBoard(board) {
+    return board.map(row => [...row]);
 }
 
-function isGeneralInDanger(testBoard, color) {
-    // Find the general position
-    let generalRow = -1, generalCol = -1;
-    const generalPieces = color === 'b' ? ['b将', 'b帅'] : ['r将', 'r帅'];
+function makeMove(testBoard, fromRow, fromCol, toRow, toCol) {
+    const newBoard = copyBoard(testBoard);
+    newBoard[toRow][toCol] = newBoard[fromRow][fromCol];
+    newBoard[fromRow][fromCol] = '';
+    return newBoard;
+}
 
+function findGeneral(testBoard, color) {
+    const generalPieces = color === 'b' ? ['b将', 'b帅'] : ['r将', 'r帅'];
     for (let row = 0; row < 10; row++) {
         for (let col = 0; col < 9; col++) {
             if (generalPieces.includes(testBoard[row][col])) {
-                generalRow = row;
-                generalCol = col;
-                break;
+                return { row, col };
             }
         }
-        if (generalRow !== -1) break;
     }
+    return null;
+}
 
-    if (generalRow === -1) return true; // General not found = in danger
-
-    // Check if any opponent piece can capture the general
-    const opponentColor = color === 'r' ? 'b' : 'r';
+function getValidMovesForBoard(testBoard, row, col) {
     const savedBoard = board;
     board = testBoard;
+    const moves = getValidMoves(row, col);
+    board = savedBoard;
+    return moves;
+}
 
+function isPositionAttacked(testBoard, targetRow, targetCol, byColor) {
+    // Check if position (targetRow, targetCol) is attacked by any piece of color 'byColor'
     for (let row = 0; row < 10; row++) {
         for (let col = 0; col < 9; col++) {
             const piece = testBoard[row][col];
-            if (piece && piece[0] === opponentColor) {
-                const moves = getValidMoves(row, col);
-                if (moves.some(m => m.row === generalRow && m.col === generalCol)) {
-                    board = savedBoard;
+            if (piece && piece[0] === byColor) {
+                const moves = getValidMovesForBoard(testBoard, row, col);
+                if (moves.some(m => m.row === targetRow && m.col === targetCol)) {
                     return true;
                 }
             }
         }
     }
-
-    board = savedBoard;
     return false;
 }
 
-function evaluateMove(fromRow, fromCol, toRow, toCol) {
+function isInCheck(testBoard, color) {
+    const general = findGeneral(testBoard, color);
+    if (!general) return true; // No general = lost
+    const opponentColor = color === 'r' ? 'b' : 'r';
+    return isPositionAttacked(testBoard, general.row, general.col, opponentColor);
+}
+
+function getAllPossibleMoves(testBoard, color) {
+    const moves = [];
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = testBoard[row][col];
+            if (piece && piece[0] === color) {
+                const pieceMoves = getValidMovesForBoard(testBoard, row, col);
+                pieceMoves.forEach(move => {
+                    moves.push({
+                        fromRow: row,
+                        fromCol: col,
+                        toRow: move.row,
+                        toCol: move.col,
+                        piece: piece
+                    });
+                });
+            }
+        }
+    }
+    return moves;
+}
+
+function evaluatePosition(testBoard, forColor) {
     let score = 0;
+
+    // Material evaluation
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = testBoard[row][col];
+            if (piece) {
+                const value = getPieceValue(piece);
+                if (piece[0] === forColor) {
+                    score += value;
+                } else {
+                    score -= value;
+                }
+            }
+        }
+    }
+
+    return score;
+}
+
+function evaluateMove(fromRow, fromCol, toRow, toCol) {
     const movingPiece = board[fromRow][fromCol];
     const targetPiece = board[toRow][toCol];
 
     // Simulate the move
-    const simulation = simulateMove(fromRow, fromCol, toRow, toCol);
+    const newBoard = makeMove(board, fromRow, fromCol, toRow, toCol);
 
-    // CRITICAL: Avoid moves that leave our general in danger
-    if (isGeneralInDanger(simulation.board, 'b')) {
-        return -10000; // Heavily penalize moves that expose the general
+    // CRITICAL: If this move leaves us in check, it's illegal in real chess
+    // Reject it completely
+    if (isInCheck(newBoard, 'b')) {
+        return -999999;
     }
 
-    // Reward capturing opponent pieces (weighted by value)
+    let score = 0;
+
+    // HIGH PRIORITY: Capture opponent's general (instant win)
+    if (targetPiece && (targetPiece === 'r将' || targetPiece === 'r帅')) {
+        return 1000000;
+    }
+
+    // Check if we're currently in check - escaping check is TOP priority
+    if (isInCheck(board, 'b')) {
+        score += 5000; // Huge bonus for any move that gets us out of check
+    }
+
+    // Evaluate material gain from capture
     if (targetPiece && targetPiece[0] === 'r') {
         const captureValue = getPieceValue(targetPiece);
-        score += captureValue * 10; // High priority for captures
+        const movingValue = getPieceValue(movingPiece);
 
-        // Extra bonus for capturing the general (winning move)
-        if (captureValue >= 1000) {
-            score += 100000;
+        // Check if the position we're moving to is safe
+        const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
+
+        if (isDestinationSafe) {
+            // Safe capture - full value
+            score += captureValue * 100;
+        } else {
+            // Risky capture - only do it if it's a good trade
+            const tradeDiff = captureValue - movingValue;
+            if (tradeDiff > 0) {
+                score += tradeDiff * 50; // Good trade
+            } else if (tradeDiff === 0) {
+                score += 10; // Equal trade - slightly positive
+            } else {
+                score += tradeDiff * 100; // Bad trade - heavy penalty
+            }
+        }
+    } else {
+        // Non-capture move - check if destination is safe
+        const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
+        if (!isDestinationSafe) {
+            const movingValue = getPieceValue(movingPiece);
+            score -= movingValue * 50; // Penalty for moving to attacked square
         }
     }
 
-    // Check if this move threatens the opponent's general
-    const savedBoard = board;
-    board = simulation.board;
-    const threateningGeneral = isGeneralInDanger(simulation.board, 'r');
-    board = savedBoard;
+    // Check if this move puts opponent in check
+    if (isInCheck(newBoard, 'r')) {
+        score += 300; // Big bonus for checking opponent
 
-    if (threateningGeneral) {
-        score += 50; // Bonus for checking the opponent
-    }
-
-    // Defensive positioning: protect our general
-    let ourGeneralRow = -1, ourGeneralCol = -1;
-    for (let row = 0; row < 10; row++) {
-        for (let col = 0; col < 9; col++) {
-            if (board[row][col] === 'b将' || board[row][col] === 'b帅') {
-                ourGeneralRow = row;
-                ourGeneralCol = col;
+        // Extra bonus if opponent has no escape (checkmate)
+        const opponentMoves = getAllPossibleMoves(newBoard, 'r');
+        let hasEscape = false;
+        for (let move of opponentMoves) {
+            const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
+            if (!isInCheck(testBoard, 'r')) {
+                hasEscape = true;
                 break;
             }
         }
-        if (ourGeneralRow !== -1) break;
-    }
-
-    if (ourGeneralRow !== -1) {
-        // Bonus for moving pieces closer to defend the general
-        const oldDistance = Math.abs(fromRow - ourGeneralRow) + Math.abs(fromCol - ourGeneralCol);
-        const newDistance = Math.abs(toRow - ourGeneralRow) + Math.abs(toCol - ourGeneralCol);
-
-        const movingValue = getPieceValue(movingPiece);
-        if (movingValue > 2 && newDistance < oldDistance && newDistance <= 3) {
-            score += 5; // Encourage defensive positioning for valuable pieces
+        if (!hasEscape) {
+            score += 500000; // Checkmate!
         }
     }
 
-    // Positional bonuses
-    // Move pieces forward (towards opponent)
-    if (toRow < fromRow) {
-        score += 1;
+    // Positional evaluation
+    // Control center
+    const centerCols = [3, 4, 5];
+    const centerRows = [3, 4, 5, 6];
+    if (centerCols.includes(toCol) && centerRows.includes(toRow)) {
+        score += 3;
     }
 
-    // Control the center
-    const centerCols = [3, 4, 5];
-    if (centerCols.includes(toCol)) {
+    // Advance pieces
+    if (toRow < fromRow) {
         score += 2;
     }
 
-    // Small random factor to add variety
-    score += Math.random() * 0.5;
+    // Protect general
+    const ourGeneral = findGeneral(newBoard, 'b');
+    if (ourGeneral) {
+        const distance = Math.abs(toRow - ourGeneral.row) + Math.abs(toCol - ourGeneral.col);
+        const movingValue = getPieceValue(movingPiece);
+        if (movingValue >= 4 && distance <= 3) {
+            score += 8; // Keep strong pieces near general
+        }
+    }
+
+    // Small random for variety
+    score += Math.random() * 0.1;
 
     return score;
 }
 
 function computerMove() {
-    // Intelligent AI: evaluate all moves and choose the best one
-    const allMoves = [];
+    // Check if we're in check first
+    const inCheck = isInCheck(board, 'b');
 
+    // Get all possible moves
+    const allMoves = [];
     for (let row = 0; row < 10; row++) {
         for (let col = 0; col < 9; col++) {
             const piece = board[row][col];
@@ -456,16 +534,29 @@ function computerMove() {
         }
     }
 
-    if (allMoves.length > 0) {
-        // Sort moves by score (best first)
-        allMoves.sort((a, b) => b.score - a.score);
+    // Filter out illegal moves (those that leave us in check)
+    const legalMoves = allMoves.filter(m => m.score > -999999);
 
-        // Choose from top 3 moves for some variety
-        const topMoves = allMoves.slice(0, Math.min(3, allMoves.length));
-        const move = topMoves[Math.floor(Math.random() * topMoves.length)];
-
-        movePiece(move.fromRow, move.fromCol, move.toRow, move.toCol);
+    if (legalMoves.length === 0) {
+        console.log("No legal moves - checkmate!");
+        return;
     }
+
+    // Sort by score
+    legalMoves.sort((a, b) => b.score - a.score);
+
+    // If in check, must take the best escape move
+    if (inCheck) {
+        const move = legalMoves[0];
+        movePiece(move.fromRow, move.fromCol, move.toRow, move.toCol);
+        return;
+    }
+
+    // Otherwise, choose from top moves with some variety
+    const topMoves = legalMoves.slice(0, Math.min(5, legalMoves.length));
+    const move = topMoves[Math.floor(Math.random() * topMoves.length)];
+
+    movePiece(move.fromRow, move.fromCol, move.toRow, move.toCol);
 }
 
 function checkGameOver() {
