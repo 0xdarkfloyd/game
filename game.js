@@ -405,6 +405,30 @@ function evaluatePosition(testBoard, forColor) {
     return score;
 }
 
+function getThreatenedPieces(testBoard, color) {
+    // Find all pieces of 'color' that are under attack
+    const threatened = [];
+    const opponentColor = color === 'r' ? 'b' : 'r';
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = testBoard[row][col];
+            if (piece && piece[0] === color) {
+                if (isPositionAttacked(testBoard, row, col, opponentColor)) {
+                    threatened.push({
+                        row: row,
+                        col: col,
+                        piece: piece,
+                        value: getPieceValue(piece)
+                    });
+                }
+            }
+        }
+    }
+
+    return threatened;
+}
+
 function evaluateMove(fromRow, fromCol, toRow, toCol) {
     const movingPiece = board[fromRow][fromCol];
     const targetPiece = board[toRow][toCol];
@@ -430,7 +454,55 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
         score += 5000; // Huge bonus for any move that gets us out of check
     }
 
-    // Evaluate material gain from capture
+    // DEFENSIVE: Check if Red can checkmate us on next move
+    const redMoves = getAllPossibleMoves(newBoard, 'r');
+    let redCanCheckmate = false;
+    for (let move of redMoves) {
+        const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
+        if (isInCheck(testBoard, 'b')) {
+            // Red puts us in check - can we escape?
+            const ourEscapes = getAllPossibleMoves(testBoard, 'b');
+            let canEscape = false;
+            for (let escape of ourEscapes) {
+                const escapeBoard = makeMove(testBoard, escape.fromRow, escape.fromCol, escape.toRow, escape.toCol);
+                if (!isInCheck(escapeBoard, 'b')) {
+                    canEscape = true;
+                    break;
+                }
+            }
+            if (!canEscape) {
+                redCanCheckmate = true;
+                // Check if this move prevents that checkmate
+                // If we're capturing the threatening piece or blocking, big bonus
+                if (targetPiece && move.fromRow === toRow && move.fromCol === toCol) {
+                    score += 8000; // Capturing the threatening piece!
+                } else {
+                    score -= 7000; // This move doesn't prevent checkmate - bad!
+                }
+                break;
+            }
+        }
+    }
+
+    // DEFENSIVE: Evaluate what Red can capture after our move
+    let worstLoss = 0;
+    for (let move of redMoves) {
+        const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
+        const captured = newBoard[move.toRow][move.toCol];
+        if (captured && captured[0] === 'b') {
+            const lossValue = getPieceValue(captured);
+            if (lossValue > worstLoss) {
+                worstLoss = lossValue;
+            }
+        }
+    }
+
+    // Heavy penalty if Red can capture valuable pieces after this move
+    if (worstLoss > 0) {
+        score -= worstLoss * 80;
+    }
+
+    // OFFENSIVE: Evaluate material gain from capture
     if (targetPiece && targetPiece[0] === 'r') {
         const captureValue = getPieceValue(targetPiece);
         const movingValue = getPieceValue(movingPiece);
@@ -440,16 +512,25 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
 
         if (isDestinationSafe) {
             // Safe capture - full value
-            score += captureValue * 100;
+            score += captureValue * 120;
+
+            // Extra bonus for capturing pieces that threaten us
+            const threatenedBefore = getThreatenedPieces(board, 'b');
+            const threatenedAfter = getThreatenedPieces(newBoard, 'b');
+            if (threatenedAfter.length < threatenedBefore.length) {
+                score += 200; // We reduced threats by capturing!
+            }
         } else {
             // Risky capture - only do it if it's a good trade
             const tradeDiff = captureValue - movingValue;
-            if (tradeDiff > 0) {
-                score += tradeDiff * 50; // Good trade
+            if (tradeDiff >= 3) {
+                score += tradeDiff * 60; // Very good trade
+            } else if (tradeDiff > 0) {
+                score += tradeDiff * 30; // Good trade
             } else if (tradeDiff === 0) {
-                score += 10; // Equal trade - slightly positive
+                score += 5; // Equal trade
             } else {
-                score += tradeDiff * 100; // Bad trade - heavy penalty
+                score += tradeDiff * 150; // Bad trade - heavy penalty
             }
         }
     } else {
@@ -457,13 +538,29 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
         const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
         if (!isDestinationSafe) {
             const movingValue = getPieceValue(movingPiece);
-            score -= movingValue * 50; // Penalty for moving to attacked square
+            score -= movingValue * 70; // Heavy penalty for moving to attacked square
         }
     }
 
-    // Check if this move puts opponent in check
+    // DEFENSIVE: Check if we're saving a threatened piece
+    const threatenedBefore = getThreatenedPieces(board, 'b');
+    const threatenedAfter = getThreatenedPieces(newBoard, 'b');
+
+    for (let threatened of threatenedBefore) {
+        if (threatened.row === fromRow && threatened.col === fromCol) {
+            // We moved a threatened piece
+            const stillThreatened = threatenedAfter.find(t =>
+                t.row === toRow && t.col === toCol
+            );
+            if (!stillThreatened) {
+                score += threatened.value * 40; // Successfully saved the piece
+            }
+        }
+    }
+
+    // OFFENSIVE: Check if this move puts opponent in check
     if (isInCheck(newBoard, 'r')) {
-        score += 300; // Big bonus for checking opponent
+        score += 400; // Big bonus for checking opponent
 
         // Extra bonus if opponent has no escape (checkmate)
         const opponentMoves = getAllPossibleMoves(newBoard, 'r');
@@ -476,21 +573,20 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
             }
         }
         if (!hasEscape) {
-            score += 500000; // Checkmate!
+            score += 800000; // Checkmate!
         }
     }
 
     // Positional evaluation
-    // Control center
     const centerCols = [3, 4, 5];
     const centerRows = [3, 4, 5, 6];
     if (centerCols.includes(toCol) && centerRows.includes(toRow)) {
-        score += 3;
+        score += 4;
     }
 
-    // Advance pieces
+    // Advance pieces toward opponent
     if (toRow < fromRow) {
-        score += 2;
+        score += 3;
     }
 
     // Protect general
@@ -499,7 +595,7 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
         const distance = Math.abs(toRow - ourGeneral.row) + Math.abs(toCol - ourGeneral.col);
         const movingValue = getPieceValue(movingPiece);
         if (movingValue >= 4 && distance <= 3) {
-            score += 8; // Keep strong pieces near general
+            score += 10; // Keep strong pieces near general
         }
     }
 
