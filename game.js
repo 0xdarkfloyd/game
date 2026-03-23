@@ -1,9 +1,11 @@
 const RED_COLOR = 'r';
 const BLACK_COLOR = 'b';
 const MATE_SCORE = 900000;
+const SEARCH_ABORT = Symbol('search-abort');
 const QUIESCENCE_DEPTH = 3;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
+const NODE_CHECK_INTERVAL = 256;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -151,6 +153,8 @@ let moveSequence = [];
 let pendingAnimatedMove = null;
 let audioContext = null;
 const transpositionTable = new Map();
+let searchDeadline = Infinity;
+let searchNodeCounter = 0;
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -234,6 +238,29 @@ function updateSideButtons() {
 
     redButton.classList.toggle('active', humanColor === RED_COLOR);
     blackButton.classList.toggle('active', humanColor === BLACK_COLOR);
+}
+
+function getNow() {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function shouldAbortSearch() {
+    searchNodeCounter++;
+    return searchNodeCounter % NODE_CHECK_INTERVAL === 0 && getNow() >= searchDeadline;
+}
+
+function getSearchTimeLimit(activeBoard, legalMoves) {
+    const pieceCount = countPieces(activeBoard);
+
+    if (legalMoves.length >= 36 || pieceCount >= 28) {
+        return 240;
+    }
+
+    if (pieceCount >= 20) {
+        return 320;
+    }
+
+    return 420;
 }
 
 function getBoardKey(activeBoard, color) {
@@ -1054,6 +1081,10 @@ function findOpeningBookMove(activeBoard, color, historySequence) {
 }
 
 function quiescence(activeBoard, color, alpha, beta, depth) {
+    if (shouldAbortSearch()) {
+        throw SEARCH_ABORT;
+    }
+
     const standPat = evaluateForColor(activeBoard, color);
     if (standPat >= beta || depth === 0) {
         return { score: standPat };
@@ -1164,6 +1195,10 @@ function chooseVerifiedRootMove(activeBoard, color, historySequence, orderedMove
     let bestScore = -Infinity;
 
     for (const move of orderedMoves.slice(0, verifyLimit)) {
+        if (getNow() >= searchDeadline) {
+            break;
+        }
+
         const nextBoard = applyMoveToBoard(activeBoard, move);
         const extension = shouldExtendSearch(activeBoard, nextBoard, move, color, verifyDepth, pieceCount, 1);
         const result = negamax(
@@ -1191,6 +1226,10 @@ function chooseVerifiedRootMove(activeBoard, color, historySequence, orderedMove
 }
 
 function negamax(activeBoard, color, depth, alpha, beta, ply = 0, extensionBudget = 1) {
+    if (shouldAbortSearch()) {
+        throw SEARCH_ABORT;
+    }
+
     const originalAlpha = alpha;
     const redGeneral = findGeneral(activeBoard, RED_COLOR);
     const blackGeneral = findGeneral(activeBoard, BLACK_COLOR);
@@ -1236,6 +1275,10 @@ function negamax(activeBoard, color, depth, alpha, beta, ply = 0, extensionBudge
     let bestScore = -Infinity;
 
     for (const move of candidateMoves) {
+        if (getNow() >= searchDeadline) {
+            throw SEARCH_ABORT;
+        }
+
         const nextBoard = applyMoveToBoard(activeBoard, move);
         const extension = shouldExtendSearch(activeBoard, nextBoard, move, color, depth - 1, pieceCount, extensionBudget);
         const result = negamax(
@@ -1309,15 +1352,56 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
     const pieceCount = countPieces(activeBoard);
-    const extensionBudget = countPieces(activeBoard) <= 18 ? 2 : 1;
-    const result = negamax(activeBoard, color, depth, -Infinity, Infinity, 0, extensionBudget);
-    const orderedMoves = orderMoves(activeBoard, legalMoves, result.bestMove, historySequence);
+    const extensionBudget = pieceCount <= 18 ? 2 : 1;
+    const timeLimit = getSearchTimeLimit(activeBoard, legalMoves);
+    const fallbackMove = orderMoves(activeBoard, legalMoves, null, historySequence)[0];
+    let bestMove = fallbackMove;
+    let bestResult = null;
 
-    if (historySequence.length < 10 || pieceCount <= 18) {
-        return result.bestMove || orderedMoves[0];
+    searchDeadline = getNow() + timeLimit;
+    searchNodeCounter = 0;
+
+    for (let currentDepth = Math.min(2, depth); currentDepth <= depth; currentDepth++) {
+        try {
+            const result = negamax(activeBoard, color, currentDepth, -Infinity, Infinity, 0, extensionBudget);
+            if (result.bestMove) {
+                bestMove = result.bestMove;
+                bestResult = result;
+            }
+        } catch (error) {
+            if (error !== SEARCH_ABORT) {
+                throw error;
+            }
+            break;
+        }
+
+        if (getNow() >= searchDeadline) {
+            break;
+        }
     }
 
-    return chooseVerifiedRootMove(activeBoard, color, historySequence, orderedMoves, depth, result.bestMove || orderedMoves[0], extensionBudget);
+    const orderedMoves = orderMoves(activeBoard, legalMoves, bestResult?.bestMove || bestMove, historySequence);
+
+    if (historySequence.length < 10 || pieceCount <= 18 || getNow() + 40 >= searchDeadline) {
+        return bestMove || orderedMoves[0];
+    }
+
+    try {
+        return chooseVerifiedRootMove(
+            activeBoard,
+            color,
+            historySequence,
+            orderedMoves,
+            depth,
+            bestMove || orderedMoves[0],
+            extensionBudget
+        );
+    } catch (error) {
+        if (error !== SEARCH_ABORT) {
+            throw error;
+        }
+        return bestMove || orderedMoves[0];
+    }
 }
 
 function getPiecePrefix(activeBoard, piece, row, col) {
