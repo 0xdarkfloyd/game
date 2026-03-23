@@ -9,8 +9,33 @@ const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
     [`${RED_COLOR}|`]: [
         { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u4e2d\u70ae' },
+        { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u4ed9\u4eba\u6307\u8def' },
         { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u8d77\u99ac\u5c40' },
         { fromRow: 9, fromCol: 6, toRow: 7, toCol: 4, name: '\u98db\u76f8\u5c40' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5c4f\u98a8\u99ac' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u55ae\u63d0\u99ac' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
+    ],
+    [`${RED_COLOR}|6,2-5,2/0,1-2,2`]: [
+        { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u8d77\u53f3\u99ac' },
+        { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u8f49\u4e2d\u70ae' },
+        { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/9,7-7,6`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u5c4f\u98a8\u99ac' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/7,7-7,4`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u5c4f\u98a8\u99ac' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/9,0-9,1`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
     ],
     [`${BLACK_COLOR}|7,7-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u5c4f\u98a8\u99ac' },
@@ -19,11 +44,17 @@ const OPENING_BOOK = {
     ],
     [`${RED_COLOR}|7,7-7,4/0,1-2,2`]: [
         { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u99ac\u4e8c\u9032\u4e09' },
+        { fromRow: 9, fromCol: 8, toRow: 9, toCol: 7, name: '\u8eca\u4e00\u5e73\u4e8c' },
         { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u5c4f\u98a8\u99ac' },
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
-        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53527\u90321' }
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,8-9,7`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,4-5,4`]: [
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
@@ -31,6 +62,7 @@ const OPENING_BOOK = {
     ],
     [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
+        { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
         { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,1-7,2`]: [
@@ -45,13 +77,23 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u8d77\u99ac\u5c0d\u5c4f\u98a8\u99ac' },
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u8d77\u99ac\u5c0d\u8d77\u99ac' }
     ],
+    [`${RED_COLOR}|9,7-7,6/0,1-2,2`]: [
+        { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u8d77\u99ac\u8f49\u4e2d\u70ae' },
+        { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
+        { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u96d9\u99ac' }
+    ],
     [`${BLACK_COLOR}|9,6-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u98db\u76f8\u5c0d\u5c4f\u98a8\u99ac' },
+        { fromRow: 2, fromCol: 1, toRow: 2, toCol: 5, name: '\u904e\u5bae\u70ae' },
         { fromRow: 2, fromCol: 7, toRow: 2, toCol: 4, name: '\u5217\u70ae' }
     ],
-    [`${RED_COLOR}|9,7-7,6/0,1-2,2`]: [
-        { fromRow: 7, fromCol: 7, toRow: 7, toCol: 4, name: '\u8d77\u99ac\u5f8c\u8f49\u4e2d\u70ae' },
-        { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u96d9\u99ac' }
+    [`${RED_COLOR}|9,6-7,4/2,1-2,5`]: [
+        { fromRow: 9, fromCol: 7, toRow: 7, toCol: 6, name: '\u8d77\u53f3\u99ac' },
+        { fromRow: 9, fromCol: 8, toRow: 9, toCol: 7, name: '\u8eca\u4e00\u5e73\u4e8c' }
+    ],
+    [`${BLACK_COLOR}|9,6-7,4/2,1-2,5/9,7-7,6`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5c4f\u98a8\u99ac' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
     ]
 };
 
