@@ -80,10 +80,26 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' }
     ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,2-5,2/9,7-7,6`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' }
+    ],
     [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
         { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
         { fromRow: 6, fromCol: 2, toRow: 5, toCol: 2, name: '\u5175\u4e03\u9032\u4e00' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,7-2,6/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u5de6\u99ac\u51fa\u52d5' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,7-2,6/6,2-5,2/0,1-2,2/9,1-7,2`]: [
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca1\u5e732' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,1-7,2`]: [
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
@@ -773,16 +789,45 @@ function getCapturingMoves(activeBoard, color) {
     return tacticalMoves;
 }
 
-function getPositionBonus(piece, row, col) {
+function countPieceType(activeBoard, color, type) {
+    let count = 0;
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            if (activeBoard[row][col] === `${color}${type}`) {
+                count++;
+            }
+        }
+    }
+
+    return count;
+}
+
+function countPiecesBetweenOnFile(activeBoard, col, startRow, endRow) {
+    let blockers = 0;
+    const step = startRow < endRow ? 1 : -1;
+
+    for (let row = startRow + step; row !== endRow; row += step) {
+        if (activeBoard[row][col]) {
+            blockers++;
+        }
+    }
+
+    return blockers;
+}
+
+function getPositionBonus(piece, row, col, pieceCount) {
     const color = piece[0];
     const type = piece[1];
     const centerDistance = Math.abs(4 - col);
 
     if (type === 'S') {
         const progress = color === 'r' ? 9 - row : row;
-        let bonus = progress * 12;
+        const progressWeight = pieceCount >= 28 ? 7 : pieceCount >= 24 ? 8 : pieceCount >= 18 ? 10 : 12;
+        const riverBonus = pieceCount >= 24 ? 12 : pieceCount >= 18 ? 18 : 26;
+        let bonus = progress * progressWeight;
         if (hasCrossedRiver(color, row)) {
-            bonus += 26;
+            bonus += riverBonus;
         }
         bonus += Math.max(0, 10 - centerDistance * 2);
         return bonus;
@@ -808,7 +853,75 @@ function getPositionBonus(piece, row, col) {
     return 0;
 }
 
+function evaluateKingSafety(activeBoard, color, pieceCount) {
+    const general = findGeneral(activeBoard, color);
+    if (!general) {
+        return -2000;
+    }
+
+    const opponent = otherColor(color);
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const forward = color === RED_COLOR ? -1 : 1;
+    const advisors = countPieceType(activeBoard, color, 'A');
+    const elephants = countPieceType(activeBoard, color, 'E');
+    let score = advisors * 16 + elephants * 14;
+
+    if (general.row !== homeRow) {
+        score -= 46;
+    }
+    if (general.col !== 4) {
+        score -= 14;
+    }
+
+    const frontRow = general.row + forward;
+    if (isInsideBoard(frontRow, general.col)) {
+        if (!activeBoard[frontRow][general.col]) {
+            score -= 18;
+        }
+    }
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = activeBoard[row][col];
+            if (!piece || piece[0] !== opponent) {
+                continue;
+            }
+
+            const type = piece[1];
+            const advanced = opponent === RED_COLOR ? row <= 5 : row >= 4;
+            if (type === 'H' && advanced && Math.abs(row - general.row) <= 3 && Math.abs(col - general.col) <= 2) {
+                score -= 14;
+            }
+
+            if (col === general.col) {
+                const blockers = countPiecesBetweenOnFile(activeBoard, col, row, general.row);
+                if (type === 'R' && blockers === 0) {
+                    score -= 72;
+                }
+                if (type === 'C' && blockers === 1) {
+                    score -= 64;
+                }
+            }
+
+            if (advanced && Math.abs(col - general.col) <= 1) {
+                if (type === 'R') {
+                    score -= 22;
+                } else if (type === 'C') {
+                    score -= 16;
+                }
+            }
+        }
+    }
+
+    if (pieceCount >= 24 && advisors + elephants <= 2) {
+        score -= 20;
+    }
+
+    return score;
+}
+
 function evaluateBoard(activeBoard) {
+    const pieceCount = countPieces(activeBoard);
     let score = 0;
 
     for (let row = 0; row < 10; row++) {
@@ -818,7 +931,7 @@ function evaluateBoard(activeBoard) {
                 continue;
             }
 
-            const baseScore = PIECE_VALUES[piece[1]] + getPositionBonus(piece, row, col);
+            const baseScore = PIECE_VALUES[piece[1]] + getPositionBonus(piece, row, col, pieceCount);
             const mobility = getPseudoMoves(activeBoard, row, col).length * MOBILITY_WEIGHTS[piece[1]];
             const sign = piece[0] === computerColor ? 1 : -1;
 
@@ -839,6 +952,8 @@ function evaluateBoard(activeBoard) {
 
     score += evaluateOpeningDevelopment(activeBoard, computerColor);
     score -= evaluateOpeningDevelopment(activeBoard, humanColor);
+    score += evaluateKingSafety(activeBoard, computerColor, pieceCount);
+    score -= evaluateKingSafety(activeBoard, humanColor, pieceCount);
 
     return score;
 }
@@ -854,11 +969,11 @@ function getSearchMoveLimit(pieceCount, depth, tacticalOnly = false) {
     }
 
     if (pieceCount >= 28) {
-        return depth >= 3 ? 12 : 16;
+        return depth >= 3 ? 13 : 16;
     }
 
     if (pieceCount >= 22) {
-        return depth >= 4 ? 14 : 18;
+        return depth >= 4 ? 15 : 18;
     }
 
     if (pieceCount >= 16) {
@@ -915,6 +1030,9 @@ function evaluateOpeningDevelopment(activeBoard, color) {
             if (piece[1] === 'H' && row !== homeRow) {
                 score += 18;
             }
+            if (piece[1] === 'H' && row === homeRow && col !== 1 && col !== 7) {
+                score -= 26;
+            }
 
             if (piece[1] === 'R' && !(row === homeRow && (col === 0 || col === 8))) {
                 score += 12;
@@ -924,24 +1042,32 @@ function evaluateOpeningDevelopment(activeBoard, color) {
                 score += 12;
             }
 
-            if ((piece[1] === 'A' || piece[1] === 'E') && undevelopedMajors >= 3 && row !== homeRow) {
-                score -= 18;
+            if ((piece[1] === 'A' || piece[1] === 'E') && undevelopedMajors >= 2 && row !== homeRow) {
+                score -= 28;
+            }
+
+            if (piece[1] === 'C' && undevelopedMajors >= 2) {
+                const cannonAdvanced = color === RED_COLOR ? row <= 4 : row >= 5;
+                if (cannonAdvanced) {
+                    score -= 50;
+                }
             }
 
             if (piece[1] === 'S' && row !== soldierRow) {
+                const advance = Math.abs(row - soldierRow);
                 if (col === 4) {
-                    score += undevelopedMajors >= 3 ? -6 : 3;
+                    score += undevelopedMajors >= 3 ? -10 - advance * 4 : 2;
                 } else {
-                    score -= undevelopedMajors >= 2 ? 10 : 4;
+                    score -= undevelopedMajors >= 2 ? 18 + advance * 8 : 6 + advance * 3;
                 }
 
                 if ((col === 0 || col === 8) && undevelopedMajors >= 2) {
-                    score -= 6;
+                    score -= 12;
                 }
             }
 
             if (piece[1] === 'C' && row !== cannonRow && undevelopedMajors >= 2) {
-                score -= 10;
+                score -= 14;
             }
         }
     }
@@ -964,6 +1090,15 @@ function getOpeningMoveBonus(activeBoard, move) {
     if (move.piece[1] === 'H' && move.fromRow === homeRow) {
         score += 30;
     }
+    if (move.piece[1] === 'H' && !move.captured) {
+        const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+        if (!forward && move.fromRow !== homeRow) {
+            score -= undevelopedMajors >= 2 ? 34 : 16;
+        }
+        if (move.toRow === homeRow && move.toCol !== move.fromCol) {
+            score -= 22;
+        }
+    }
 
     if (move.piece[1] === 'R' && move.fromRow === homeRow) {
         score += 20;
@@ -972,19 +1107,28 @@ function getOpeningMoveBonus(activeBoard, move) {
     if (move.piece[1] === 'C' && move.fromRow === cannonRow && move.toRow === cannonRow && move.toCol === 4) {
         score += 24;
     }
-
-    if (move.piece[1] === 'S') {
-        if (move.fromRow === soldierRow && move.fromCol === 4) {
-            score += undevelopedMajors >= 3 ? -8 : 8;
-        } else if (move.fromRow === soldierRow) {
-            score -= undevelopedMajors >= 3 ? 18 : 10;
-        } else {
-            score -= undevelopedMajors >= 2 ? 22 : 10;
+    if (move.piece[1] === 'C' && undevelopedMajors >= 2) {
+        const cannonAdvanced = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
+        if (cannonAdvanced) {
+            score -= move.captured ? 64 : 54;
+        }
+        if (!move.captured && Math.abs(move.toRow - move.fromRow) >= 3) {
+            score -= 18;
         }
     }
 
-    if ((move.piece[1] === 'A' || move.piece[1] === 'E') && undevelopedMajors >= 3) {
-        score -= 32;
+    if (move.piece[1] === 'S') {
+        if (move.fromRow === soldierRow && move.fromCol === 4) {
+            score += undevelopedMajors >= 3 ? -12 : 6;
+        } else if (move.fromRow === soldierRow) {
+            score -= undevelopedMajors >= 3 ? 28 : 16;
+        } else {
+            score -= undevelopedMajors >= 2 ? 34 : 14;
+        }
+    }
+
+    if ((move.piece[1] === 'A' || move.piece[1] === 'E') && undevelopedMajors >= 2) {
+        score -= 42;
     }
 
     if (move.piece[1] === 'G') {
