@@ -950,6 +950,52 @@ function evaluateSoldierStructure(activeBoard, color, counts, openingPhase) {
     return score;
 }
 
+function evaluateDevelopment(activeBoard, color, openingPhase) {
+    if (openingPhase <= 0.2) {
+        return 0;
+    }
+
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    let score = -Math.round(undevelopedMajors * (8 + openingPhase * 10));
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = activeBoard[row][col];
+            if (!piece || piece[0] !== color) {
+                continue;
+            }
+
+            if (piece[1] === 'H' && row !== homeRow) {
+                score += Math.round(14 + openingPhase * 10);
+            }
+
+            if (piece[1] === 'R' && (row !== homeRow || col !== 0 && col !== 8)) {
+                score += Math.round(10 + openingPhase * 8);
+            }
+
+            if (piece[1] === 'C') {
+                const deepRaid = color === RED_COLOR ? row <= 3 : row >= 6;
+                const crossedRiver = color === RED_COLOR ? row <= 4 : row >= 5;
+
+                if (crossedRiver) {
+                    score -= Math.round(6 + openingPhase * 8);
+                }
+
+                if (deepRaid) {
+                    score -= Math.round(20 + openingPhase * 18 + undevelopedMajors * 8);
+                }
+
+                if (undevelopedMajors >= 2 && row !== (color === RED_COLOR ? 7 : 2) && col !== 4) {
+                    score -= Math.round(10 + openingPhase * 10);
+                }
+            }
+        }
+    }
+
+    return score;
+}
+
 function evaluateBoard(activeBoard) {
     let score = 0;
     const counts = buildPieceCounts(activeBoard);
@@ -976,6 +1022,8 @@ function evaluateBoard(activeBoard) {
     score -= evaluateGeneralSafety(activeBoard, humanColor, counts, openingPhase);
     score += evaluateSoldierStructure(activeBoard, computerColor, counts, openingPhase);
     score -= evaluateSoldierStructure(activeBoard, humanColor, counts, openingPhase);
+    score += evaluateDevelopment(activeBoard, computerColor, openingPhase);
+    score -= evaluateDevelopment(activeBoard, humanColor, openingPhase);
 
     if (isInCheck(activeBoard, humanColor)) {
         score += 55;
