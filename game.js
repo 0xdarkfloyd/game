@@ -120,6 +120,7 @@ let statusMessage = '';
 let moveHistory = [];
 let moveLog = [];
 let moveSequence = [];
+let positionHistory = [];
 let pendingAnimatedMove = null;
 let audioContext = null;
 const transpositionTable = new Map();
@@ -173,6 +174,10 @@ function cloneMoveSequence(entries) {
     return entries.slice();
 }
 
+function clonePositionHistory(entries) {
+    return entries.slice();
+}
+
 function getFileNumber(col) {
     return 9 - col;
 }
@@ -187,6 +192,29 @@ function getOpeningBookKey(color, historySequence) {
 
 function getMoveKey(move) {
     return `${move.fromRow},${move.fromCol}-${move.toRow},${move.toCol}`;
+}
+
+function parseMoveKey(moveKey) {
+    const [fromPart, toPart] = moveKey.split('-');
+    const [fromRow, fromCol] = fromPart.split(',').map(Number);
+    const [toRow, toCol] = toPart.split(',').map(Number);
+    return { fromRow, fromCol, toRow, toCol };
+}
+
+function mirrorCol(col) {
+    return 8 - col;
+}
+
+function mirrorMoveDescriptor(move) {
+    return {
+        ...move,
+        fromCol: mirrorCol(move.fromCol),
+        toCol: mirrorCol(move.toCol)
+    };
+}
+
+function mirrorMoveKey(moveKey) {
+    return getMoveKey(mirrorMoveDescriptor(parseMoveKey(moveKey)));
 }
 
 function getStartStatusMessage() {
@@ -814,17 +842,54 @@ function orderMoves(activeBoard, moves, ttMove) {
         .sort((left, right) => scoreMove(activeBoard, right, ttMove) - scoreMove(activeBoard, left, ttMove));
 }
 
-function findOpeningBookMove(activeBoard, color, historySequence) {
-    const candidates = OPENING_BOOK[getOpeningBookKey(color, historySequence)];
-    if (!candidates || candidates.length === 0) {
-        return null;
+function isPerpetualCheckViolation(activeBoard, move, color, history = positionHistory) {
+    if (!history || history.length < 4) {
+        return false;
     }
 
+    const nextBoard = applyMoveToBoard(activeBoard, move);
+    const opponent = otherColor(color);
+    if (!isInCheck(nextBoard, opponent)) {
+        return false;
+    }
+
+    const nextKey = getBoardKey(nextBoard, opponent);
+    let occurrences = 0;
+
+    for (const key of history) {
+        if (key === nextKey) {
+            occurrences++;
+            if (occurrences >= 2) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function filterPlayableMoves(activeBoard, color, moves, history = positionHistory) {
+    return moves.filter(move => !isPerpetualCheckViolation(activeBoard, move, color, history));
+}
+
+function findOpeningBookMove(activeBoard, color, historySequence) {
     const legalMoves = getAllLegalMoves(activeBoard, color);
     const legalByKey = new Map(legalMoves.map(move => [getMoveKey(move), move]));
+    const directCandidates = OPENING_BOOK[getOpeningBookKey(color, historySequence)] || [];
 
-    for (const candidate of candidates) {
+    for (const candidate of directCandidates) {
         const key = getMoveKey(candidate);
+        if (legalByKey.has(key)) {
+            return legalByKey.get(key);
+        }
+    }
+
+    const mirroredSequence = historySequence.map(mirrorMoveKey);
+    const mirroredCandidates = OPENING_BOOK[getOpeningBookKey(color, mirroredSequence)] || [];
+
+    for (const candidate of mirroredCandidates) {
+        const mirroredCandidate = mirrorMoveDescriptor(candidate);
+        const key = getMoveKey(mirroredCandidate);
         if (legalByKey.has(key)) {
             return legalByKey.get(key);
         }
@@ -967,11 +1032,11 @@ function chooseSearchDepth(activeBoard, legalMoves) {
 
 function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
     const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
-    if (bookMove) {
+    if (bookMove && !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory)) {
         return bookMove;
     }
 
-    const legalMoves = getAllLegalMoves(activeBoard, color);
+    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory);
     if (legalMoves.length === 0) {
         return null;
     }
@@ -1074,9 +1139,17 @@ function getGameState(activeBoard, sideToMove) {
         return { winner: RED_COLOR, message: '\u7d05\u65b9\u52dd\uff1a\u9ed1\u5c07\u88ab\u5403\u3002' };
     }
 
-    const legalMoves = getAllLegalMoves(activeBoard, sideToMove);
+    const rawLegalMoves = getAllLegalMoves(activeBoard, sideToMove);
+    const legalMoves = filterPlayableMoves(activeBoard, sideToMove, rawLegalMoves, positionHistory);
     if (legalMoves.length > 0) {
         return null;
+    }
+
+    if (rawLegalMoves.length > 0) {
+        return {
+            winner: otherColor(sideToMove),
+            message: `${colorName(otherColor(sideToMove))}\u52dd\uff1a${colorName(sideToMove)}\u9577\u5c07\u7981\u624b\u3002`
+        };
     }
 
     if (isInCheck(activeBoard, sideToMove)) {
@@ -1318,7 +1391,7 @@ function clearSelection() {
 
 function selectPiece(row, col) {
     selectedCell = { row, col };
-    validMoves = getLegalMovesForPiece(board, row, col);
+    validMoves = filterPlayableMoves(board, board[row][col][0], getLegalMovesForPiece(board, row, col), positionHistory);
     createBoard();
 }
 
@@ -1331,7 +1404,8 @@ function snapshotState() {
         aiThinking,
         statusMessage,
         moveLog: cloneMoveLog(moveLog),
-        moveSequence: cloneMoveSequence(moveSequence)
+        moveSequence: cloneMoveSequence(moveSequence),
+        positionHistory: clonePositionHistory(positionHistory)
     };
 }
 
@@ -1344,6 +1418,7 @@ function restoreState(snapshot) {
     statusMessage = snapshot.statusMessage;
     moveLog = cloneMoveLog(snapshot.moveLog || []);
     moveSequence = cloneMoveSequence(snapshot.moveSequence || []);
+    positionHistory = clonePositionHistory(snapshot.positionHistory || []);
     pendingAnimatedMove = null;
     clearSelection();
     createBoard();
@@ -1417,6 +1492,7 @@ function performMove(move) {
     board = applyMoveToBoard(board, move);
     lastMove = move;
     currentPlayer = otherColor(currentPlayer);
+    positionHistory.push(getBoardKey(board, currentPlayer));
     clearSelection();
     finalizeMove();
 }
@@ -1507,6 +1583,7 @@ function resetGame() {
     moveHistory = [];
     moveLog = [];
     moveSequence = [];
+    positionHistory = [getBoardKey(board, currentPlayer)];
     pendingAnimatedMove = null;
     transpositionTable.clear();
     statusMessage = getStartStatusMessage();
