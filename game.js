@@ -104,6 +104,14 @@ const OPENING_BOOK = {
         { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' },
         { fromRow: 0, fromCol: 0, toRow: 1, toCol: 0, name: '\u8eca9\u90321' }
     ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,2-5,2/0,7-2,6/9,1-7,2/3,6-4,6/7,2-5,3`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' }
+    ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,2-5,2/0,7-2,6/9,1-7,2/3,6-4,6/7,2-5,3/0,0-0,1/7,1-7,2`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
     [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
         { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
@@ -1043,6 +1051,34 @@ function countUndevelopedMajors(activeBoard, color) {
     return count;
 }
 
+function countUndevelopedRooks(activeBoard, color) {
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    let count = 0;
+
+    if (activeBoard[homeRow][0] === `${color}R`) {
+        count++;
+    }
+    if (activeBoard[homeRow][8] === `${color}R`) {
+        count++;
+    }
+
+    return count;
+}
+
+function countDevelopedHorses(activeBoard, color) {
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    let count = 0;
+
+    if (activeBoard[homeRow][1] !== `${color}H`) {
+        count++;
+    }
+    if (activeBoard[homeRow][7] !== `${color}H`) {
+        count++;
+    }
+
+    return count;
+}
+
 function evaluateOpeningDevelopment(activeBoard, color) {
     const pieceCount = countPieces(activeBoard);
     if (pieceCount < 24) {
@@ -1054,6 +1090,8 @@ function evaluateOpeningDevelopment(activeBoard, color) {
     const cannonRow = color === RED_COLOR ? 7 : 2;
     const naturalHorseRow = color === RED_COLOR ? 7 : 2;
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    const undevelopedRooks = countUndevelopedRooks(activeBoard, color);
+    const developedHorses = countDevelopedHorses(activeBoard, color);
     let score = -undevelopedMajors * 14;
 
     const general = findGeneral(activeBoard, color);
@@ -1084,6 +1122,9 @@ function evaluateOpeningDevelopment(activeBoard, color) {
 
             if (piece[1] === 'R' && !(row === homeRow && (col === 0 || col === 8))) {
                 score += 12;
+            }
+            if (piece[1] === 'R' && undevelopedRooks === 2 && developedHorses === 2 && row === homeRow) {
+                score -= 18;
             }
 
             if (piece[1] === 'C' && row === cannonRow && col === 4) {
@@ -1117,6 +1158,15 @@ function evaluateOpeningDevelopment(activeBoard, color) {
             if (piece[1] === 'C' && row !== cannonRow && undevelopedMajors >= 2) {
                 score -= 14;
             }
+
+            if (undevelopedRooks === 2 && developedHorses === 2) {
+                if (piece[1] === 'S' && row !== soldierRow) {
+                    score -= col === 4 ? 10 : 18;
+                }
+                if ((piece[1] === 'H' || piece[1] === 'C') && !((piece[1] === 'H' && row === naturalHorseRow && (col === 2 || col === 6)))) {
+                    score -= 10;
+                }
+            }
         }
     }
 
@@ -1134,6 +1184,8 @@ function getOpeningMoveBonus(activeBoard, move) {
     const cannonRow = color === RED_COLOR ? 7 : 2;
     const naturalHorseRow = color === RED_COLOR ? 7 : 2;
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    const undevelopedRooks = countUndevelopedRooks(activeBoard, color);
+    const developedHorses = countDevelopedHorses(activeBoard, color);
     let score = 0;
 
     if (move.piece[1] === 'H' && move.fromRow === homeRow) {
@@ -1155,6 +1207,9 @@ function getOpeningMoveBonus(activeBoard, move) {
 
     if (move.piece[1] === 'R' && move.fromRow === homeRow) {
         score += 20;
+        if (undevelopedRooks === 2 && developedHorses === 2) {
+            score += move.toRow === homeRow ? 34 : 18;
+        }
     }
 
     if (move.piece[1] === 'C' && move.fromRow === cannonRow && move.toRow === cannonRow && move.toCol === 4) {
@@ -1178,6 +1233,10 @@ function getOpeningMoveBonus(activeBoard, move) {
         } else {
             score -= undevelopedMajors >= 2 ? 34 : 14;
         }
+
+        if (undevelopedRooks === 2 && developedHorses === 2) {
+            score -= move.fromCol === 4 ? 18 : 32;
+        }
     }
 
     if ((move.piece[1] === 'A' || move.piece[1] === 'E') && undevelopedMajors >= 2) {
@@ -1190,6 +1249,15 @@ function getOpeningMoveBonus(activeBoard, move) {
 
     if (move.piece[1] === 'C' && !move.captured && move.fromRow === cannonRow && move.toRow !== cannonRow && undevelopedMajors >= 2) {
         score -= 30;
+    }
+
+    if (undevelopedRooks === 2 && developedHorses === 2 && !move.captured) {
+        if (move.piece[1] === 'H') {
+            score -= 34;
+        }
+        if (move.piece[1] === 'C') {
+            score -= 26;
+        }
     }
 
     return score;
@@ -1213,6 +1281,8 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
     }
 
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    const undevelopedRooks = countUndevelopedRooks(activeBoard, color);
+    const developedHorses = countDevelopedHorses(activeBoard, color);
     const lastOwnMove = recentSideMoves[recentSideMoves.length - 1];
     const previousOwnMove = recentSideMoves.length > 1 ? recentSideMoves[recentSideMoves.length - 2] : null;
     let score = 0;
@@ -1246,6 +1316,18 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
         const lastMovedPiece = activeBoard[lastOwnMove.toRow][lastOwnMove.toCol];
         if (lastMovedPiece === `${color}C` && samePieceAsLastMove) {
             score -= 22;
+        }
+    }
+
+    if (undevelopedRooks === 2 && developedHorses === 2 && !move.captured) {
+        if (move.piece[1] === 'R' && move.fromRow === (color === RED_COLOR ? 9 : 0)) {
+            score += move.toRow === move.fromRow ? 30 : 14;
+        }
+        if (move.piece[1] === 'S') {
+            score -= move.fromCol === 4 ? 18 : 26;
+        }
+        if (move.piece[1] === 'H' || move.piece[1] === 'C') {
+            score -= 24;
         }
     }
 
