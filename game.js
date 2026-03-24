@@ -1293,6 +1293,9 @@ function evaluateOpeningDevelopment(activeBoard, color) {
                 if (Math.abs(col - 4) <= 1 && Math.abs(row - homeRow) === 1) {
                     score -= 52;
                 }
+                if ((col === 0 || col === 8) && row !== homeRow) {
+                    score -= 24;
+                }
             }
             if (piece[1] === 'H' && row === homeRow && col !== 1 && col !== 7) {
                 score -= 26;
@@ -1404,6 +1407,9 @@ function getOpeningMoveBonus(activeBoard, move) {
         }
         if (move.toRow === homeRow && (move.toCol === 1 || move.toCol === 7) && undevelopedRooks >= 1) {
             score -= undevelopedRooks === 2 ? 58 : 34;
+        }
+        if ((move.toCol === 0 || move.toCol === 8) && move.toRow !== homeRow && undevelopedRooks >= 1) {
+            score -= undevelopedRooks === 2 ? 46 : 24;
         }
         if (move.fromRow === naturalHorseRow && (move.fromCol === 2 || move.fromCol === 6) &&
             Math.abs(move.toCol - 4) <= 1 && Math.abs(move.toRow - homeRow) === 1) {
@@ -2088,9 +2094,7 @@ function applyPracticalOpeningChoice(activeBoard, color, legalMoves, candidateMo
     }
     if (candidateMove.piece[1] === 'H' &&
         candidateMove.fromRow === naturalHorseRow &&
-        (candidateMove.fromCol === 2 || candidateMove.fromCol === 6) &&
-        (candidateMove.toRow === homeRow ||
-            (Math.abs(candidateMove.toCol - 4) <= 1 && Math.abs(candidateMove.toRow - homeRow) === 1))) {
+        (candidateMove.fromCol === 2 || candidateMove.fromCol === 6)) {
         return rookMoves[0];
     }
 
@@ -2754,29 +2758,36 @@ async function computerMove() {
         return;
     }
 
-    const requestBoard = cloneBoard(board);
-    const requestHistory = cloneMoveSequence(moveSequence);
-    const move = await requestComputerMove(requestBoard, computerColor, requestHistory);
+    try {
+        const requestBoard = cloneBoard(board);
+        const requestHistory = cloneMoveSequence(moveSequence);
+        const move = await requestComputerMove(requestBoard, computerColor, requestHistory);
 
-    if (!gameActive || currentPlayer !== computerColor) {
+        if (!gameActive || currentPlayer !== computerColor) {
+            return;
+        }
+
+        const legalMoves = filterPlayableMoves(board, computerColor, getAllLegalMoves(board, computerColor), positionHistory, moveSequence);
+        const chosenMove = move
+            ? legalMoves.find(candidate => sameMove(candidate, move)) || getFallbackMove(board, computerColor, moveSequence)
+            : null;
+
+        if (!chosenMove) {
+            finalizeMove();
+            return;
+        }
+
+        performMove(chosenMove);
+    } catch (error) {
+        const fallbackMove = getFallbackMove(board, computerColor, moveSequence);
+        if (gameActive && currentPlayer === computerColor && fallbackMove) {
+            performMove(fallbackMove);
+            return;
+        }
+    } finally {
         aiThinking = false;
         updateStatus();
-        return;
     }
-
-    aiThinking = false;
-
-    const legalMoves = filterPlayableMoves(board, computerColor, getAllLegalMoves(board, computerColor), positionHistory, moveSequence);
-    const chosenMove = move
-        ? legalMoves.find(candidate => sameMove(candidate, move)) || getFallbackMove(board, computerColor, moveSequence)
-        : null;
-
-    if (!chosenMove) {
-        finalizeMove();
-        return;
-    }
-
-    performMove(chosenMove);
 }
 
 function undoMove() {
