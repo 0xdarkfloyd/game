@@ -103,20 +103,66 @@ function createBoard() {
     blackPalace2.style.transform = 'rotate(-45deg)';
     boardElement.appendChild(blackPalace2);
 
-    // Draw river text (楚河 汉界)
+    // Draw river text (楚 河 / 汉 界)
     const riverTextLeft = document.createElement('div');
     riverTextLeft.className = 'river-text';
-    riverTextLeft.textContent = '楚河';
-    riverTextLeft.style.left = (0.5 * CELL_SIZE) + 'px';
-    riverTextLeft.style.top = (4.3 * CELL_SIZE) + 'px';
+    riverTextLeft.textContent = '楚 河';
+    riverTextLeft.style.left = (0.3 * CELL_SIZE) + 'px';
+    riverTextLeft.style.top = (4.35 * CELL_SIZE) + 'px';
     boardElement.appendChild(riverTextLeft);
 
     const riverTextRight = document.createElement('div');
     riverTextRight.className = 'river-text';
-    riverTextRight.textContent = '汉界';
-    riverTextRight.style.left = (5.5 * CELL_SIZE) + 'px';
-    riverTextRight.style.top = (4.3 * CELL_SIZE) + 'px';
+    riverTextRight.textContent = '汉 界';
+    riverTextRight.style.left = (5.3 * CELL_SIZE) + 'px';
+    riverTextRight.style.top = (4.35 * CELL_SIZE) + 'px';
     boardElement.appendChild(riverTextRight);
+
+    // Draw position markers for cannon and soldier positions
+    const markers = [
+        // Top side (Black) - Cannon positions
+        { row: 2, col: 1 }, { row: 2, col: 7 },
+        // Top side (Black) - Soldier positions
+        { row: 3, col: 0 }, { row: 3, col: 2 }, { row: 3, col: 4 }, { row: 3, col: 6 }, { row: 3, col: 8 },
+        // Bottom side (Red) - Soldier positions
+        { row: 6, col: 0 }, { row: 6, col: 2 }, { row: 6, col: 4 }, { row: 6, col: 6 }, { row: 6, col: 8 },
+        // Bottom side (Red) - Cannon positions
+        { row: 7, col: 1 }, { row: 7, col: 7 }
+    ];
+
+    markers.forEach(pos => {
+        // Draw 4 corners for each marker position
+        const positions = [];
+        const isLeftEdge = pos.col === 0;
+        const isRightEdge = pos.col === 8;
+        const isTopEdge = pos.row === 0;
+        const isBottomEdge = pos.row === 9;
+
+        // Top-left corner
+        if (!isTopEdge && !isLeftEdge) {
+            positions.push({ corner: 'tl', dx: -6, dy: -6 });
+        }
+        // Top-right corner
+        if (!isTopEdge && !isRightEdge) {
+            positions.push({ corner: 'tr', dx: 6, dy: -6 });
+        }
+        // Bottom-left corner
+        if (!isBottomEdge && !isLeftEdge) {
+            positions.push({ corner: 'bl', dx: -6, dy: 6 });
+        }
+        // Bottom-right corner
+        if (!isBottomEdge && !isRightEdge) {
+            positions.push({ corner: 'br', dx: 6, dy: 6 });
+        }
+
+        positions.forEach(({ corner, dx, dy }) => {
+            const marker = document.createElement('div');
+            marker.className = `position-marker marker-${corner}`;
+            marker.style.left = (pos.col * CELL_SIZE + dx - 6) + 'px';
+            marker.style.top = (pos.row * CELL_SIZE + dy - 6) + 'px';
+            boardElement.appendChild(marker);
+        });
+    });
 
     // Draw clickable intersections
     for (let row = 0; row < 10; row++) {
