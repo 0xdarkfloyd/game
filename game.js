@@ -4,6 +4,11 @@ const MATE_SCORE = 900000;
 const QUIESCENCE_DEPTH = 3;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
+const AI_WORKER_TIMEOUT_MS = 1400;
+const OPENING_SEARCH_TIME_MS = 380;
+const MIDGAME_SEARCH_TIME_MS = 650;
+const ENDGAME_SEARCH_TIME_MS = 900;
+const SEARCH_TIME_CHECK_INTERVAL = 1;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -258,6 +263,12 @@ let positionHistory = [];
 let pendingAnimatedMove = null;
 let audioContext = null;
 const transpositionTable = new Map();
+let aiWorker = null;
+let aiRequestId = 0;
+let pendingAiJob = null;
+let searchDeadline = 0;
+let searchNodeCounter = 0;
+let searchTimedOut = false;
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -835,6 +846,44 @@ function getCapturingMoves(activeBoard, color) {
         }
     }
     return tacticalMoves;
+}
+
+function getSearchTimeBudget(activeBoard, legalMoves) {
+    const pieceCount = countPieces(activeBoard);
+
+    if (pieceCount >= 28 || legalMoves.length >= 34) {
+        return OPENING_SEARCH_TIME_MS;
+    }
+
+    if (pieceCount >= 18) {
+        return MIDGAME_SEARCH_TIME_MS;
+    }
+
+    return ENDGAME_SEARCH_TIME_MS;
+}
+
+function beginSearchBudget(activeBoard, legalMoves) {
+    searchDeadline = Date.now() + getSearchTimeBudget(activeBoard, legalMoves);
+    searchNodeCounter = 0;
+    searchTimedOut = false;
+}
+
+function shouldAbortSearch() {
+    if (searchTimedOut || !searchDeadline) {
+        return searchTimedOut;
+    }
+
+    searchNodeCounter++;
+    if (searchNodeCounter % SEARCH_TIME_CHECK_INTERVAL !== 0) {
+        return false;
+    }
+
+    if (Date.now() >= searchDeadline) {
+        searchTimedOut = true;
+        return true;
+    }
+
+    return false;
 }
 
 function countPieceType(activeBoard, color, type) {
@@ -1538,6 +1587,9 @@ function findOpeningBookMove(activeBoard, color, historySequence) {
 
 function quiescence(activeBoard, color, alpha, beta, depth) {
     const standPat = evaluateForColor(activeBoard, color);
+    if (shouldAbortSearch()) {
+        return { score: standPat, aborted: true };
+    }
     if (standPat >= beta || depth === 0) {
         return { score: standPat };
     }
@@ -1574,6 +1626,9 @@ function quiescence(activeBoard, color, alpha, beta, depth) {
         if (alpha >= beta) {
             break;
         }
+        if (result.aborted) {
+            return { score: bestScore, aborted: true };
+        }
     }
 
     return { score: bestScore };
@@ -1588,6 +1643,9 @@ function negamax(activeBoard, color, depth, alpha, beta) {
     }
     if (!blackGeneral) {
         return { score: color === RED_COLOR ? MATE_SCORE + depth : -MATE_SCORE - depth };
+    }
+    if (shouldAbortSearch()) {
+        return { score: evaluateForColor(activeBoard, color), aborted: true };
     }
 
     const ttKey = getBoardKey(activeBoard, color);
@@ -1634,6 +1692,13 @@ function negamax(activeBoard, color, depth, alpha, beta) {
         }
         if (alpha >= beta) {
             break;
+        }
+        if (result.aborted) {
+            return {
+                score: bestScore === -Infinity ? score : bestScore,
+                bestMove,
+                aborted: true
+            };
         }
     }
 
@@ -1684,6 +1749,124 @@ function getRootCandidateLimit(pieceCount, legalMoveCount) {
     return legalMoveCount;
 }
 
+function getFallbackMove(activeBoard, color, historySequence = moveSequence) {
+    const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
+    if (bookMove &&
+        !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory) &&
+        !isPerpetualChaseViolation(activeBoard, bookMove, color, positionHistory, historySequence)) {
+        return bookMove;
+    }
+
+    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
+    if (legalMoves.length === 0) {
+        return null;
+    }
+
+    return orderMoves(activeBoard, legalMoves)[0];
+}
+
+function disposeAiWorker() {
+    if (aiWorker) {
+        aiWorker.terminate();
+        aiWorker = null;
+    }
+}
+
+function cancelPendingAiJob() {
+    aiRequestId++;
+    if (pendingAiJob) {
+        if (pendingAiJob.timeoutId) {
+            clearTimeout(pendingAiJob.timeoutId);
+        }
+        pendingAiJob = null;
+        disposeAiWorker();
+    }
+}
+
+function ensureAiWorker() {
+    if (typeof Worker === 'undefined' || typeof window === 'undefined') {
+        return null;
+    }
+
+    if (aiWorker) {
+        return aiWorker;
+    }
+
+    try {
+        aiWorker = new Worker('ai-worker.js');
+    } catch (error) {
+        aiWorker = null;
+        return null;
+    }
+
+    aiWorker.onmessage = event => {
+        const data = event.data || {};
+        if (!pendingAiJob || data.id !== pendingAiJob.id) {
+            return;
+        }
+
+        const job = pendingAiJob;
+        pendingAiJob = null;
+        clearTimeout(job.timeoutId);
+        job.resolve(data.move || job.fallbackMove);
+    };
+
+    aiWorker.onerror = () => {
+        if (!pendingAiJob) {
+            disposeAiWorker();
+            return;
+        }
+
+        const job = pendingAiJob;
+        pendingAiJob = null;
+        clearTimeout(job.timeoutId);
+        disposeAiWorker();
+        job.resolve(job.fallbackMove);
+    };
+
+    return aiWorker;
+}
+
+function requestComputerMove(activeBoard, color, historySequence = moveSequence) {
+    const fallbackMove = getFallbackMove(activeBoard, color, historySequence);
+    const worker = ensureAiWorker();
+
+    if (!worker || typeof window === 'undefined') {
+        return Promise.resolve(fallbackMove);
+    }
+
+    cancelPendingAiJob();
+
+    return new Promise(resolve => {
+        const id = ++aiRequestId;
+        const timeoutId = window.setTimeout(() => {
+            if (!pendingAiJob || pendingAiJob.id !== id) {
+                return;
+            }
+
+            const job = pendingAiJob;
+            pendingAiJob = null;
+            disposeAiWorker();
+            resolve(job.fallbackMove);
+        }, AI_WORKER_TIMEOUT_MS);
+
+        pendingAiJob = {
+            id,
+            resolve,
+            timeoutId,
+            fallbackMove
+        };
+
+        worker.postMessage({
+            id,
+            board: cloneBoard(activeBoard),
+            color,
+            historySequence: cloneMoveSequence(historySequence),
+            positionHistory: clonePositionHistory(positionHistory)
+        });
+    });
+}
+
 function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
     const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
     if (bookMove &&
@@ -1703,6 +1886,7 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
     const pieceCount = countPieces(activeBoard);
+    beginSearchBudget(activeBoard, legalMoves);
 
     if (pieceCount >= 24 && legalMoves.length <= 32) {
         const rootEntries = legalMoves.map(move => {
@@ -1729,6 +1913,9 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = entry.move;
+            }
+            if (result.aborted) {
+                break;
             }
         }
 
@@ -2099,6 +2286,7 @@ function snapshotState() {
 }
 
 function restoreState(snapshot) {
+    cancelPendingAiJob();
     board = cloneBoard(snapshot.board);
     currentPlayer = snapshot.currentPlayer;
     lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
@@ -2214,22 +2402,36 @@ function handleCellClick(row, col) {
     createBoard();
 }
 
-function computerMove() {
+async function computerMove() {
     if (!gameActive || currentPlayer !== computerColor) {
         aiThinking = false;
         updateStatus();
         return;
     }
 
-    const move = chooseComputerMove(board, computerColor, moveSequence);
+    const requestBoard = cloneBoard(board);
+    const requestHistory = cloneMoveSequence(moveSequence);
+    const move = await requestComputerMove(requestBoard, computerColor, requestHistory);
+
+    if (!gameActive || currentPlayer !== computerColor) {
+        aiThinking = false;
+        updateStatus();
+        return;
+    }
+
     aiThinking = false;
 
-    if (!move) {
+    const legalMoves = filterPlayableMoves(board, computerColor, getAllLegalMoves(board, computerColor), positionHistory, moveSequence);
+    const chosenMove = move
+        ? legalMoves.find(candidate => sameMove(candidate, move)) || getFallbackMove(board, computerColor, moveSequence)
+        : null;
+
+    if (!chosenMove) {
         finalizeMove();
         return;
     }
 
-    performMove(move);
+    performMove(chosenMove);
 }
 
 function undoMove() {
@@ -2262,6 +2464,7 @@ function setHumanSide(color) {
 }
 
 function resetGame() {
+    cancelPendingAiJob();
     board = cloneBoard(initialBoard);
     currentPlayer = RED_COLOR;
     selectedCell = null;
