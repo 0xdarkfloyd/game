@@ -1,14 +1,13 @@
 const RED_COLOR = 'r';
 const BLACK_COLOR = 'b';
 const MATE_SCORE = 900000;
-const QUIESCENCE_DEPTH = 3;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
-const AI_WORKER_TIMEOUT_MS = 2400;
-const OPENING_SEARCH_TIME_MS = 620;
-const MIDGAME_SEARCH_TIME_MS = 920;
-const ENDGAME_SEARCH_TIME_MS = 1250;
-const SEARCH_TIME_CHECK_INTERVAL = 1;
+const AI_WORKER_TIMEOUT_MS = 1800;
+const OPENING_SEARCH_TIME_MS = 700;
+const MIDGAME_SEARCH_TIME_MS = 860;
+const ENDGAME_SEARCH_TIME_MS = 980;
+const SEARCH_TIME_CHECK_INTERVAL = 32;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -296,6 +295,16 @@ let pendingAiJob = null;
 let searchDeadline = 0;
 let searchNodeCounter = 0;
 let searchTimedOut = false;
+let engineCore = null;
+let createEngineCoreFactory = typeof createXiangqiEngineCore === 'function' ? createXiangqiEngineCore : null;
+
+if (!createEngineCoreFactory && typeof require === 'function') {
+    try {
+        ({ createXiangqiEngineCore: createEngineCoreFactory } = require('./engine-core.js'));
+    } catch (error) {
+        createEngineCoreFactory = null;
+    }
+}
 
 function cloneBoard(source) {
     return source.map(row => row.slice());
@@ -930,6 +939,42 @@ function getCapturingMoves(activeBoard, color) {
         }
     }
     return tacticalMoves;
+}
+
+function ensureEngineCore() {
+    if (engineCore || !createEngineCoreFactory) {
+        return engineCore;
+    }
+
+    engineCore = createEngineCoreFactory({
+        RED_COLOR,
+        BLACK_COLOR,
+        MATE_SCORE,
+        OPENING_BOOK,
+        cloneBoard,
+        cloneMoveSequence,
+        clonePositionHistory,
+        otherColor,
+        countPieces,
+        findGeneral,
+        applyMoveToBoard,
+        getBoardKey,
+        getMoveKey,
+        getOpeningBookKey,
+        parseMoveKey,
+        mirrorMoveKey,
+        mirrorMoveDescriptor,
+        getAllLegalMoves,
+        getPseudoMoves,
+        getAttackerValues,
+        isInCheck,
+        isSquareAttacked,
+        hasCrossedRiver,
+        filterPlayableMoves,
+        sameMove
+    });
+
+    return engineCore;
 }
 
 function getSearchTimeBudget(activeBoard, legalMoves) {
@@ -2024,19 +2069,18 @@ function getRootCandidateLimit(pieceCount, legalMoveCount) {
 }
 
 function getFallbackMove(activeBoard, color, historySequence = moveSequence) {
-    const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
-    if (bookMove &&
-        !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory) &&
-        !isPerpetualChaseViolation(activeBoard, bookMove, color, positionHistory, historySequence)) {
-        return bookMove;
+    const engine = ensureEngineCore();
+    if (engine) {
+        return engine.pickFallbackMove(
+            cloneBoard(activeBoard),
+            color,
+            cloneMoveSequence(historySequence),
+            clonePositionHistory(positionHistory)
+        );
     }
 
     const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
-    if (legalMoves.length === 0) {
-        return null;
-    }
-
-    return orderMoves(activeBoard, legalMoves)[0];
+    return legalMoves[0] || null;
 }
 
 function searchRootEntries(rootEntries, color, depth) {
@@ -2137,14 +2181,14 @@ function ensureAiWorker() {
 
     aiWorker.onmessage = event => {
         const data = event.data || {};
-        if (!pendingAiJob || data.id !== pendingAiJob.id) {
+        if (!pendingAiJob || data.requestId !== pendingAiJob.requestId) {
             return;
         }
 
         const job = pendingAiJob;
         pendingAiJob = null;
         clearTimeout(job.timeoutId);
-        job.resolve(data.move || job.fallbackMove);
+        job.resolve(data.result && data.result.move ? data.result.move : job.fallbackMove);
     };
 
     aiWorker.onerror = () => {
@@ -2166,6 +2210,8 @@ function ensureAiWorker() {
 function requestComputerMove(activeBoard, color, historySequence = moveSequence) {
     const fallbackMove = getFallbackMove(activeBoard, color, historySequence);
     const worker = ensureAiWorker();
+    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
+    const timeBudgetMs = getSearchTimeBudget(activeBoard, legalMoves);
 
     if (!worker || typeof window === 'undefined') {
         return Promise.resolve(fallbackMove);
@@ -2174,9 +2220,9 @@ function requestComputerMove(activeBoard, color, historySequence = moveSequence)
     cancelPendingAiJob();
 
     return new Promise(resolve => {
-        const id = ++aiRequestId;
+        const requestId = ++aiRequestId;
         const timeoutId = window.setTimeout(() => {
-            if (!pendingAiJob || pendingAiJob.id !== id) {
+            if (!pendingAiJob || pendingAiJob.requestId !== requestId) {
                 return;
             }
 
@@ -2184,95 +2230,44 @@ function requestComputerMove(activeBoard, color, historySequence = moveSequence)
             pendingAiJob = null;
             disposeAiWorker();
             resolve(job.fallbackMove);
-        }, AI_WORKER_TIMEOUT_MS);
+        }, Math.max(AI_WORKER_TIMEOUT_MS, timeBudgetMs + 400));
 
         pendingAiJob = {
-            id,
+            requestId,
             resolve,
             timeoutId,
             fallbackMove
         };
 
         worker.postMessage({
-            id,
+            requestId,
             board: cloneBoard(activeBoard),
-            color,
-            historySequence: cloneMoveSequence(historySequence),
-            positionHistory: clonePositionHistory(positionHistory)
+            currentPlayer: color,
+            history: cloneMoveSequence(historySequence),
+            positionHistory: clonePositionHistory(positionHistory),
+            timeBudgetMs
         });
     });
 }
 
 function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
-    const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
-    if (bookMove &&
-        !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory) &&
-        !isPerpetualChaseViolation(activeBoard, bookMove, color, positionHistory, historySequence)) {
-        const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
-        return applyPracticalOpeningChoice(activeBoard, color, legalMoves, bookMove);
+    const engine = ensureEngineCore();
+    if (!engine) {
+        return getFallbackMove(activeBoard, color, historySequence);
     }
 
-    const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
-    if (legalMoves.length === 0) {
-        return null;
-    }
+    const result = engine.computeBestMove({
+        board: cloneBoard(activeBoard),
+        currentPlayer: color,
+        history: cloneMoveSequence(historySequence),
+        positionHistory: clonePositionHistory(positionHistory),
+        timeBudgetMs: getSearchTimeBudget(
+            activeBoard,
+            filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence)
+        )
+    });
 
-    if (transpositionTable.size > 25000) {
-        transpositionTable.clear();
-    }
-
-    const depth = chooseSearchDepth(activeBoard, legalMoves);
-    const pieceCount = countPieces(activeBoard);
-    const openingContext = {
-        rookDevelopmentAvailable: pieceCount >= 24 && countUndevelopedRooks(activeBoard, color) >= 1
-            ? hasHomeRookDevelopment(activeBoard, color)
-            : false
-    };
-    beginSearchBudget(activeBoard, legalMoves);
-
-    if (pieceCount >= 24 && legalMoves.length <= 32) {
-        const rootEntries = legalMoves.map(move => {
-            const nextBoard = applyMoveToBoard(activeBoard, move);
-            const openingAdjustment = getRootOpeningAdjustment(activeBoard, move, color, historySequence, openingContext);
-            const tacticalAdjustment = getRootTacticalAdjustment(activeBoard, nextBoard, move, color);
-            return {
-                move,
-                nextBoard,
-                adjustment: openingAdjustment + tacticalAdjustment,
-                sortScore: scoreMove(activeBoard, move) + openingAdjustment + tacticalAdjustment
-            };
-        });
-
-        rootEntries.sort((left, right) => right.sortScore - left.sortScore);
-        const rootMoves = rootEntries.slice(0, getRootCandidateLimit(pieceCount, rootEntries.length));
-        let bestMove = rootMoves[0].move;
-
-        for (let currentDepth = 1; currentDepth <= depth; currentDepth++) {
-            const result = searchRootEntries(rootMoves, color, currentDepth);
-            if (result.bestMove) {
-                bestMove = result.bestMove;
-            }
-            if (result.aborted) {
-                break;
-            }
-        }
-
-        return applyPracticalOpeningChoice(activeBoard, color, legalMoves, bestMove || rootMoves[0].move);
-    }
-
-    let bestMove = orderMoves(activeBoard, legalMoves)[0];
-
-    for (let currentDepth = 1; currentDepth <= depth; currentDepth++) {
-        const result = negamax(activeBoard, color, currentDepth, -Infinity, Infinity);
-        if (result.bestMove) {
-            bestMove = result.bestMove;
-        }
-        if (result.aborted) {
-            break;
-        }
-    }
-
-    return applyPracticalOpeningChoice(activeBoard, color, legalMoves, bestMove);
+    return result.move || getFallbackMove(activeBoard, color, historySequence);
 }
 
 function getPiecePrefix(activeBoard, piece, row, col) {
@@ -2862,11 +2857,16 @@ if (typeof module !== 'undefined') {
         applyMoveToBoard,
         chooseComputerMove,
         cloneBoard,
+        cloneMoveSequence,
+        clonePositionHistory,
         createMove,
         evaluateBoard,
+        ensureEngineCore,
         findGeneral,
         findOpeningBookMove,
+        filterPlayableMoves,
         formatMoveNotation,
+        getBoardKey,
         getMoveKey,
         getAllLegalMoves,
         getGameState,

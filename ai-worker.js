@@ -1,24 +1,29 @@
-importScripts('game.js');
+importScripts('engine-core.js', 'game.js');
 
 self.onmessage = event => {
     const data = event.data || {};
 
     try {
-        const boardState = cloneBoard(data.board || initialBoard);
-        const color = data.color || BLACK_COLOR;
-        const historySequence = cloneMoveSequence(data.historySequence || []);
+        const engine = ensureEngineCore();
+        if (!engine) {
+            throw new Error('engine core unavailable');
+        }
 
-        humanColor = otherColor(color);
-        computerColor = color;
-        moveSequence = historySequence;
-        positionHistory = clonePositionHistory(data.positionHistory || []);
-        transpositionTable.clear();
+        const result = engine.computeBestMove({
+            board: cloneBoard(data.board || initialBoard),
+            currentPlayer: data.currentPlayer || BLACK_COLOR,
+            history: cloneMoveSequence(data.history || []),
+            positionHistory: clonePositionHistory(data.positionHistory || []),
+            timeBudgetMs: data.timeBudgetMs
+        });
 
-        const move = chooseComputerMove(boardState, color, historySequence);
-        self.postMessage({ id: data.id, move });
+        self.postMessage({
+            requestId: data.requestId,
+            result
+        });
     } catch (error) {
         self.postMessage({
-            id: data.id,
+            requestId: data.requestId,
             error: error && error.message ? error.message : String(error)
         });
     }
