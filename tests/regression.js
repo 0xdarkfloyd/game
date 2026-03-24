@@ -55,19 +55,19 @@ function compute(state, timeBudgetMs = 900) {
 
 const scenarios = [
     {
-        name: 'middle cannon opening avoids early cannon',
+        name: 'middle cannon opening prefers horse development',
         sequence: ['7,7-7,4'],
         check(result) {
             assert(result.move, 'expected a move');
-            assert(!['bC', 'bA', 'bE', 'bG'].includes(result.move.piece), `bad opening piece: ${result.move.piece}`);
+            assert.strictEqual(result.move.piece, 'bH', `expected horse, got ${result.move.piece}`);
         }
     },
     {
-        name: 'flank cannon opening avoids early cannon',
+        name: 'flank cannon opening prefers horse development',
         sequence: ['7,1-7,4'],
         check(result) {
             assert(result.move, 'expected a move');
-            assert(!['bC', 'bA', 'bE', 'bG'].includes(result.move.piece), `bad opening piece: ${result.move.piece}`);
+            assert.strictEqual(result.move.piece, 'bH', `expected horse, got ${result.move.piece}`);
         }
     },
     {

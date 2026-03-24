@@ -547,12 +547,20 @@
 
             if (move.piece[1] === 'R' && move.fromRow === homeRow(color)) {
                 score += 72 + (move.toRow === move.fromRow ? 12 - Math.abs(4 - move.toCol) * 2 : 24);
+                if (undevelopedHorses === 2) {
+                    score -= move.toRow === move.fromRow ? 18 : 58;
+                } else if (undevelopedHorses === 1 && move.toRow !== move.fromRow) {
+                    score -= 20;
+                }
             }
 
             if (move.piece[1] === 'H' && move.fromRow === homeRow(color)) {
                 score += 18;
                 if (undevelopedHorses >= 1) {
                     score += 14;
+                }
+                if (undevelopedHorses === 2) {
+                    score += 18;
                 }
             }
             if (!move.captured && move.piece[1] === 'H') {
@@ -622,6 +630,8 @@
                     score -= undevelopedHorses === 2 ? 24 : 10;
                 } else if (move.piece[1] === 'H' && move.fromRow === homeRow(color)) {
                     score += undevelopedHorses === 2 ? 10 : 6;
+                } else if (move.piece[1] === 'R' && move.fromRow === homeRow(color) && move.toRow !== move.fromRow) {
+                    score -= undevelopedHorses === 2 ? 22 : 8;
                 }
             }
 
