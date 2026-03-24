@@ -473,7 +473,7 @@
             return Math.round(score);
         }
 
-        function evaluateExchangeSafety(board, color, phase) {
+        function evaluateExchangeSafety(board, color, stage) {
             const opponent = otherColor(color);
             let score = 0;
 
@@ -489,18 +489,18 @@
 
                     const attackers = getAttackerValues(board, row, col, opponent);
                     const defenders = getAttackerValues(board, row, col, color);
-                    const value = pieceValue(piece[1], phase);
+                    const value = pieceValue(piece[1], stage);
 
                     if (attackers.length === 0) {
                         continue;
                     }
                     if (defenders.length === 0) {
-                        score -= Math.round(value * 0.1);
+                        score -= Math.round(value * stageWeight(stage, 0.08, 0.12, 0.1));
                         continue;
                     }
 
                     if (attackers[0] < value && attackers[0] <= defenders[0]) {
-                        score -= Math.round((value - attackers[0]) * 0.15);
+                        score -= Math.round((value - attackers[0]) * stageWeight(stage, 0.12, 0.18, 0.14));
                     } else if (attackers.length > defenders.length) {
                         score -= 12 * Math.min(2, attackers.length - defenders.length);
                     }
@@ -792,6 +792,22 @@
             return Math.round(score);
         }
 
+        function getImmediateRiskPenalty(nextBoard, move, color, stage) {
+            let penalty = 0;
+            if (isInCheck(nextBoard, color)) {
+                penalty += stageWeight(stage, 36, 44, 40);
+            }
+
+            if (move.piece[1] !== 'G' && isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color))) {
+                penalty += Math.round(pieceValue(move.piece[1], stage) * (move.captured ? 0.08 : 0.14));
+                if (move.captured) {
+                    penalty += 12;
+                }
+            }
+
+            return penalty;
+        }
+
         function getRootContinuationBias(board, nextBoard, move, color, history, stage) {
             if (stage.opening < 0.16 && stage.middlegame < 0.28) {
                 return 0;
@@ -803,7 +819,6 @@
                 score += (evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage)) * 0.75;
                 score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
             }
-
             if (move.piece[1] === 'R' && countUndevelopedRooks(nextBoard, color) < countUndevelopedRooks(board, color)) {
                 score += stageWeight(stage, 18, 10, 4);
             }
@@ -843,11 +858,12 @@
             const entries = shortlist.map(entry => {
                 const nextBoard = applyMoveToBoard(board, entry.move);
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
+                const safetyPenalty = getImmediateRiskPenalty(nextBoard, entry.move, color, searchConfig.stage);
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6)
+                    sortScore: entry.quickScore + continuationBias - safetyPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) - Math.round(safetyPenalty * 0.8)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
 
