@@ -169,6 +169,55 @@
             return false;
         }
 
+        function hasHomeHorizontalRookDevelopment(board, color) {
+            const row = homeRow(color);
+            const rookMoves = getAllLegalMoves(board, color);
+            return rookMoves.some(move => move.piece === `${color}R` && move.fromRow === row && move.toRow === row && !move.captured);
+        }
+
+        function isHomeHorizontalRookMove(move, color) {
+            return move.piece === `${color}R` &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === move.fromRow &&
+                !move.captured;
+        }
+
+        function isHomeVerticalRookMove(move, color) {
+            return move.piece === `${color}R` &&
+                move.fromRow === homeRow(color) &&
+                move.toRow !== move.fromRow &&
+                !move.captured;
+        }
+
+        function isNaturalHorseDevelopment(move, color) {
+            return move.piece === `${color}H` &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === naturalHorseRow(color) &&
+                (move.toCol === 2 || move.toCol === 6) &&
+                !move.captured;
+        }
+
+        function getOpeningPlanMode(openingContext) {
+            const centralCannonPressure = openingContext.ownCenteredCannon || openingContext.opponentCenteredCannon;
+
+            if (openingContext.undevelopedRooks >= 1 && openingContext.horizontalRookMovesAvailable) {
+                if (openingContext.developedHorses === 2) {
+                    return 'horizontal-rook';
+                }
+                if (openingContext.undevelopedHorses === 1 && openingContext.opponentCenteredCannon) {
+                    return 'horizontal-rook';
+                }
+            }
+
+            if (openingContext.undevelopedHorses >= 1) {
+                if (!centralCannonPressure || openingContext.undevelopedRooks === 2) {
+                    return 'second-horse';
+                }
+            }
+
+            return 'balanced';
+        }
+
         function countPiecesBetweenOnFile(board, col, startRow, endRow) {
             let blockers = 0;
             const step = startRow < endRow ? 1 : -1;
@@ -375,10 +424,20 @@
                     }
 
                     if (piece[1] === 'R' && !(row === row0 && (col === 0 || col === 8))) {
-                        score += row === row0 ? 34 : 48;
-                        score += Math.max(0, 12 - Math.abs(4 - col) * 3);
+                        score += row === row0 ? 52 : 26;
+                        score += row === row0
+                            ? Math.max(0, 18 - Math.abs(4 - col) * 3)
+                            : Math.max(0, 8 - Math.abs(4 - col) * 2);
+                        if (centralCannonPressure && row === row0) {
+                            score += 12;
+                        }
                         if (undevelopedHorses === 1 && !centralCannonPressure) {
-                            score -= row === row0 ? 32 : 48;
+                            score -= row === row0 ? 18 : 58;
+                        }
+                        if (row !== row0 && !centralCannonPressure) {
+                            score -= 26;
+                        } else if (row !== row0 && centralCannonPressure) {
+                            score -= 16;
                         }
                     }
 
@@ -573,7 +632,7 @@
             for (let index = 0; index < direct.length; index++) {
                 const key = getMoveKey(direct[index]);
                 if (legalByKey.has(key)) {
-                    suggestions.set(key, Math.max(suggestions.get(key) || 0, 40 - index * 8));
+                    suggestions.set(key, Math.max(suggestions.get(key) || 0, 80 - index * 14));
                 }
             }
 
@@ -583,7 +642,7 @@
                 const mirroredMove = mirrorMoveDescriptor(mirrored[index]);
                 const key = getMoveKey(mirroredMove);
                 if (legalByKey.has(key)) {
-                    suggestions.set(key, Math.max(suggestions.get(key) || 0, 40 - index * 8));
+                    suggestions.set(key, Math.max(suggestions.get(key) || 0, 80 - index * 14));
                 }
             }
 
@@ -600,24 +659,72 @@
             const undevelopedHorses = openingContext.undevelopedHorses;
             const developedHorses = openingContext.developedHorses;
             const rookMovesAvailable = openingContext.rookMovesAvailable;
+            const horizontalRookMovesAvailable = openingContext.horizontalRookMovesAvailable;
             const lastOwnMove = openingContext.lastOwnMove;
             const previousOwnMove = openingContext.previousOwnMove;
             const ownCenteredCannon = openingContext.ownCenteredCannon;
             const opponentCenteredCannon = openingContext.opponentCenteredCannon;
             const centralCannonPressure = ownCenteredCannon || opponentCenteredCannon;
+            const openingPlanMode = getOpeningPlanMode(openingContext);
             let score = 0;
 
+            if (!move.captured) {
+                if (openingPlanMode === 'horizontal-rook') {
+                    if (isHomeHorizontalRookMove(move, color)) {
+                        score += 136 - Math.abs(4 - move.toCol) * 6;
+                    } else if (isHomeVerticalRookMove(move, color)) {
+                        score -= 128;
+                    } else if (move.piece[1] === 'H') {
+                        score -= isNaturalHorseDevelopment(move, color)
+                            ? openingContext.undevelopedHorses === 1 ? 112 : 42
+                            : 86;
+                    } else if (move.piece[1] === 'C') {
+                        score -= move.toCol === 4 ? 92 : 126;
+                    } else if (move.piece[1] === 'S') {
+                        score -= move.toCol === 4 ? 34 : 78;
+                    } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                        score -= 92;
+                    }
+                } else if (openingPlanMode === 'second-horse') {
+                    if (isNaturalHorseDevelopment(move, color)) {
+                        score += 96;
+                    } else if (isHomeHorizontalRookMove(move, color)) {
+                        score += 18;
+                    } else if (isHomeVerticalRookMove(move, color)) {
+                        score -= 54;
+                    } else if (move.piece[1] === 'C') {
+                        score -= move.toCol === 4 ? 26 : 56;
+                    } else if (move.piece[1] === 'S') {
+                        score -= move.toCol === 4 ? 8 : 34;
+                    } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                        score -= 56;
+                    }
+                }
+            }
+
             if (move.piece[1] === 'R' && move.fromRow === homeRow(color)) {
-                score += 72 + (move.toRow === move.fromRow ? 12 - Math.abs(4 - move.toCol) * 2 : 24);
+                const horizontalDeployment = move.toRow === move.fromRow;
+                score += horizontalDeployment
+                    ? 58 - Math.abs(4 - move.toCol) * 4
+                    : 18;
                 if (undevelopedHorses === 2) {
-                    score -= move.toRow === move.fromRow ? 18 : 58;
+                    score -= horizontalDeployment ? 8 : 68;
                 } else if (undevelopedHorses === 1 && move.toRow !== move.fromRow) {
                     score -= 20;
                 }
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
-                    score -= move.toRow === move.fromRow ? 34 : 76;
-                } else if (opponentCenteredCannon && move.toRow !== move.fromRow) {
-                    score += 18;
+                    score -= horizontalDeployment ? 8 : 88;
+                }
+                if (opponentCenteredCannon && horizontalDeployment) {
+                    score += 26;
+                }
+                if (!horizontalDeployment && !opponentCenteredCannon) {
+                    score -= 24;
+                } else if (!horizontalDeployment && opponentCenteredCannon) {
+                    score -= 18;
+                }
+                if (!move.captured && !horizontalDeployment && horizontalRookMovesAvailable && opponentCenteredCannon) {
+                    score -= 72;
                 }
             }
             if (!move.captured && move.piece[1] === 'R' && move.fromRow !== homeRow(color) && undevelopedMajors >= 1) {
@@ -636,6 +743,9 @@
                     score += 18;
                 } else if (!centralCannonPressure) {
                     score += 42;
+                }
+                if (undevelopedHorses === 1 && horizontalRookMovesAvailable && opponentCenteredCannon) {
+                    score -= 42;
                 }
             }
             if (!move.captured && move.piece[1] === 'H') {
@@ -820,7 +930,9 @@
                 score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
             }
             if (move.piece[1] === 'R' && countUndevelopedRooks(nextBoard, color) < countUndevelopedRooks(board, color)) {
-                score += stageWeight(stage, 18, 10, 4);
+                score += move.toRow === move.fromRow
+                    ? stageWeight(stage, 20, 12, 4)
+                    : stageWeight(stage, 6, 6, 2);
             }
             if (move.piece[1] === 'H' && countUndevelopedHorses(nextBoard, color) < countUndevelopedHorses(board, color)) {
                 score += stageWeight(stage, 12, 8, 4);
@@ -838,6 +950,7 @@
                 undevelopedHorses: countUndevelopedHorses(board, color),
                 developedHorses: countDevelopedHorses(board, color),
                 rookMovesAvailable: countUndevelopedRooks(board, color) >= 1 && hasHomeRookDevelopment(board, color),
+                horizontalRookMovesAvailable: hasHomeHorizontalRookDevelopment(board, color),
                 ownCenteredCannon: hasCenteredCannon(board, color),
                 opponentCenteredCannon: hasCenteredCannon(board, otherColor(color)),
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
@@ -913,7 +1026,10 @@
                     score += 18;
                 }
                 if (move.piece[1] === 'R' && move.fromRow === homeRow(pieceColor) && move.toRow === move.fromRow) {
-                    score += 10;
+                    score += 18;
+                }
+                if (move.piece[1] === 'R' && move.fromRow === homeRow(pieceColor) && move.toRow !== move.fromRow) {
+                    score -= 12;
                 }
                 if (move.piece[1] === 'C' && move.fromRow === cannonRow(pieceColor) && move.toCol === 4) {
                     score += 10;
@@ -1111,6 +1227,7 @@
             let bestScore = -Infinity;
             let bestPv = [bestMove];
             let completedDepth = 0;
+            const policyWeight = searchConfig.phase === 'opening' ? 1.9 : searchConfig.phase === 'middlegame' ? 1.15 : 1;
 
             for (let depth = 1; depth <= searchConfig.maxDepth; depth++) {
                 let depthBestMove = bestMove;
@@ -1119,7 +1236,7 @@
 
                 for (const entry of rootEntries) {
                     const result = negamax(entry.nextBoard, otherColor(color), depth - 1, -Infinity, Infinity, context, history.concat(getMoveKey(entry.move)));
-                    const score = -result.score + entry.policyBias;
+                    const score = -result.score + entry.policyBias * policyWeight;
 
                     if (score > depthBestScore) {
                         depthBestScore = score;

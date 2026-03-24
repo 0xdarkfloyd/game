@@ -56,9 +56,9 @@ const OPENING_BOOK = {
         { fromRow: 6, fromCol: 6, toRow: 5, toCol: 6, name: '\u5175\u4e03\u9032\u4e00' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,7-7,6`]: [
-        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u5c4f\u98a8\u99ac' },
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
-        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' }
+        { fromRow: 0, fromCol: 8, toRow: 1, toCol: 8, name: '\u8eca1\u90321' },
+        { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u5c4f\u98a8\u99ac' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/9,1-7,2`]: [
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
@@ -180,6 +180,10 @@ const OPENING_BOOK = {
     [`${BLACK_COLOR}|6,6-5,6/0,1-2,2/9,1-7,2`]: [
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,6-5,6/0,1-2,2/9,1-7,2/0,7-2,6/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
     ],
     [`${BLACK_COLOR}|6,6-5,6/0,7-2,6/9,1-7,2/0,1-2,2/7,7-7,5`]: [
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
