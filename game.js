@@ -4,10 +4,10 @@ const MATE_SCORE = 900000;
 const QUIESCENCE_DEPTH = 3;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
-const AI_WORKER_TIMEOUT_MS = 1900;
-const OPENING_SEARCH_TIME_MS = 480;
-const MIDGAME_SEARCH_TIME_MS = 820;
-const ENDGAME_SEARCH_TIME_MS = 1100;
+const AI_WORKER_TIMEOUT_MS = 2400;
+const OPENING_SEARCH_TIME_MS = 620;
+const MIDGAME_SEARCH_TIME_MS = 920;
+const ENDGAME_SEARCH_TIME_MS = 1250;
 const SEARCH_TIME_CHECK_INTERVAL = 1;
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
@@ -249,13 +249,13 @@ const PIECE_VALUES = {
 };
 
 const MOBILITY_WEIGHTS = {
-    R: 5,
+    R: 6,
     H: 8,
     E: 1,
     A: 1,
     G: 0,
-    C: 6,
-    S: 3
+    C: 4,
+    S: 2
 };
 
 const initialBoard = [
@@ -1177,6 +1177,23 @@ function getRookDeploymentValue(activeBoard, color, row, col) {
     return score;
 }
 
+function hasHomeRookDevelopment(activeBoard, color) {
+    const homeRow = color === RED_COLOR ? 9 : 0;
+
+    for (const rookCol of [0, 8]) {
+        if (activeBoard[homeRow][rookCol] !== `${color}R`) {
+            continue;
+        }
+
+        const rookMoves = getLegalMovesForPiece(activeBoard, homeRow, rookCol);
+        if (rookMoves.some(move => !move.captured)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function evaluateOpeningDevelopment(activeBoard, color) {
     const pieceCount = countPieces(activeBoard);
     if (pieceCount < 24) {
@@ -1217,7 +1234,7 @@ function evaluateOpeningDevelopment(activeBoard, color) {
                     score += 6;
                 }
                 if (Math.abs(col - 4) <= 1 && Math.abs(row - homeRow) === 1) {
-                    score -= 30;
+                    score -= 52;
                 }
             }
             if (piece[1] === 'H' && row === homeRow && col !== 1 && col !== 7) {
@@ -1237,6 +1254,14 @@ function evaluateOpeningDevelopment(activeBoard, color) {
             if (piece[1] === 'C' && undevelopedRooks >= 1 && developedHorses === 2 && row === cannonRow && Math.abs(col - 4) >= 2) {
                 score -= 18;
             }
+            if (piece[1] === 'C' && undevelopedRooks >= 1) {
+                const edgeDistance = Math.abs(col - 4);
+                if (edgeDistance >= 4) {
+                    score -= undevelopedRooks === 2 ? 42 : 24;
+                } else if (edgeDistance >= 3 && row !== cannonRow) {
+                    score -= undevelopedRooks === 2 ? 26 : 14;
+                }
+            }
 
             if ((piece[1] === 'A' || piece[1] === 'E') && undevelopedMajors >= 2 && row !== homeRow) {
                 score -= 28;
@@ -1249,6 +1274,14 @@ function evaluateOpeningDevelopment(activeBoard, color) {
                 const cannonAdvanced = color === RED_COLOR ? row <= 4 : row >= 5;
                 if (cannonAdvanced) {
                     score -= 50;
+                }
+            }
+
+            if (piece[1] === 'C' && row !== cannonRow && undevelopedRooks >= 1) {
+                const edgeDistance = Math.abs(col - 4);
+                score -= 16 + edgeDistance * 6;
+                if (undevelopedRooks === 2 && developedHorses >= 1 && col !== 4) {
+                    score -= 18;
                 }
             }
 
@@ -1317,14 +1350,14 @@ function getOpeningMoveBonus(activeBoard, move) {
         }
         if (move.fromRow === naturalHorseRow && (move.fromCol === 2 || move.fromCol === 6) &&
             Math.abs(move.toCol - 4) <= 1 && Math.abs(move.toRow - homeRow) === 1) {
-            score -= 56;
+            score -= undevelopedRooks >= 1 ? 88 : 56;
         }
     }
 
     if (move.piece[1] === 'R' && move.fromRow === homeRow) {
         score += 20 + getRookDeploymentValue(activeBoard, color, move.toRow, move.toCol);
         if (undevelopedRooks === 2 && developedHorses === 2) {
-            score += move.toRow === homeRow ? 42 : 24;
+            score += move.toRow === homeRow ? 78 : 40;
         }
     }
 
@@ -1352,15 +1385,23 @@ function getOpeningMoveBonus(activeBoard, move) {
     if (move.piece[1] === 'C' && move.fromRow === cannonRow && move.toRow !== cannonRow && move.toCol !== 4 && undevelopedRooks >= 1 && !move.captured) {
         score -= undevelopedRooks === 2 ? 34 : 22;
     }
+    if (move.piece[1] === 'C' && !move.captured && undevelopedRooks >= 1) {
+        const edgeDistance = Math.abs(4 - move.toCol);
+        if (edgeDistance >= 4) {
+            score -= undevelopedRooks === 2 ? 72 : 44;
+        } else if (move.fromRow === cannonRow && move.toCol !== 4 && move.toRow !== cannonRow) {
+            score -= undevelopedRooks === 2 ? 36 : 20;
+        }
+    }
     if (undevelopedRooks >= 1 && developedHorses === 2 && !move.captured) {
         if (move.piece[1] === 'R' && move.fromRow === homeRow) {
-            score += move.toRow === homeRow ? 28 : 18;
+            score += move.toRow === homeRow ? 52 : 28;
         } else if (move.piece[1] === 'A' || move.piece[1] === 'E') {
-            score -= undevelopedRooks === 2 ? 42 : 26;
+            score -= undevelopedRooks === 2 ? 68 : 36;
         } else if (move.piece[1] === 'H' || move.piece[1] === 'C') {
-            score -= undevelopedRooks === 2 ? 30 : 18;
+            score -= undevelopedRooks === 2 ? 58 : 28;
         } else if (move.piece[1] === 'S') {
-            score -= move.fromCol === 4 ? 16 : 28;
+            score -= move.fromCol === 4 ? 24 : 42;
         }
     }
 
@@ -1413,7 +1454,7 @@ function getSideHistoryMoves(historySequence, color) {
         .map(parseMoveKey);
 }
 
-function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
+function getRootOpeningAdjustment(activeBoard, move, color, historySequence, openingContext = null) {
     const pieceCount = countPieces(activeBoard);
     if (pieceCount < 24 || !historySequence || historySequence.length < 2) {
         return 0;
@@ -1427,6 +1468,11 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
     const undevelopedRooks = countUndevelopedRooks(activeBoard, color);
     const developedHorses = countDevelopedHorses(activeBoard, color);
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const cannonRow = color === RED_COLOR ? 7 : 2;
+    const rookDevelopmentAvailable = openingContext
+        ? openingContext.rookDevelopmentAvailable
+        : undevelopedRooks >= 1 && hasHomeRookDevelopment(activeBoard, color);
     const lastOwnMove = recentSideMoves[recentSideMoves.length - 1];
     const previousOwnMove = recentSideMoves.length > 1 ? recentSideMoves[recentSideMoves.length - 2] : null;
     let score = 0;
@@ -1471,24 +1517,52 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
         }
     }
 
-    if (undevelopedRooks === 2 && developedHorses === 2 && !move.captured) {
-        if (move.piece[1] === 'R' && move.fromRow === (color === RED_COLOR ? 9 : 0)) {
-            score += move.toRow === move.fromRow ? 36 : 18;
-            score += getRookDeploymentValue(activeBoard, color, move.toRow, move.toCol);
-        }
-        if (move.piece[1] === 'S') {
-            score -= move.fromCol === 4 ? 22 : 34;
-        }
-        if (move.piece[1] === 'H' || move.piece[1] === 'C') {
-            score -= 34;
-        }
-        if (move.piece[1] === 'A' || move.piece[1] === 'E') {
-            score -= 48;
+    if (!move.captured && move.piece[1] === 'C' && undevelopedRooks >= 1) {
+        const edgeDistance = Math.abs(4 - move.toCol);
+        if (edgeDistance >= 4) {
+            score -= undevelopedRooks === 2 ? 88 : 54;
+        } else if (move.fromRow === cannonRow && move.toCol !== 4 && move.toRow !== cannonRow) {
+            score -= undevelopedRooks === 2 ? 52 : 28;
         }
     }
 
-    if (!move.captured && move.piece[1] === 'H' && move.toRow === (color === RED_COLOR ? 9 : 0) && undevelopedRooks >= 1) {
+    if (undevelopedRooks === 2 && developedHorses === 2 && !move.captured) {
+        if (move.piece[1] === 'R' && move.fromRow === homeRow) {
+            score += move.toRow === move.fromRow ? 72 : 32;
+            score += getRookDeploymentValue(activeBoard, color, move.toRow, move.toCol);
+        }
+        if (move.piece[1] === 'S') {
+            score -= move.fromCol === 4 ? 32 : 52;
+        }
+        if (move.piece[1] === 'H' || move.piece[1] === 'C') {
+            score -= 58;
+        }
+        if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+            score -= 72;
+        }
+    }
+
+    if (rookDevelopmentAvailable && !move.captured) {
+        if (move.piece[1] === 'R' && move.fromRow === homeRow) {
+            score += undevelopedRooks === 2 ? 34 : 18;
+        } else if (undevelopedRooks === 2 && developedHorses === 2) {
+            score -= move.piece[1] === 'S' ? 30 : 46;
+        } else if (undevelopedRooks === 1 && (move.piece[1] === 'H' || move.piece[1] === 'C' || move.piece[1] === 'A' || move.piece[1] === 'E')) {
+            score -= 18;
+        }
+    }
+
+    if (!move.captured && move.piece[1] === 'H' && move.toRow === homeRow && undevelopedRooks >= 1) {
         score -= undevelopedRooks === 2 ? 66 : 34;
+    }
+    if (!move.captured &&
+        move.piece[1] === 'H' &&
+        move.fromRow === (color === RED_COLOR ? 7 : 2) &&
+        (move.fromCol === 2 || move.fromCol === 6) &&
+        Math.abs(move.toCol - 4) <= 1 &&
+        Math.abs(move.toRow - homeRow) === 1 &&
+        undevelopedRooks >= 1) {
+        score -= undevelopedRooks === 2 ? 74 : 42;
     }
 
     return score;
@@ -1838,14 +1912,14 @@ function chooseSearchDepth(activeBoard, legalMoves) {
     const pieceCount = countPieces(activeBoard);
 
     if (pieceCount >= 28 || legalMoves.length >= 34) {
-        return 3;
-    }
-
-    if (pieceCount >= 18) {
         return 4;
     }
 
-    return 5;
+    if (pieceCount >= 18) {
+        return 5;
+    }
+
+    return 6;
 }
 
 function getRootCandidateLimit(pieceCount, legalMoveCount) {
@@ -1899,6 +1973,41 @@ function searchRootEntries(rootEntries, color, depth) {
     }
 
     return { bestMove, bestScore };
+}
+
+function applyPracticalOpeningChoice(activeBoard, color, legalMoves, candidateMove) {
+    if (!candidateMove || countPieces(activeBoard) < 24 || candidateMove.captured || candidateMove.piece[1] === 'R') {
+        return candidateMove;
+    }
+
+    const undevelopedRooks = countUndevelopedRooks(activeBoard, color);
+    const developedHorses = countDevelopedHorses(activeBoard, color);
+    const homeRow = color === RED_COLOR ? 9 : 0;
+    const naturalHorseRow = color === RED_COLOR ? 7 : 2;
+    if (undevelopedRooks === 0 || developedHorses < 2) {
+        return candidateMove;
+    }
+
+    const rookMoves = legalMoves
+        .filter(move => move.piece[1] === 'R' && move.fromRow === homeRow && !move.captured)
+        .sort((left, right) => scoreMove(activeBoard, right) - scoreMove(activeBoard, left));
+
+    if (rookMoves.length === 0) {
+        return candidateMove;
+    }
+
+    if (candidateMove.piece[1] === 'S' && (candidateMove.fromCol === 0 || candidateMove.fromCol === 8)) {
+        return rookMoves[0];
+    }
+    if (candidateMove.piece[1] === 'H' &&
+        candidateMove.fromRow === naturalHorseRow &&
+        (candidateMove.fromCol === 2 || candidateMove.fromCol === 6) &&
+        (candidateMove.toRow === homeRow ||
+            (Math.abs(candidateMove.toCol - 4) <= 1 && Math.abs(candidateMove.toRow - homeRow) === 1))) {
+        return rookMoves[0];
+    }
+
+    return candidateMove;
 }
 
 function disposeAiWorker() {
@@ -2022,12 +2131,17 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
     const pieceCount = countPieces(activeBoard);
+    const openingContext = {
+        rookDevelopmentAvailable: pieceCount >= 24 && countUndevelopedRooks(activeBoard, color) >= 1
+            ? hasHomeRookDevelopment(activeBoard, color)
+            : false
+    };
     beginSearchBudget(activeBoard, legalMoves);
 
     if (pieceCount >= 24 && legalMoves.length <= 32) {
         const rootEntries = legalMoves.map(move => {
             const nextBoard = applyMoveToBoard(activeBoard, move);
-            const openingAdjustment = getRootOpeningAdjustment(activeBoard, move, color, historySequence);
+            const openingAdjustment = getRootOpeningAdjustment(activeBoard, move, color, historySequence, openingContext);
             const tacticalAdjustment = getRootTacticalAdjustment(activeBoard, nextBoard, move, color);
             return {
                 move,
@@ -2051,7 +2165,7 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
             }
         }
 
-        return bestMove || rootMoves[0].move;
+        return applyPracticalOpeningChoice(activeBoard, color, legalMoves, bestMove || rootMoves[0].move);
     }
 
     let bestMove = orderMoves(activeBoard, legalMoves)[0];
@@ -2066,7 +2180,7 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
         }
     }
 
-    return bestMove;
+    return applyPracticalOpeningChoice(activeBoard, color, legalMoves, bestMove);
 }
 
 function getPiecePrefix(activeBoard, piece, row, col) {
