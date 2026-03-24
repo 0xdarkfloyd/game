@@ -117,6 +117,10 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
         { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
     ],
+    [`${BLACK_COLOR}|7,7-7,4/0,1-2,2/6,2-5,2/0,7-2,6/9,1-7,2/3,6-4,6/7,2-5,1`]: [
+        { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
+    ],
     [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/9,7-7,8/0,7-2,6/9,1-7,2`]: [
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca9\u5e738' },
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
@@ -144,6 +148,14 @@ const OPENING_BOOK = {
     [`${BLACK_COLOR}|7,1-7,4/0,7-2,6/6,2-5,2/0,1-2,2/9,1-7,2`]: [
         { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
         { fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, name: '\u8eca1\u5e732' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,7-2,6/9,1-7,2/0,1-2,2/6,2-5,2`]: [
+        { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
+    ],
+    [`${BLACK_COLOR}|7,1-7,4/0,7-2,6/9,1-7,2/0,1-2,2/6,2-5,2/0,8-0,7/7,2-5,1`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
     ],
     [`${BLACK_COLOR}|7,7-7,4/0,7-2,6/9,1-7,2`]: [
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca1\u5e732' },
@@ -1315,8 +1327,13 @@ function getOpeningMoveBonus(activeBoard, move) {
         }
     }
 
-    if ((move.piece[1] === 'A' || move.piece[1] === 'E') && undevelopedMajors >= 2) {
-        score -= 42;
+    if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+        if (undevelopedMajors >= 2) {
+            score -= 42;
+        }
+        if (!move.captured && undevelopedRooks >= 1 && developedHorses >= 2) {
+            score -= move.fromRow === homeRow ? 26 : 54;
+        }
     }
 
     if (move.piece[1] === 'G') {
@@ -1373,10 +1390,12 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
             score -= undevelopedMajors >= 2 ? 58 : 32;
         } else if (move.piece[1] === 'R') {
             score -= undevelopedMajors >= 2 ? 34 : 18;
+        } else if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+            score -= undevelopedMajors >= 2 ? 54 : 28;
         }
 
         if (isExactReverseMove(lastOwnMove, move)) {
-            score -= 42;
+            score -= move.piece[1] === 'A' || move.piece[1] === 'E' ? 64 : 42;
         }
     }
 
@@ -1385,6 +1404,8 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
             score -= undevelopedMajors >= 2 ? 24 : 12;
         } else if (move.piece[1] === 'R') {
             score -= 12;
+        } else if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+            score -= undevelopedMajors >= 2 ? 22 : 10;
         }
     }
 
