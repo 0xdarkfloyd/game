@@ -53,6 +53,20 @@ function compute(state, timeBudgetMs = 900) {
     };
 }
 
+function createEmptyBoard() {
+    return Array.from({ length: 10 }, () => Array(9).fill(''));
+}
+
+function computeOnBoard(board, side = game.BLACK_COLOR, timeBudgetMs = 700) {
+    return engine.computeBestMove({
+        board,
+        currentPlayer: side,
+        history: [],
+        positionHistory: [game.getBoardKey(board, side)],
+        timeBudgetMs
+    });
+}
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -222,4 +236,29 @@ for (const scenario of scenarios) {
     }
 }
 
-console.log(`regression scenarios passed: ${scenarios.length}`);
+{
+    const board = createEmptyBoard();
+    board[0][4] = 'bG';
+    board[9][4] = 'rG';
+    board[2][4] = 'bR';
+    board[5][4] = 'rS';
+
+    const result = computeOnBoard(board);
+    assert(result.move, 'expected safe-capture move');
+    assert.strictEqual(game.getMoveKey(result.move), '2,4-5,4', `expected safe rook capture, got ${game.getMoveKey(result.move)}`);
+}
+
+{
+    const board = createEmptyBoard();
+    board[0][4] = 'bG';
+    board[9][4] = 'rG';
+    board[2][4] = 'bR';
+    board[5][4] = 'rS';
+    board[6][4] = 'rR';
+
+    const result = computeOnBoard(board);
+    assert(result.move, 'expected non-hanging move');
+    assert.notStrictEqual(game.getMoveKey(result.move), '2,4-5,4', 'should avoid hanging rook capture');
+}
+
+console.log(`regression scenarios passed: ${scenarios.length} + 2 tactical`);

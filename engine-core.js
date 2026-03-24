@@ -886,19 +886,29 @@
         }
 
         function getTacticalBias(board, nextBoard, move, color, history) {
-            const phase = getPhase(board, history);
-            const capturedValue = move.captured ? pieceValue(move.captured[1], phase) : 0;
-            const moverValue = pieceValue(move.piece[1], phase);
+            const stage = getStageProfile(board, history);
+            const capturedValue = move.captured ? pieceValue(move.captured[1], stage) : 0;
+            const moverValue = pieceValue(move.piece[1], stage);
             let score = move.captured ? capturedValue * 0.18 : 0;
 
             if (move.captured) {
                 score += capturedValue - moverValue * 0.06;
             }
             if (isInCheck(nextBoard, otherColor(color))) {
-                score += phase === 'opening' ? 26 : 40;
+                score += stageWeight(stage, 26, 40, 34);
             }
 
-            score -= getExposurePenalty(nextBoard, move, color, history);
+            if (move.piece[1] !== 'G' && isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color))) {
+                const defended = isSquareAttacked(nextBoard, move.toRow, move.toCol, color);
+                if (!defended) {
+                    score -= Math.round(moverValue * (move.captured ? 0.28 : 0.36));
+                } else if (move.captured && capturedValue < moverValue) {
+                    score -= Math.round((moverValue - capturedValue) * 0.2);
+                } else {
+                    score -= Math.round(moverValue * 0.08);
+                }
+            }
+
             return Math.round(score);
         }
 
@@ -956,6 +966,9 @@
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
                 previousOwnMove: sameSideMoves.length > 1 ? sameSideMoves[sameSideMoves.length - 2] : null
             };
+            const openingPlanMode = searchConfig.phase === 'opening'
+                ? getOpeningPlanMode(openingContext)
+                : 'balanced';
             const quickEntries = legalMoves.map(move => {
                 const bookBias = suggestions.get(getMoveKey(move)) || 0;
                 const practicalBias = getPracticalOpeningBias(board, move, color, history, openingContext);
@@ -971,12 +984,32 @@
             const entries = shortlist.map(entry => {
                 const nextBoard = applyMoveToBoard(board, entry.move);
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
+                let captureBias = entry.move.captured
+                    ? Math.round(pieceValue(entry.move.captured[1], searchConfig.stage) * 0.22 - pieceValue(entry.move.piece[1], searchConfig.stage) * 0.05)
+                    : 0;
+                if (searchConfig.phase === 'opening' && entry.move.captured) {
+                    if (openingPlanMode === 'horizontal-rook' && entry.move.piece[1] !== 'R') {
+                        captureBias -= 86;
+                    } else if (openingPlanMode === 'second-horse' && entry.move.piece[1] !== 'H') {
+                        captureBias -= 72;
+                    }
+
+                    if (entry.move.piece[1] === 'C') {
+                        const deepRaid = color === RED_COLOR ? entry.move.toRow <= 4 : entry.move.toRow >= 5;
+                        if (deepRaid && openingContext.undevelopedMajors >= 2) {
+                            captureBias -= 96;
+                        }
+                    }
+                }
+                const checkBias = isInCheck(nextBoard, otherColor(color))
+                    ? Math.round(stageWeight(searchConfig.stage, 20, 30, 28))
+                    : 0;
                 const safetyPenalty = getImmediateRiskPenalty(nextBoard, entry.move, color, searchConfig.stage);
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias - safetyPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) - Math.round(safetyPenalty * 0.8)
+                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias - safetyPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) - Math.round(safetyPenalty * 0.8)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
 
