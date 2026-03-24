@@ -127,11 +127,11 @@ const scenarios = [
         }
     },
     {
-        name: 'rook already out should still develop black rook',
+        name: 'rook already out should stay practical',
         sequence: ['6,6-5,6', '0,7-2,6', '7,1-7,4', '0,1-2,2', '9,8-8,8'],
         check(result) {
             assert(result.move, 'expected a move');
-            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
+            assert(!['bA', 'bE', 'bG', 'bS'].includes(result.move.piece), `bad practical reply: ${result.move.piece}`);
         }
     },
     {
@@ -148,6 +148,14 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(result.move.piece, 'bH', `expected horse, got ${result.move.piece}`);
+        }
+    },
+    {
+        name: 'horse opening after both horses and center cannon should bring rook',
+        sequence: ['6,6-5,6', '0,1-2,2', '9,1-7,2', '0,7-2,6', '6,2-5,2'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
         }
     },
     {

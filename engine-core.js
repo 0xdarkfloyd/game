@@ -63,22 +63,44 @@
         const naturalHorseRow = color => color === RED_COLOR ? 7 : 2;
         const cannonRow = color => color === RED_COLOR ? 7 : 2;
         const soldierRow = color => color === RED_COLOR ? 6 : 3;
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+        function getStageProfile(board, history) {
+            const pieceCount = countPieces(board);
+            const moveCount = history.length;
+            const openingHint = clamp((pieceCount - 20) / 12, 0, 1) * clamp((18 - moveCount) / 18, 0.25, 1);
+            const endgameHint = clamp((18 - pieceCount) / 10, 0, 1);
+            const middlegameHint = Math.max(0.2, 1 - openingHint * 0.7 - endgameHint * 0.75);
+            const total = openingHint + middlegameHint + endgameHint || 1;
+
+            return {
+                opening: openingHint / total,
+                middlegame: middlegameHint / total,
+                endgame: endgameHint / total
+            };
+        }
+
+        function stageWeight(stage, opening, middlegame, endgame) {
+            return stage.opening * opening + stage.middlegame * middlegame + stage.endgame * endgame;
+        }
 
         function getPhase(board, history) {
-            const pieceCount = countPieces(board);
-            if (pieceCount >= 28 || history.length < 10) {
+            const stage = getStageProfile(board, history);
+            if (stage.opening >= 0.48) {
                 return 'opening';
             }
-            if (pieceCount >= 16) {
-                return 'middlegame';
+            if (stage.endgame >= 0.42) {
+                return 'endgame';
             }
-            return 'endgame';
+            return 'middlegame';
         }
 
         function getPhaseConfig(board, history, overrideTimeBudgetMs) {
             const phase = getPhase(board, history);
+            const stage = getStageProfile(board, history);
             return {
                 phase,
+                stage,
                 ...CONFIG.phase[phase],
                 time: overrideTimeBudgetMs || CONFIG.phase[phase].time
             };
@@ -158,22 +180,43 @@
             return blockers;
         }
 
-        function pieceValue(type, phase) {
-            return CONFIG.values[type][phase];
+        function pieceValue(type, stageOrPhase) {
+            if (typeof stageOrPhase === 'string') {
+                return CONFIG.values[type][stageOrPhase];
+            }
+
+            return Math.round(stageWeight(
+                stageOrPhase,
+                CONFIG.values[type].opening,
+                CONFIG.values[type].middlegame,
+                CONFIG.values[type].endgame
+            ));
         }
 
-        function pieceSquareBonus(piece, row, col, phase) {
+        function mobilityValue(type, stage) {
+            return stageWeight(
+                stage,
+                CONFIG.mobility.opening[type],
+                CONFIG.mobility.middlegame[type],
+                CONFIG.mobility.endgame[type]
+            );
+        }
+
+        function pieceSquareBonus(piece, row, col, stage) {
             const color = piece[0];
             const type = piece[1];
             const centerDistance = Math.abs(4 - col);
+            const opening = stage.opening;
+            const middlegame = stage.middlegame;
+            const endgame = stage.endgame;
 
             if (type === 'S') {
                 const progress = color === RED_COLOR ? 9 - row : row;
-                let score = progress * (phase === 'opening' ? 5 : phase === 'middlegame' ? 8 : 10);
+                let score = progress * stageWeight(stage, 5, 8, 10);
                 if (hasCrossedRiver(color, row)) {
-                    score += phase === 'opening' ? 8 : phase === 'middlegame' ? 20 : 28;
+                    score += stageWeight(stage, 8, 20, 28);
                 }
-                return score + Math.max(0, 8 - centerDistance * 2);
+                return Math.round(score + Math.max(0, 8 - centerDistance * 2));
             }
 
             if (type === 'H') {
@@ -181,39 +224,36 @@
                 if ((col === 0 || col === 8) && row !== homeRow(color)) {
                     score -= 20;
                 }
-                return score;
+                return Math.round(score + endgame * 8);
             }
 
             if (type === 'C') {
                 let score = Math.max(0, 18 - centerDistance * 3);
-                if (phase === 'opening' && Math.abs(col - 4) >= 3) {
-                    score -= 12;
-                }
-                return score;
+                score -= opening * (Math.abs(col - 4) >= 3 ? 12 : 0);
+                score -= endgame * (row !== cannonRow(color) ? 6 : 0);
+                return Math.round(score);
             }
 
             if (type === 'R') {
                 let score = Math.max(0, 12 - centerDistance * 2);
-                if (phase !== 'opening' && row !== homeRow(color)) {
-                    score += 10;
-                }
-                return score;
+                score += (middlegame + endgame) * (row !== homeRow(color) ? 10 : 0);
+                return Math.round(score);
             }
 
             if (type === 'E' || type === 'A') {
-                return phase === 'opening'
-                    ? 14 - Math.abs(row - homeRow(color)) * 5 - centerDistance * 2
-                    : 6 - centerDistance;
+                const openingScore = 14 - Math.abs(row - homeRow(color)) * 5 - centerDistance * 2;
+                const laterScore = 6 - centerDistance;
+                return Math.round(opening * openingScore + (middlegame + endgame) * laterScore);
             }
 
             if (type === 'G') {
-                return (col === 4 ? 16 : 0) - (phase === 'opening' && row !== homeRow(color) ? 18 : 0);
+                return Math.round((col === 4 ? 16 : 0) - opening * (row !== homeRow(color) ? 18 : 0));
             }
 
             return 0;
         }
 
-        function evaluateKingSafety(board, color, phase) {
+        function evaluateKingSafety(board, color, stage) {
             const general = findGeneral(board, color);
             if (!general) {
                 return -2000;
@@ -224,10 +264,10 @@
             const forward = color === RED_COLOR ? -1 : 1;
             const advisors = countPieceType(board, color, 'A');
             const elephants = countPieceType(board, color, 'E');
-            let score = advisors * (phase === 'opening' ? 20 : 12) + elephants * (phase === 'opening' ? 18 : 10);
+            let score = advisors * stageWeight(stage, 20, 14, 12) + elephants * stageWeight(stage, 18, 12, 10);
 
             if (general.row !== row0) {
-                score -= phase === 'opening' ? 40 : 24;
+                score -= stageWeight(stage, 40, 28, 24);
             }
             if (general.col !== 4) {
                 score -= 12;
@@ -235,7 +275,7 @@
 
             const frontRow = general.row + forward;
             if (frontRow >= 0 && frontRow < 10 && !board[frontRow][general.col]) {
-                score -= phase === 'opening' ? 14 : 18;
+                score -= stageWeight(stage, 14, 18, 18);
             }
 
             for (let row = 0; row < 10; row++) {
@@ -268,10 +308,10 @@
                 }
             }
 
-            return score;
+            return Math.round(score);
         }
 
-        function evaluateRookPressure(board, color) {
+        function evaluateRookPressure(board, color, stage) {
             const enemyGeneral = findGeneral(board, otherColor(color));
             if (!enemyGeneral) {
                 return 0;
@@ -292,24 +332,26 @@
                     if (col === enemyGeneral.col) {
                         const blockers = countPiecesBetweenOnFile(board, col, row, enemyGeneral.row);
                         if (piece[1] === 'R' && blockers === 0) {
-                            score += 24;
+                            score += stageWeight(stage, 18, 24, 20);
                         }
                         if (piece[1] === 'C' && blockers === 1) {
-                            score += 22;
+                            score += stageWeight(stage, 20, 22, 16);
                         }
                     }
 
                     if (Math.abs(col - enemyGeneral.col) <= 1 && Math.abs(row - enemyGeneral.row) <= 4) {
-                        score += piece[1] === 'R' ? 12 : 8;
+                        score += piece[1] === 'R'
+                            ? stageWeight(stage, 10, 12, 8)
+                            : stageWeight(stage, 8, 8, 4);
                     }
                 }
             }
 
-            return score;
+            return Math.round(score);
         }
 
-        function evaluateDevelopment(board, color, phase) {
-            if (phase !== 'opening') {
+        function evaluateDevelopment(board, color, stage) {
+            if (stage.opening < 0.14) {
                 return 0;
             }
 
@@ -370,6 +412,11 @@
                         const deepRaid = color === RED_COLOR ? row <= 4 : row >= 5;
                         if (deepRaid && undevelopedMajors >= 2) {
                             score -= 48;
+                        } else if (deepRaid && undevelopedRooks >= 1) {
+                            score -= 38;
+                        }
+                        if (undevelopedHorses === 1 && !centralCannonPressure && row !== cannonRow(color)) {
+                            score -= 18;
                         }
                     }
 
@@ -396,10 +443,10 @@
                 score -= 26;
             }
 
-            return score;
+            return Math.round(score * (stage.opening + stage.middlegame * 0.35));
         }
 
-        function evaluateSoldiers(board, color, phase) {
+        function evaluateSoldiers(board, color, stage) {
             let score = 0;
 
             for (let row = 0; row < 10; row++) {
@@ -409,7 +456,7 @@
                     }
 
                     if (hasCrossedRiver(color, row)) {
-                        score += phase === 'opening' ? 4 : phase === 'middlegame' ? 14 : 22;
+                        score += stageWeight(stage, 4, 14, 22);
                     }
 
                     for (const nextCol of [col - 1, col + 1]) {
@@ -417,13 +464,13 @@
                             continue;
                         }
                         if (board[row][nextCol] === `${color}S`) {
-                            score += phase === 'endgame' ? 10 : 4;
+                            score += stageWeight(stage, 4, 4, 10);
                         }
                     }
                 }
             }
 
-            return score;
+            return Math.round(score);
         }
 
         function evaluateExchangeSafety(board, color, phase) {
@@ -463,7 +510,7 @@
             return score;
         }
 
-        function evaluateSide(board, color, phase) {
+        function evaluateSide(board, color, stage) {
             let score = 0;
 
             for (let row = 0; row < 10; row++) {
@@ -474,28 +521,28 @@
                     }
 
                     const type = piece[1];
-                    score += pieceValue(type, phase);
-                    score += pieceSquareBonus(piece, row, col, phase);
-                    score += getPseudoMoves(board, row, col).length * CONFIG.mobility[phase][type];
+                    score += pieceValue(type, stage);
+                    score += pieceSquareBonus(piece, row, col, stage);
+                    score += getPseudoMoves(board, row, col).length * mobilityValue(type, stage);
                 }
             }
 
-            score += evaluateDevelopment(board, color, phase);
-            score += evaluateKingSafety(board, color, phase);
-            score += evaluateSoldiers(board, color, phase);
-            score += evaluateRookPressure(board, color);
+            score += evaluateDevelopment(board, color, stage);
+            score += evaluateKingSafety(board, color, stage);
+            score += evaluateSoldiers(board, color, stage);
+            score += evaluateRookPressure(board, color, stage);
             return score;
         }
 
         function evaluateBoardForColor(board, color, history) {
-            const phase = getPhase(board, history);
-            let score = evaluateSide(board, RED_COLOR, phase) - evaluateSide(board, BLACK_COLOR, phase);
+            const stage = getStageProfile(board, history);
+            let score = evaluateSide(board, RED_COLOR, stage) - evaluateSide(board, BLACK_COLOR, stage);
 
             if (isInCheck(board, BLACK_COLOR)) {
-                score += phase === 'opening' ? 24 : 36;
+                score += stageWeight(stage, 24, 34, 36);
             }
             if (isInCheck(board, RED_COLOR)) {
-                score -= phase === 'opening' ? 24 : 36;
+                score -= stageWeight(stage, 24, 34, 36);
             }
 
             return color === RED_COLOR ? score : -score;
@@ -605,12 +652,12 @@
             }
 
             if (!move.captured && move.piece[1] === 'C') {
+                const deepRaid = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
                 if (move.fromRow === cannonRow(color) && move.toRow === cannonRow(color) && move.toCol === 4) {
                     score += 24;
                 } else if (move.fromRow === cannonRow(color) && move.toRow === cannonRow(color)) {
                     score -= 16 + Math.abs(4 - move.toCol) * 4;
                 } else {
-                    const deepRaid = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
                     if (deepRaid && undevelopedMajors >= 2) {
                         score -= move.captured ? 46 : 64;
                     } else if (undevelopedRooks >= 1 && move.toCol !== 4) {
@@ -629,6 +676,9 @@
                 }
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
                     score -= move.toCol === 4 ? 44 : 26;
+                }
+                if (deepRaid && undevelopedRooks >= 1) {
+                    score -= move.captured ? 72 : 96;
                 }
             }
 
@@ -742,6 +792,28 @@
             return Math.round(score);
         }
 
+        function getRootContinuationBias(board, nextBoard, move, color, history, stage) {
+            if (stage.opening < 0.16 && stage.middlegame < 0.28) {
+                return 0;
+            }
+
+            let score = 0;
+            if (!move.captured) {
+                score += (evaluateDevelopment(nextBoard, color, stage) - evaluateDevelopment(board, color, stage)) * 0.55;
+                score += (evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage)) * 0.75;
+                score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
+            }
+
+            if (move.piece[1] === 'R' && countUndevelopedRooks(nextBoard, color) < countUndevelopedRooks(board, color)) {
+                score += stageWeight(stage, 18, 10, 4);
+            }
+            if (move.piece[1] === 'H' && countUndevelopedHorses(nextBoard, color) < countUndevelopedHorses(board, color)) {
+                score += stageWeight(stage, 12, 8, 4);
+            }
+
+            return Math.round(score);
+        }
+
         function buildRootEntries(board, color, history, positionHistory, searchConfig, legalMoves) {
             const suggestions = getOpeningSuggestionMap(board, color, history, legalMoves);
             const sameSideMoves = getSideHistoryMoves(history, color);
@@ -768,12 +840,16 @@
             }).sort((left, right) => right.quickScore - left.quickScore);
 
             const shortlist = quickEntries.slice(0, Math.min(legalMoves.length, Math.max(searchConfig.rootLimit * 2, 12)));
-            const entries = shortlist.map(entry => ({
-                move: entry.move,
-                nextBoard: applyMoveToBoard(board, entry.move),
-                sortScore: entry.quickScore,
-                policyBias: entry.policyBias
-            })).sort((left, right) => right.sortScore - left.sortScore);
+            const entries = shortlist.map(entry => {
+                const nextBoard = applyMoveToBoard(board, entry.move);
+                const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
+                return {
+                    move: entry.move,
+                    nextBoard,
+                    sortScore: entry.quickScore + continuationBias,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6)
+                };
+            }).sort((left, right) => right.sortScore - left.sortScore);
 
             const bestScore = entries[0] ? entries[0].sortScore : 0;
             const filtered = [];
@@ -793,13 +869,14 @@
             return filtered.slice(0, Math.min(searchConfig.rootLimit, filtered.length));
         }
 
-        function scoreMoveForOrdering(board, move, phase, ttMove) {
+        function scoreMoveForOrdering(board, move, stage, ttMove) {
             if (sameMove(move, ttMove)) {
                 return 10000000;
             }
 
-            const capturedValue = move.captured ? pieceValue(move.captured[1], phase) : 0;
-            const moverValue = pieceValue(move.piece[1], phase);
+            const pieceColor = move.piece[0];
+            const capturedValue = move.captured ? pieceValue(move.captured[1], stage) : 0;
+            const moverValue = pieceValue(move.piece[1], stage);
             let score = capturedValue * 10 - moverValue * 0.2;
 
             if (move.captured && move.captured[1] === 'G') {
@@ -809,19 +886,37 @@
                 score += 10;
             }
             if (move.piece[1] === 'C') {
-                score += phase === 'opening' ? 4 : 6;
+                score += stageWeight(stage, 4, 6, 2);
             }
             if (move.piece[1] === 'S') {
-                score += phase === 'endgame' ? 10 : 2;
+                score += stageWeight(stage, 2, 4, 10);
+            }
+
+            if (!move.captured && stage.opening >= 0.28) {
+                if (move.piece[1] === 'H' && move.fromRow === homeRow(pieceColor)) {
+                    score += 18;
+                }
+                if (move.piece[1] === 'R' && move.fromRow === homeRow(pieceColor) && move.toRow === move.fromRow) {
+                    score += 10;
+                }
+                if (move.piece[1] === 'C' && move.fromRow === cannonRow(pieceColor) && move.toCol === 4) {
+                    score += 10;
+                }
+                if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+                    score -= 18;
+                }
+                if (move.piece[1] === 'G') {
+                    score -= 40;
+                }
             }
 
             return score + Math.max(0, 4 - Math.abs(4 - move.toCol)) * 5;
         }
 
-        function orderMoves(board, moves, phase, ttMove, limit) {
+        function orderMoves(board, moves, stage, ttMove, limit) {
             const ordered = moves
                 .slice()
-                .sort((left, right) => scoreMoveForOrdering(board, right, phase, ttMove) - scoreMoveForOrdering(board, left, phase, ttMove));
+                .sort((left, right) => scoreMoveForOrdering(board, right, stage, ttMove) - scoreMoveForOrdering(board, left, stage, ttMove));
             return typeof limit === 'number' ? ordered.slice(0, limit) : ordered;
         }
 
@@ -855,11 +950,12 @@
                 alpha = standPat;
             }
 
-            const phase = getPhase(board, history);
+            const stage = getStageProfile(board, history);
+            const inCheck = isInCheck(board, color);
             const tacticalMoves = orderMoves(
                 board,
-                getAllLegalMoves(board, color).filter(move => isInCheck(board, color) || move.captured),
-                phase,
+                getAllLegalMoves(board, color).filter(move => inCheck || move.captured),
+                stage,
                 null,
                 context.quiescenceLimit
             );
@@ -921,13 +1017,13 @@
                 return quiescence(board, color, alpha, beta, context, history, context.quiescenceDepth);
             }
 
-            const phase = getPhase(board, history);
+            const stage = getStageProfile(board, history);
             const legalMoves = getAllLegalMoves(board, color);
             if (legalMoves.length === 0) {
                 return { score: isInCheck(board, color) ? -MATE_SCORE - depth : -3000 - depth, pv: [] };
             }
 
-            const orderedMoves = orderMoves(board, legalMoves, phase, cached && cached.bestMove, context.branchLimit);
+            const orderedMoves = orderMoves(board, legalMoves, stage, cached && cached.bestMove, context.branchLimit);
             let bestScore = -Infinity;
             let bestMove = orderedMoves[0];
             let bestPv = [];
