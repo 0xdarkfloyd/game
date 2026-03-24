@@ -10,9 +10,9 @@
         checkInterval: 4,
         quiescenceDepth: 3,
         phase: {
-            opening: { time: 850, maxDepth: 4, rootLimit: 10, branchLimit: 10, quiescenceLimit: 6 },
-            middlegame: { time: 950, maxDepth: 5, rootLimit: 12, branchLimit: 12, quiescenceLimit: 8 },
-            endgame: { time: 1000, maxDepth: 6, rootLimit: 18, branchLimit: 16, quiescenceLimit: 10 }
+            opening: { time: 1000, maxDepth: 5, rootLimit: 10, branchLimit: 10, quiescenceLimit: 6 },
+            middlegame: { time: 1100, maxDepth: 5, rootLimit: 12, branchLimit: 12, quiescenceLimit: 8 },
+            endgame: { time: 1200, maxDepth: 6, rootLimit: 18, branchLimit: 16, quiescenceLimit: 10 }
         },
         values: {
             R: { opening: 920, middlegame: 930, endgame: 900 },
@@ -1031,7 +1031,40 @@
             return filtered.slice(0, Math.min(searchConfig.rootLimit, filtered.length));
         }
 
-        function scoreMoveForOrdering(board, move, stage, ttMove) {
+        function getMoveHistoryKey(move) {
+            return `${move.piece}|${move.fromRow},${move.fromCol}-${move.toRow},${move.toCol}`;
+        }
+
+        function getKillerMoves(context, ply) {
+            return context.killers.get(ply) || [];
+        }
+
+        function recordKillerMove(context, ply, move) {
+            if (move.captured) {
+                return;
+            }
+
+            const killers = getKillerMoves(context, ply)
+                .filter(candidate => !sameMove(candidate, move));
+            killers.unshift(move);
+            context.killers.set(ply, killers.slice(0, 2));
+        }
+
+        function recordHistoryScore(context, move, depth) {
+            if (move.captured) {
+                return;
+            }
+
+            const key = getMoveHistoryKey(move);
+            const current = context.historyScores.get(key) || 0;
+            context.historyScores.set(key, current + depth * depth * 6);
+        }
+
+        function getHistoryScore(context, move) {
+            return context.historyScores.get(getMoveHistoryKey(move)) || 0;
+        }
+
+        function scoreMoveForOrdering(board, move, stage, ttMove, context, ply) {
             if (sameMove(move, ttMove)) {
                 return 10000000;
             }
@@ -1040,6 +1073,7 @@
             const capturedValue = move.captured ? pieceValue(move.captured[1], stage) : 0;
             const moverValue = pieceValue(move.piece[1], stage);
             let score = capturedValue * 10 - moverValue * 0.2;
+            const killerMoves = context ? getKillerMoves(context, ply) : [];
 
             if (move.captured && move.captured[1] === 'G') {
                 score += MATE_SCORE;
@@ -1075,13 +1109,24 @@
                 }
             }
 
+            if (!move.captured) {
+                if (killerMoves[0] && sameMove(move, killerMoves[0])) {
+                    score += 9000;
+                } else if (killerMoves[1] && sameMove(move, killerMoves[1])) {
+                    score += 7500;
+                }
+                if (context) {
+                    score += Math.min(5000, getHistoryScore(context, move));
+                }
+            }
+
             return score + Math.max(0, 4 - Math.abs(4 - move.toCol)) * 5;
         }
 
-        function orderMoves(board, moves, stage, ttMove, limit) {
+        function orderMoves(board, moves, stage, ttMove, limit, context, ply) {
             const ordered = moves
                 .slice()
-                .sort((left, right) => scoreMoveForOrdering(board, right, stage, ttMove) - scoreMoveForOrdering(board, left, stage, ttMove));
+                .sort((left, right) => scoreMoveForOrdering(board, right, stage, ttMove, context, ply) - scoreMoveForOrdering(board, left, stage, ttMove, context, ply));
             return typeof limit === 'number' ? ordered.slice(0, limit) : ordered;
         }
 
@@ -1103,7 +1148,7 @@
             return false;
         }
 
-        function quiescence(board, color, alpha, beta, context, history, depth) {
+        function quiescence(board, color, alpha, beta, context, history, depth, ply) {
             const standPat = evaluateBoardForColor(board, color, history);
             if (shouldAbort(context)) {
                 return { score: standPat, aborted: true, pv: [] };
@@ -1122,14 +1167,16 @@
                 getAllLegalMoves(board, color).filter(move => inCheck || move.captured),
                 stage,
                 null,
-                context.quiescenceLimit
+                context.quiescenceLimit,
+                context,
+                ply
             );
 
             let bestScore = standPat;
             let bestPv = [];
             for (const move of tacticalMoves) {
                 const nextBoard = applyMoveToBoard(board, move);
-                const result = quiescence(nextBoard, otherColor(color), -beta, -alpha, context, history.concat(getMoveKey(move)), depth - 1);
+                const result = quiescence(nextBoard, otherColor(color), -beta, -alpha, context, history.concat(getMoveKey(move)), depth - 1, ply + 1);
                 const score = -result.score;
 
                 if (score > bestScore) {
@@ -1147,7 +1194,7 @@
             return { score: bestScore, pv: bestPv };
         }
 
-        function negamax(board, color, depth, alpha, beta, context, history) {
+        function negamax(board, color, depth, alpha, beta, context, history, ply) {
             const originalAlpha = alpha;
             const ttKey = `${getBoardKey(board, color)}|${depth}`;
             const cached = context.tt.get(ttKey);
@@ -1179,7 +1226,7 @@
             }
 
             if (depth === 0) {
-                return quiescence(board, color, alpha, beta, context, history, context.quiescenceDepth);
+                return quiescence(board, color, alpha, beta, context, history, context.quiescenceDepth, ply);
             }
 
             const stage = getStageProfile(board, history);
@@ -1188,14 +1235,14 @@
                 return { score: isInCheck(board, color) ? -MATE_SCORE - depth : -3000 - depth, pv: [] };
             }
 
-            const orderedMoves = orderMoves(board, legalMoves, stage, cached && cached.bestMove, context.branchLimit);
+            const orderedMoves = orderMoves(board, legalMoves, stage, cached && cached.bestMove, context.branchLimit, context, ply);
             let bestScore = -Infinity;
             let bestMove = orderedMoves[0];
             let bestPv = [];
 
             for (const move of orderedMoves) {
                 const nextBoard = applyMoveToBoard(board, move);
-                const result = negamax(nextBoard, otherColor(color), depth - 1, -beta, -alpha, context, history.concat(getMoveKey(move)));
+                const result = negamax(nextBoard, otherColor(color), depth - 1, -beta, -alpha, context, history.concat(getMoveKey(move)), ply + 1);
                 const score = -result.score;
 
                 if (score > bestScore) {
@@ -1206,7 +1253,12 @@
                 if (score > alpha) {
                     alpha = score;
                 }
-                if (alpha >= beta || result.aborted) {
+                if (alpha >= beta) {
+                    recordKillerMove(context, ply, move);
+                    recordHistoryScore(context, move, depth);
+                    break;
+                }
+                if (result.aborted) {
                     break;
                 }
             }
@@ -1251,6 +1303,8 @@
                 timedOut: false,
                 nodes: 0,
                 tt: new Map(),
+                historyScores: new Map(),
+                killers: new Map(),
                 branchLimit: searchConfig.branchLimit,
                 quiescenceLimit: searchConfig.quiescenceLimit,
                 quiescenceDepth: CONFIG.quiescenceDepth
@@ -1261,15 +1315,18 @@
             let bestPv = [bestMove];
             let completedDepth = 0;
             const policyWeight = searchConfig.phase === 'opening' ? 1.9 : searchConfig.phase === 'middlegame' ? 1.15 : 1;
+            let orderedRootEntries = rootEntries.slice();
 
             for (let depth = 1; depth <= searchConfig.maxDepth; depth++) {
                 let depthBestMove = bestMove;
                 let depthBestScore = -Infinity;
                 let depthBestPv = bestPv;
+                const depthScores = new Map();
 
-                for (const entry of rootEntries) {
-                    const result = negamax(entry.nextBoard, otherColor(color), depth - 1, -Infinity, Infinity, context, history.concat(getMoveKey(entry.move)));
+                for (const entry of orderedRootEntries) {
+                    const result = negamax(entry.nextBoard, otherColor(color), depth - 1, -Infinity, Infinity, context, history.concat(getMoveKey(entry.move)), 1);
                     const score = -result.score + entry.policyBias * policyWeight;
+                    depthScores.set(getMoveKey(entry.move), score);
 
                     if (score > depthBestScore) {
                         depthBestScore = score;
@@ -1289,6 +1346,41 @@
                 bestScore = depthBestScore;
                 bestPv = depthBestPv;
                 completedDepth = depth;
+
+                orderedRootEntries = orderedRootEntries
+                    .slice()
+                    .sort((left, right) => (depthScores.get(getMoveKey(right.move)) || -Infinity) - (depthScores.get(getMoveKey(left.move)) || -Infinity));
+            }
+
+            if (!context.timedOut &&
+                completedDepth >= 2 &&
+                orderedRootEntries.length >= 2 &&
+                Date.now() + 120 < context.deadline) {
+                const verifyCount = Math.min(3, orderedRootEntries.length);
+                const verifyDepth = Math.min(searchConfig.maxDepth, completedDepth + 1);
+                let verifyBestMove = bestMove;
+                let verifyBestScore = bestScore;
+                let verifyBestPv = bestPv;
+
+                for (let index = 0; index < verifyCount; index++) {
+                    const entry = orderedRootEntries[index];
+                    const result = negamax(entry.nextBoard, otherColor(color), verifyDepth - 1, -Infinity, Infinity, context, history.concat(getMoveKey(entry.move)), 1);
+                    const score = -result.score + entry.policyBias * (policyWeight * 0.55);
+                    if (score > verifyBestScore) {
+                        verifyBestScore = score;
+                        verifyBestMove = entry.move;
+                        verifyBestPv = [entry.move].concat(result.pv || []);
+                    }
+                    if (result.aborted || context.timedOut) {
+                        break;
+                    }
+                }
+
+                if (!context.timedOut) {
+                    bestMove = verifyBestMove;
+                    bestScore = verifyBestScore;
+                    bestPv = verifyBestPv;
+                }
             }
 
             return {
