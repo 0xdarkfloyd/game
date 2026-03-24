@@ -63,11 +63,27 @@ const scenarios = [
         }
     },
     {
+        name: 'middle cannon after one horse should bring rook',
+        sequence: ['7,7-7,4', '0,1-2,2', '9,7-7,6'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
+        }
+    },
+    {
         name: 'flank cannon opening prefers horse development',
         sequence: ['7,1-7,4'],
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(result.move.piece, 'bH', `expected horse, got ${result.move.piece}`);
+        }
+    },
+    {
+        name: 'flank cannon after one horse should bring rook',
+        sequence: ['7,1-7,4', '0,7-2,6', '9,1-7,2'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
         }
     },
     {

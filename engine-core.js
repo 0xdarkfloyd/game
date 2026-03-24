@@ -10,9 +10,9 @@
         checkInterval: 4,
         quiescenceDepth: 3,
         phase: {
-            opening: { time: 700, maxDepth: 4, rootLimit: 10, branchLimit: 10, quiescenceLimit: 6 },
-            middlegame: { time: 860, maxDepth: 5, rootLimit: 12, branchLimit: 12, quiescenceLimit: 8 },
-            endgame: { time: 980, maxDepth: 6, rootLimit: 18, branchLimit: 16, quiescenceLimit: 10 }
+            opening: { time: 850, maxDepth: 4, rootLimit: 10, branchLimit: 10, quiescenceLimit: 6 },
+            middlegame: { time: 950, maxDepth: 5, rootLimit: 12, branchLimit: 12, quiescenceLimit: 8 },
+            endgame: { time: 1000, maxDepth: 6, rootLimit: 18, branchLimit: 16, quiescenceLimit: 10 }
         },
         values: {
             R: { opening: 920, middlegame: 930, endgame: 900 },
@@ -553,6 +553,9 @@
                     score -= 20;
                 }
             }
+            if (!move.captured && move.piece[1] === 'R' && move.fromRow !== homeRow(color) && undevelopedMajors >= 1) {
+                score -= undevelopedMajors >= 3 ? 34 : undevelopedMajors === 2 ? 24 : 14;
+            }
 
             if (move.piece[1] === 'H' && move.fromRow === homeRow(color)) {
                 score += 18;
@@ -595,6 +598,9 @@
                 }
                 if (undevelopedHorses === 2 && move.toRow !== cannonRow(color)) {
                     score -= 22;
+                }
+                if (move.fromRow !== cannonRow(color) && undevelopedMajors >= 1) {
+                    score -= undevelopedMajors >= 3 ? 28 : undevelopedMajors === 2 ? 20 : 12;
                 }
             }
 
