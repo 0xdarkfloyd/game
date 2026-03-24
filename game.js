@@ -1334,6 +1334,42 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
     return score;
 }
 
+function getRootTacticalAdjustment(activeBoard, nextBoard, move, color) {
+    const opponent = otherColor(color);
+    const capturedValue = move.captured ? PIECE_VALUES[move.captured[1]] : 0;
+    const moverValue = PIECE_VALUES[move.piece[1]];
+    const attacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, opponent);
+    const defended = isSquareAttacked(nextBoard, move.toRow, move.toCol, color);
+    let score = 0;
+
+    if (isInCheck(nextBoard, opponent)) {
+        score += 42;
+    }
+
+    if (attacked) {
+        if (!defended) {
+            if (!move.captured) {
+                score -= Math.round(moverValue * 0.34);
+            } else if (capturedValue < moverValue) {
+                score -= Math.round((moverValue - capturedValue) * 0.5);
+            } else {
+                score -= 18;
+            }
+        } else if (!move.captured && move.piece[1] === 'R') {
+            score -= 20;
+        }
+    }
+
+    if (move.piece[1] === 'R' || move.piece[1] === 'H' || move.piece[1] === 'C') {
+        const fromAttacked = isSquareAttacked(activeBoard, move.fromRow, move.fromCol, opponent);
+        if (!move.captured && !fromAttacked && attacked && !defended) {
+            score -= 28;
+        }
+    }
+
+    return score;
+}
+
 function scoreMove(activeBoard, move, ttMove) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -1632,6 +1668,22 @@ function chooseSearchDepth(activeBoard, legalMoves) {
     return 5;
 }
 
+function getRootCandidateLimit(pieceCount, legalMoveCount) {
+    if (pieceCount >= 24) {
+        return Math.min(7, legalMoveCount);
+    }
+
+    if (pieceCount >= 20) {
+        return Math.min(5, legalMoveCount);
+    }
+
+    if (pieceCount >= 16) {
+        return Math.min(4, legalMoveCount);
+    }
+
+    return legalMoveCount;
+}
+
 function chooseComputerMove(activeBoard, color = computerColor, historySequence = moveSequence) {
     const bookMove = findOpeningBookMove(activeBoard, color, historySequence);
     if (bookMove &&
@@ -1652,30 +1704,35 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
     const pieceCount = countPieces(activeBoard);
 
-    if (pieceCount >= 24) {
-        const orderedMoves = legalMoves
-            .slice()
-            .sort((left, right) => {
-                const rightScore = scoreMove(activeBoard, right) + getRootOpeningAdjustment(activeBoard, right, color, historySequence);
-                const leftScore = scoreMove(activeBoard, left) + getRootOpeningAdjustment(activeBoard, left, color, historySequence);
-                return rightScore - leftScore;
-            });
-        const rootMoves = orderedMoves.slice(0, Math.min(8, orderedMoves.length));
-        let bestMove = rootMoves[0];
+    if (pieceCount >= 24 && legalMoves.length <= 32) {
+        const rootEntries = legalMoves.map(move => {
+            const nextBoard = applyMoveToBoard(activeBoard, move);
+            const openingAdjustment = getRootOpeningAdjustment(activeBoard, move, color, historySequence);
+            const tacticalAdjustment = getRootTacticalAdjustment(activeBoard, nextBoard, move, color);
+            return {
+                move,
+                nextBoard,
+                adjustment: openingAdjustment + tacticalAdjustment,
+                sortScore: scoreMove(activeBoard, move) + openingAdjustment + tacticalAdjustment
+            };
+        });
+
+        rootEntries.sort((left, right) => right.sortScore - left.sortScore);
+        const rootMoves = rootEntries.slice(0, getRootCandidateLimit(pieceCount, rootEntries.length));
+        let bestMove = rootMoves[0].move;
         let bestScore = -Infinity;
 
-        for (const move of rootMoves) {
-            const nextBoard = applyMoveToBoard(activeBoard, move);
-            const result = negamax(nextBoard, otherColor(color), depth - 1, -Infinity, Infinity);
-            const score = -result.score + getRootOpeningAdjustment(activeBoard, move, color, historySequence);
+        for (const entry of rootMoves) {
+            const result = negamax(entry.nextBoard, otherColor(color), depth - 1, -Infinity, Infinity);
+            const score = -result.score + entry.adjustment;
 
             if (score > bestScore) {
                 bestScore = score;
-                bestMove = move;
+                bestMove = entry.move;
             }
         }
 
-        return bestMove || rootMoves[0];
+        return bestMove || rootMoves[0].move;
     }
 
     const result = negamax(activeBoard, color, depth, -Infinity, Infinity);
