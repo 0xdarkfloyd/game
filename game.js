@@ -638,15 +638,15 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
         if (!hasEscape) {
             return 900000; // Checkmate Red!
         } else {
-            score += 500; // Check but not mate
+            score += 600; // Check is valuable - apply pressure!
         }
     }
 
-    // ===== DEFEND AGAINST IMMEDIATE THREATS =====
-    // Analyze all Red's possible responses to find most dangerous ones
+    // ===== DEFEND AGAINST CHECKMATE ONLY =====
+    // Only avoid moves that lead to immediate checkmate - be aggressive otherwise!
     const redMoves = getAllPossibleMoves(newBoard, 'r');
-    let maxThreat = 0;
     let canBeCheckmated = false;
+    let checkmateMove = null;
 
     for (let move of redMoves) {
         const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
@@ -664,35 +664,23 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
             }
             if (!hasEscape) {
                 canBeCheckmated = true;
-                // If we're capturing the threatening piece, that's good!
-                if (move.fromRow === toRow && move.fromCol === toCol && targetPiece) {
-                    score += 15000; // Capture threatening piece!
-                    canBeCheckmated = false;
-                }
+                checkmateMove = move;
                 break;
             }
         }
+    }
 
-        // Check what Red can capture
-        const captured = newBoard[move.toRow][move.toCol];
-        if (captured && captured[0] === 'b') {
-            const captureValue = getPieceValue(captured);
-            if (captureValue > maxThreat) {
-                maxThreat = captureValue;
-            }
+    // ONLY avoid checkmate - don't worry about minor threats
+    if (canBeCheckmated) {
+        // If we're capturing the piece that would checkmate us, that's great!
+        if (checkmateMove && checkmateMove.fromRow === toRow && checkmateMove.fromCol === toCol && targetPiece) {
+            score += 20000; // Capture the threatening piece!
+        } else {
+            return -80000; // Avoid checkmate
         }
     }
 
-    if (canBeCheckmated) {
-        score -= 50000; // This move leads to checkmate!
-    }
-
-    // Penalty for leaving pieces hanging
-    if (maxThreat > 0) {
-        score -= maxThreat * 100;
-    }
-
-    // ===== OFFENSIVE: CAPTURE EVALUATION =====
+    // ===== AGGRESSIVE OFFENSIVE: CAPTURE EVERYTHING! =====
     if (targetPiece && targetPiece[0] === 'r') {
         const captureValue = getPieceValue(targetPiece);
         const movingValue = getPieceValue(movingPiece);
@@ -701,86 +689,113 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
         const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
 
         if (isDestinationSafe) {
-            // Safe capture
-            score += captureValue * 150;
+            // Safe capture - HUGE reward!
+            score += captureValue * 200;
 
-            // Bonus for capturing attacking pieces
+            // Extra bonus for capturing attacking pieces
             if (isPositionAttacked(board, toRow, toCol, 'r')) {
-                score += 250; // Captured an attacker
+                score += 400; // Remove threats by capturing
             }
         } else {
-            // Risky capture - evaluate trade
+            // Risky capture - still do it if we gain material!
             const tradeDiff = captureValue - movingValue;
-            if (tradeDiff >= 4) {
-                score += tradeDiff * 80; // Very good trade even if risky
-            } else if (tradeDiff >= 2) {
-                score += tradeDiff * 40; // Good trade
-            } else if (tradeDiff > 0) {
-                score += tradeDiff * 20; // Slight advantage
+            if (tradeDiff >= 3) {
+                score += captureValue * 150; // Great trade - do it!
+            } else if (tradeDiff >= 1) {
+                score += captureValue * 100; // Good trade - go for it!
             } else if (tradeDiff === 0) {
-                score -= 5; // Equal trade but risky - slightly negative
+                score += captureValue * 30; // Equal trade - still aggressive
+            } else if (tradeDiff >= -1) {
+                score += captureValue * 10; // Small loss but maybe worth pressure
             } else {
-                score += tradeDiff * 200; // Bad trade - heavy penalty
+                score -= Math.abs(tradeDiff) * 80; // Only bad trades are penalized
             }
         }
+
+        // Extra bonus for capturing high-value pieces (chariots, cannons)
+        if (captureValue >= 4) {
+            score += 300; // Hunt valuable pieces!
+        }
     } else {
-        // Non-capture move - heavily penalize moving to attacked square
+        // Non-capture moves - only avoid if piece is very valuable
         if (isPositionAttacked(newBoard, toRow, toCol, 'r')) {
             const movingValue = getPieceValue(movingPiece);
-            score -= movingValue * 120;
+            // Only penalize if moving valuable pieces to danger
+            if (movingValue >= 4) {
+                score -= movingValue * 40; // Reduced penalty
+            } else {
+                score -= movingValue * 15; // Small pieces can take risks
+            }
         }
     }
 
-    // ===== DEFENSIVE: SAVE THREATENED PIECES =====
+    // ===== MODERATE DEFENSE: ONLY SAVE IMPORTANT PIECES =====
     if (isPositionAttacked(board, fromRow, fromCol, 'r')) {
         const movedPieceValue = getPieceValue(movingPiece);
         if (!isPositionAttacked(newBoard, toRow, toCol, 'r')) {
-            score += movedPieceValue * 60; // Successfully saved piece
+            // Only reward saving valuable pieces
+            if (movedPieceValue >= 4) {
+                score += movedPieceValue * 50;
+            } else {
+                score += movedPieceValue * 15; // Small pieces less important
+            }
         }
     }
 
-    // ===== POSITIONAL SCORING =====
+    // ===== AGGRESSIVE POSITIONAL PLAY =====
     const centerCols = [3, 4, 5];
-    const centerRows = [4, 5, 6];
+    const centerRows = [3, 4, 5, 6];
 
-    // Control center
+    // Control center aggressively
     if (centerCols.includes(toCol) && centerRows.includes(toRow)) {
-        score += 8;
+        score += 15; // Strong center control
     }
 
-    // Advance pieces (especially soldiers and attack pieces)
+    // Push forward aggressively!
     if (toRow < fromRow) {
         const pieceType = movingPiece.substring(1);
         if (pieceType === '卒') {
-            score += 12; // Push soldiers forward
+            score += 20; // Soldiers advance boldly
+        } else if (getPieceValue(movingPiece) >= 4) {
+            score += 12; // Attack pieces push forward
         } else {
-            score += 5;
+            score += 8;
         }
     }
 
-    // Keep strong pieces near general for defense
+    // Invade enemy territory (top 3 rows)
+    if (toRow <= 2) {
+        score += 25; // Deep invasion bonus
+    }
+
+    // Attack the enemy general's zone
+    const redGeneral = findGeneral(newBoard, 'r');
+    if (redGeneral) {
+        const distanceToRedGeneral = Math.abs(toRow - redGeneral.row) + Math.abs(toCol - redGeneral.col);
+        if (distanceToRedGeneral <= 3) {
+            score += 30; // Threaten the enemy general!
+        }
+    }
+
+    // Only minimal general protection - don't be passive
     const ourGeneral = findGeneral(newBoard, 'b');
     if (ourGeneral) {
         const distance = Math.abs(toRow - ourGeneral.row) + Math.abs(toCol - ourGeneral.col);
         const movingValue = getPieceValue(movingPiece);
 
-        if (movingValue >= 4 && distance <= 3) {
-            score += 15; // Keep valuable pieces near general
-        }
-
-        // But don't cluster too much
-        if (movingValue >= 4 && distance === 0) {
-            score -= 5; // Don't block the general
+        // Only keep one strong piece near general
+        if (movingValue >= 4 && distance <= 2) {
+            score += 8; // Minimal defense
         }
     }
 
-    // Penalty for moving pieces backward (unless retreating from danger)
+    // Don't penalize backward moves much - repositioning is OK
     if (toRow > fromRow && !isPositionAttacked(board, fromRow, fromCol, 'r')) {
-        score -= 8;
+        score -= 3; // Small penalty only
     }
 
-    // Small random for variety
-    score += Math.random() * 0.5;
+    // Random variety
+    score += Math.random() * 1.5;
 
     return score;
 }
