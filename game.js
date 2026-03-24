@@ -28,33 +28,141 @@ function createBoard() {
     const boardElement = document.getElementById('board');
     boardElement.innerHTML = '';
 
+    const CELL_SIZE = 60; // Distance between lines
+
+    // Draw horizontal lines
     for (let row = 0; row < 10; row++) {
-        const rowElement = document.createElement('div');
-        rowElement.className = 'row';
+        const line = document.createElement('div');
+        line.className = 'line h-line';
+        line.style.left = '0px';
+        line.style.top = (row * CELL_SIZE) + 'px';
+        boardElement.appendChild(line);
+    }
 
+    // Draw vertical lines
+    for (let col = 0; col < 9; col++) {
+        const x = col * CELL_SIZE;
+
+        // Middle columns (1-7) are split by the river
+        if (col >= 1 && col <= 7) {
+            // Top half (rows 0-4)
+            const lineTop = document.createElement('div');
+            lineTop.className = 'line v-line-top';
+            lineTop.style.left = x + 'px';
+            lineTop.style.top = '0px';
+            boardElement.appendChild(lineTop);
+
+            // Bottom half (rows 5-9)
+            const lineBottom = document.createElement('div');
+            lineBottom.className = 'line v-line-bottom';
+            lineBottom.style.left = x + 'px';
+            lineBottom.style.top = (5 * CELL_SIZE) + 'px';
+            boardElement.appendChild(lineBottom);
+        } else {
+            // Edge columns (0 and 8) go all the way through
+            const line = document.createElement('div');
+            line.className = 'line v-line';
+            line.style.left = x + 'px';
+            line.style.top = '0px';
+            boardElement.appendChild(line);
+        }
+    }
+
+    // Draw palace diagonal lines (九宫)
+    // Red palace (top)
+    const redPalace1 = document.createElement('div');
+    redPalace1.className = 'palace-line';
+    redPalace1.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    redPalace1.style.left = (3 * CELL_SIZE) + 'px';
+    redPalace1.style.top = '0px';
+    redPalace1.style.transform = 'rotate(45deg)';
+    boardElement.appendChild(redPalace1);
+
+    const redPalace2 = document.createElement('div');
+    redPalace2.className = 'palace-line';
+    redPalace2.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    redPalace2.style.left = (5 * CELL_SIZE) + 'px';
+    redPalace2.style.top = '0px';
+    redPalace2.style.transform = 'rotate(-45deg)';
+    boardElement.appendChild(redPalace2);
+
+    // Black palace (bottom)
+    const blackPalace1 = document.createElement('div');
+    blackPalace1.className = 'palace-line';
+    blackPalace1.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    blackPalace1.style.left = (3 * CELL_SIZE) + 'px';
+    blackPalace1.style.top = (7 * CELL_SIZE) + 'px';
+    blackPalace1.style.transform = 'rotate(45deg)';
+    boardElement.appendChild(blackPalace1);
+
+    const blackPalace2 = document.createElement('div');
+    blackPalace2.className = 'palace-line';
+    blackPalace2.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    blackPalace2.style.left = (5 * CELL_SIZE) + 'px';
+    blackPalace2.style.top = (7 * CELL_SIZE) + 'px';
+    blackPalace2.style.transform = 'rotate(-45deg)';
+    boardElement.appendChild(blackPalace2);
+
+    // Draw river text (楚河 汉界)
+    const riverTextLeft = document.createElement('div');
+    riverTextLeft.className = 'river-text';
+    riverTextLeft.textContent = '楚河';
+    riverTextLeft.style.left = (0.5 * CELL_SIZE) + 'px';
+    riverTextLeft.style.top = (4.3 * CELL_SIZE) + 'px';
+    boardElement.appendChild(riverTextLeft);
+
+    const riverTextRight = document.createElement('div');
+    riverTextRight.className = 'river-text';
+    riverTextRight.textContent = '汉界';
+    riverTextRight.style.left = (5.5 * CELL_SIZE) + 'px';
+    riverTextRight.style.top = (4.3 * CELL_SIZE) + 'px';
+    boardElement.appendChild(riverTextRight);
+
+    // Draw clickable intersections
+    for (let row = 0; row < 10; row++) {
         for (let col = 0; col < 9; col++) {
-            const cell = document.createElement('div');
-            cell.className = 'cell';
-            cell.dataset.row = row;
-            cell.dataset.col = col;
+            const intersection = document.createElement('div');
+            intersection.className = 'intersection';
+            intersection.dataset.row = row;
+            intersection.dataset.col = col;
+            intersection.style.left = (col * CELL_SIZE) + 'px';
+            intersection.style.top = (row * CELL_SIZE) + 'px';
+            intersection.addEventListener('click', () => handleCellClick(row, col));
+            boardElement.appendChild(intersection);
+        }
+    }
 
-            if (row === 4 || row === 5) {
-                cell.classList.add('river');
-            }
+    // Draw valid move indicators
+    validMoves.forEach(move => {
+        const indicator = document.createElement('div');
+        indicator.className = 'valid-move-indicator';
+        indicator.style.left = (move.col * CELL_SIZE - 10) + 'px';
+        indicator.style.top = (move.row * CELL_SIZE - 10) + 'px';
+        boardElement.appendChild(indicator);
+    });
 
+    // Draw pieces at intersections
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
             const piece = board[row][col];
             if (piece) {
                 const pieceElement = document.createElement('div');
                 pieceElement.className = 'piece ' + (piece[0] === 'r' ? 'red' : 'black');
                 pieceElement.textContent = piece.substring(1);
-                cell.appendChild(pieceElement);
+
+                // Check if this piece is selected
+                if (selectedCell && selectedCell.row === row && selectedCell.col === col) {
+                    pieceElement.classList.add('selected');
+                }
+
+                // Position at intersection (centered on the piece)
+                pieceElement.style.left = (col * CELL_SIZE - 25) + 'px';
+                pieceElement.style.top = (row * CELL_SIZE - 25) + 'px';
+
+                pieceElement.addEventListener('click', () => handleCellClick(row, col));
+                boardElement.appendChild(pieceElement);
             }
-
-            cell.addEventListener('click', () => handleCellClick(row, col));
-            rowElement.appendChild(cell);
         }
-
-        boardElement.appendChild(rowElement);
     }
 }
 
@@ -91,27 +199,13 @@ function handleCellClick(row, col) {
 function selectPiece(row, col) {
     selectedCell = { row, col };
     validMoves = getValidMoves(row, col);
-
-    // Highlight selected cell and valid moves
-    const cells = document.querySelectorAll('.cell');
-    cells.forEach(cell => {
-        const cellRow = parseInt(cell.dataset.row);
-        const cellCol = parseInt(cell.dataset.col);
-
-        if (cellRow === row && cellCol === col) {
-            cell.classList.add('selected');
-        } else if (validMoves.some(m => m.row === cellRow && m.col === cellCol)) {
-            cell.classList.add('valid-move');
-        }
-    });
+    createBoard(); // Redraw board to show selection and valid moves
 }
 
 function clearSelection() {
     selectedCell = null;
     validMoves = [];
-    document.querySelectorAll('.cell').forEach(cell => {
-        cell.classList.remove('selected', 'valid-move');
-    });
+    createBoard(); // Redraw board to clear selection
 }
 
 function movePiece(fromRow, fromCol, toRow, toCol) {
