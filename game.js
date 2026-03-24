@@ -823,6 +823,63 @@ function isSquareAttacked(activeBoard, row, col, attackerColor) {
     return false;
 }
 
+function getAttackerValues(activeBoard, row, col, attackerColor) {
+    const values = [];
+
+    for (let scanRow = 0; scanRow < 10; scanRow++) {
+        for (let scanCol = 0; scanCol < 9; scanCol++) {
+            const piece = activeBoard[scanRow][scanCol];
+            if (!piece || piece[0] !== attackerColor) {
+                continue;
+            }
+
+            if (pieceThreatensSquare(activeBoard, scanRow, scanCol, row, col)) {
+                values.push(PIECE_VALUES[piece[1]]);
+            }
+        }
+    }
+
+    values.sort((left, right) => left - right);
+    return values;
+}
+
+function getExposurePenalty(activeBoard, row, col, piece) {
+    if (!piece || piece[1] === 'G') {
+        return 0;
+    }
+
+    const color = piece[0];
+    const opponent = otherColor(color);
+    const attackers = getAttackerValues(activeBoard, row, col, opponent);
+    if (attackers.length === 0) {
+        return 0;
+    }
+
+    const defenders = getAttackerValues(activeBoard, row, col, color);
+    const pieceValue = PIECE_VALUES[piece[1]];
+    let penalty = 0;
+
+    if (defenders.length === 0) {
+        penalty -= Math.round(pieceValue * 0.34);
+    } else {
+        const leastAttacker = attackers[0];
+        const leastDefender = defenders[0];
+        if (leastAttacker < pieceValue && leastAttacker <= leastDefender) {
+            penalty -= Math.round((pieceValue - leastAttacker) * 0.45);
+        } else if (attackers.length > defenders.length) {
+            penalty -= Math.min(36, 10 * (attackers.length - defenders.length));
+        }
+    }
+
+    if (piece[1] === 'R' || piece[1] === 'C') {
+        penalty -= 10;
+    } else if (piece[1] === 'H') {
+        penalty -= 6;
+    }
+
+    return penalty;
+}
+
 function isInCheck(activeBoard, color) {
     const general = findGeneral(activeBoard, color);
     if (!general) {
@@ -1578,6 +1635,8 @@ function getRootTacticalAdjustment(activeBoard, nextBoard, move, color) {
     const moverValue = PIECE_VALUES[move.piece[1]];
     const attacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, opponent);
     const defended = isSquareAttacked(nextBoard, move.toRow, move.toCol, color);
+    const attackerValues = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent);
+    const defenderValues = getAttackerValues(nextBoard, move.toRow, move.toCol, color);
     let score = 0;
 
     if (isInCheck(nextBoard, opponent)) {
@@ -1595,6 +1654,22 @@ function getRootTacticalAdjustment(activeBoard, nextBoard, move, color) {
             }
         } else if (!move.captured && move.piece[1] === 'R') {
             score -= 20;
+        }
+    }
+
+    if (attackerValues.length > 0) {
+        if (defenderValues.length === 0) {
+            score -= Math.round(moverValue * 0.28);
+        } else {
+            const leastAttacker = attackerValues[0];
+            const leastDefender = defenderValues[0];
+            if (leastAttacker < moverValue && leastAttacker <= leastDefender) {
+                score -= Math.round((moverValue - leastAttacker) * 0.5);
+            }
+        }
+
+        if (move.captured && capturedValue < attackerValues[0]) {
+            score -= Math.round((attackerValues[0] - capturedValue) * 0.25);
         }
     }
 
