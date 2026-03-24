@@ -88,6 +88,22 @@ const OPENING_BOOK = {
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
         { fromRow: 0, fromCol: 8, toRow: 0, toCol: 7, name: '\u8eca9\u5e738' }
     ],
+    [`${BLACK_COLOR}|6,2-5,2/0,7-2,6/9,7-7,6/0,1-2,2/6,6-5,6`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2/0,7-2,6/9,7-7,6/0,1-2,2/6,6-5,6/3,6-4,6/5,6-4,6`]: [
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' },
+        { fromRow: 0, fromCol: 8, toRow: 1, toCol: 8, name: '\u8eca1\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/9,7-7,6/0,7-2,6/6,6-5,6`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,2-5,2/0,1-2,2/9,7-7,6/0,7-2,6/6,6-5,6/3,6-4,6/5,6-4,6`]: [
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' },
+        { fromRow: 0, fromCol: 0, toRow: 1, toCol: 0, name: '\u8eca9\u90321' }
+    ],
     [`${RED_COLOR}|7,7-7,4/0,7-2,6`]: [
         { fromRow: 9, fromCol: 1, toRow: 7, toCol: 2, name: '\u99ac\u516b\u9032\u4e03' },
         { fromRow: 9, fromCol: 0, toRow: 9, toCol: 1, name: '\u8eca\u4e5d\u5e73\u516b' },
@@ -133,6 +149,22 @@ const OPENING_BOOK = {
     [`${BLACK_COLOR}|6,6-5,6/0,7-2,6/9,1-7,2/0,1-2,2/7,7-7,5/3,6-4,6/7,1-7,0`]: [
         { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
         { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
+    [`${BLACK_COLOR}|9,6-7,4/0,7-2,6/9,7-7,5/3,4-4,4/7,7-7,5/0,1-2,2/9,8-9,7`]: [
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
+    ],
+    [`${BLACK_COLOR}|9,6-7,4/0,7-2,6/9,7-7,5/3,4-4,4/7,7-7,5/0,1-2,2/9,8-9,7/3,6-4,6/7,1-5,1`]: [
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
+    [`${BLACK_COLOR}|9,6-7,4/0,1-2,2/9,7-8,5/3,4-4,4/7,7-7,5/0,7-2,6/9,8-9,7`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
+    [`${BLACK_COLOR}|9,6-7,4/0,1-2,2/9,7-8,5/3,4-4,4/7,7-7,5/0,7-2,6/9,8-9,7/3,6-4,6/7,1-5,1`]: [
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
     ],
     [`${BLACK_COLOR}|9,6-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u98db\u76f8\u5c0d\u5c4f\u98a8\u99ac' },
@@ -1163,6 +1195,63 @@ function getOpeningMoveBonus(activeBoard, move) {
     return score;
 }
 
+function getSideHistoryMoves(historySequence, color) {
+    return historySequence
+        .filter((_, index) => (index % 2 === 0) === (color === RED_COLOR))
+        .map(parseMoveKey);
+}
+
+function getRootOpeningAdjustment(activeBoard, move, color, historySequence) {
+    const pieceCount = countPieces(activeBoard);
+    if (pieceCount < 24 || !historySequence || historySequence.length < 2) {
+        return 0;
+    }
+
+    const recentSideMoves = getSideHistoryMoves(historySequence, color);
+    if (recentSideMoves.length === 0) {
+        return 0;
+    }
+
+    const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
+    const lastOwnMove = recentSideMoves[recentSideMoves.length - 1];
+    const previousOwnMove = recentSideMoves.length > 1 ? recentSideMoves[recentSideMoves.length - 2] : null;
+    let score = 0;
+
+    const samePieceAsLastMove = lastOwnMove.toRow === move.fromRow && lastOwnMove.toCol === move.fromCol;
+    const samePieceAsPreviousMove = previousOwnMove &&
+        previousOwnMove.toRow === move.fromRow &&
+        previousOwnMove.toCol === move.fromCol;
+
+    if (!move.captured && samePieceAsLastMove) {
+        if (move.piece[1] === 'H' || move.piece[1] === 'C') {
+            score -= undevelopedMajors >= 2 ? 58 : 32;
+        } else if (move.piece[1] === 'R') {
+            score -= undevelopedMajors >= 2 ? 34 : 18;
+        }
+
+        if (isExactReverseMove(lastOwnMove, move)) {
+            score -= 42;
+        }
+    }
+
+    if (!move.captured && samePieceAsPreviousMove) {
+        if (move.piece[1] === 'H' || move.piece[1] === 'C') {
+            score -= undevelopedMajors >= 2 ? 24 : 12;
+        } else if (move.piece[1] === 'R') {
+            score -= 12;
+        }
+    }
+
+    if (!move.captured && move.piece[1] === 'C' && recentSideMoves.length >= 2) {
+        const lastMovedPiece = activeBoard[lastOwnMove.toRow][lastOwnMove.toCol];
+        if (lastMovedPiece === `${color}C` && samePieceAsLastMove) {
+            score -= 22;
+        }
+    }
+
+    return score;
+}
+
 function scoreMove(activeBoard, move, ttMove) {
     if (sameMove(move, ttMove)) {
         return 10000000;
@@ -1479,6 +1568,34 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
     }
 
     const depth = chooseSearchDepth(activeBoard, legalMoves);
+    const pieceCount = countPieces(activeBoard);
+
+    if (pieceCount >= 24) {
+        const orderedMoves = legalMoves
+            .slice()
+            .sort((left, right) => {
+                const rightScore = scoreMove(activeBoard, right) + getRootOpeningAdjustment(activeBoard, right, color, historySequence);
+                const leftScore = scoreMove(activeBoard, left) + getRootOpeningAdjustment(activeBoard, left, color, historySequence);
+                return rightScore - leftScore;
+            });
+        const rootMoves = orderedMoves.slice(0, Math.min(8, orderedMoves.length));
+        let bestMove = rootMoves[0];
+        let bestScore = -Infinity;
+
+        for (const move of rootMoves) {
+            const nextBoard = applyMoveToBoard(activeBoard, move);
+            const result = negamax(nextBoard, otherColor(color), depth - 1, -Infinity, Infinity);
+            const score = -result.score + getRootOpeningAdjustment(activeBoard, move, color, historySequence);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = move;
+            }
+        }
+
+        return bestMove || rootMoves[0];
+    }
+
     const result = negamax(activeBoard, color, depth, -Infinity, Infinity);
     return result.bestMove || orderMoves(activeBoard, legalMoves)[0];
 }
