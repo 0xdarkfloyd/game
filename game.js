@@ -1487,6 +1487,8 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence, ope
             score -= undevelopedMajors >= 2 ? 58 : 32;
         } else if (move.piece[1] === 'R') {
             score -= undevelopedMajors >= 2 ? 34 : 18;
+        } else if (move.piece[1] === 'S') {
+            score -= undevelopedMajors >= 2 ? 46 : 24;
         } else if (move.piece[1] === 'A' || move.piece[1] === 'E') {
             score -= undevelopedMajors >= 2 ? 54 : 28;
         }
@@ -1505,6 +1507,8 @@ function getRootOpeningAdjustment(activeBoard, move, color, historySequence, ope
             score -= undevelopedMajors >= 2 ? 24 : 12;
         } else if (move.piece[1] === 'R') {
             score -= 12;
+        } else if (move.piece[1] === 'S') {
+            score -= undevelopedMajors >= 2 ? 18 : 8;
         } else if (move.piece[1] === 'A' || move.piece[1] === 'E') {
             score -= undevelopedMajors >= 2 ? 22 : 10;
         }
@@ -1999,6 +2003,14 @@ function applyPracticalOpeningChoice(activeBoard, color, legalMoves, candidateMo
     if (candidateMove.piece[1] === 'S' && (candidateMove.fromCol === 0 || candidateMove.fromCol === 8)) {
         return rookMoves[0];
     }
+    if (candidateMove.piece[1] === 'C' &&
+        !candidateMove.captured &&
+        candidateMove.fromRow === (color === RED_COLOR ? 7 : 2)) {
+        return rookMoves[0];
+    }
+    if ((candidateMove.piece[1] === 'A' || candidateMove.piece[1] === 'E') && !candidateMove.captured) {
+        return rookMoves[0];
+    }
     if (candidateMove.piece[1] === 'H' &&
         candidateMove.fromRow === naturalHorseRow &&
         (candidateMove.fromCol === 2 || candidateMove.fromCol === 6) &&
@@ -2117,7 +2129,8 @@ function chooseComputerMove(activeBoard, color = computerColor, historySequence 
     if (bookMove &&
         !isPerpetualCheckViolation(activeBoard, bookMove, color, positionHistory) &&
         !isPerpetualChaseViolation(activeBoard, bookMove, color, positionHistory, historySequence)) {
-        return bookMove;
+        const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
+        return applyPracticalOpeningChoice(activeBoard, color, legalMoves, bookMove);
     }
 
     const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
