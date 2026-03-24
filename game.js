@@ -69,38 +69,50 @@ function createBoard() {
     }
 
     // Draw palace diagonal lines (九宫)
-    // Red palace (top)
+    // Palace spans from column 3 to 5 (3 columns) and row 0 to 2 (3 rows) for red
+    // Diagonal length is sqrt((2*CELL_SIZE)^2 + (2*CELL_SIZE)^2) = 2*CELL_SIZE*sqrt(2)
+    const diagonalLength = 2 * CELL_SIZE * Math.sqrt(2);
+
+    // Red palace (top) - rows 0-2, cols 3-5
+    // Diagonal from (3,0) to (5,2)
     const redPalace1 = document.createElement('div');
     redPalace1.className = 'palace-line';
-    redPalace1.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    redPalace1.style.width = diagonalLength + 'px';
     redPalace1.style.left = (3 * CELL_SIZE) + 'px';
     redPalace1.style.top = '0px';
     redPalace1.style.transform = 'rotate(45deg)';
+    redPalace1.style.transformOrigin = '0 0';
     boardElement.appendChild(redPalace1);
 
+    // Diagonal from (5,0) to (3,2)
     const redPalace2 = document.createElement('div');
     redPalace2.className = 'palace-line';
-    redPalace2.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    redPalace2.style.width = diagonalLength + 'px';
     redPalace2.style.left = (5 * CELL_SIZE) + 'px';
     redPalace2.style.top = '0px';
-    redPalace2.style.transform = 'rotate(-45deg)';
+    redPalace2.style.transform = 'rotate(135deg)';
+    redPalace2.style.transformOrigin = '0 0';
     boardElement.appendChild(redPalace2);
 
-    // Black palace (bottom)
+    // Black palace (bottom) - rows 7-9, cols 3-5
+    // Diagonal from (3,7) to (5,9)
     const blackPalace1 = document.createElement('div');
     blackPalace1.className = 'palace-line';
-    blackPalace1.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    blackPalace1.style.width = diagonalLength + 'px';
     blackPalace1.style.left = (3 * CELL_SIZE) + 'px';
     blackPalace1.style.top = (7 * CELL_SIZE) + 'px';
     blackPalace1.style.transform = 'rotate(45deg)';
+    blackPalace1.style.transformOrigin = '0 0';
     boardElement.appendChild(blackPalace1);
 
+    // Diagonal from (5,7) to (3,9)
     const blackPalace2 = document.createElement('div');
     blackPalace2.className = 'palace-line';
-    blackPalace2.style.width = Math.sqrt(2 * CELL_SIZE * CELL_SIZE) + 'px';
+    blackPalace2.style.width = diagonalLength + 'px';
     blackPalace2.style.left = (5 * CELL_SIZE) + 'px';
     blackPalace2.style.top = (7 * CELL_SIZE) + 'px';
-    blackPalace2.style.transform = 'rotate(-45deg)';
+    blackPalace2.style.transform = 'rotate(135deg)';
+    blackPalace2.style.transformOrigin = '0 0';
     boardElement.appendChild(blackPalace2);
 
     // Draw river text (楚 河 / 汉 界)
@@ -262,7 +274,7 @@ function movePiece(fromRow, fromCol, toRow, toCol) {
     createBoard();
 
     // Check for game over
-    checkGameOver();
+    setTimeout(() => checkGameOver(), 100);
 }
 
 function getValidMoves(row, col) {
@@ -569,6 +581,24 @@ function getThreatenedPieces(testBoard, color) {
     return threatened;
 }
 
+function getBestResponseMove(testBoard, color) {
+    // Quick 1-move lookahead to find best response
+    let bestScore = -Infinity;
+    const opponentColor = color === 'r' ? 'b' : 'r';
+
+    const moves = getAllPossibleMoves(testBoard, color);
+    for (let move of moves) {
+        const newBoard = makeMove(testBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
+        if (!isInCheck(newBoard, color)) {
+            const material = evaluatePosition(newBoard, color);
+            if (material > bestScore) {
+                bestScore = material;
+            }
+        }
+    }
+    return bestScore;
+}
+
 function evaluateMove(fromRow, fromCol, toRow, toCol) {
     const movingPiece = board[fromRow][fromCol];
     const targetPiece = board[toRow][toCol];
@@ -576,136 +606,29 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
     // Simulate the move
     const newBoard = makeMove(board, fromRow, fromCol, toRow, toCol);
 
-    // CRITICAL: If this move leaves us in check, it's illegal in real chess
-    // Reject it completely
+    // CRITICAL: If this move leaves us in check, it's illegal
     if (isInCheck(newBoard, 'b')) {
         return -999999;
     }
 
     let score = 0;
 
-    // HIGH PRIORITY: Capture opponent's general (instant win)
+    // ===== INSTANT WIN =====
     if (targetPiece && (targetPiece === 'r将' || targetPiece === 'r帅')) {
         return 1000000;
     }
 
-    // Check if we're currently in check - escaping check is TOP priority
+    // ===== ESCAPE FROM CHECK =====
     if (isInCheck(board, 'b')) {
-        score += 5000; // Huge bonus for any move that gets us out of check
+        score += 10000; // Huge bonus for escaping check
     }
 
-    // DEFENSIVE: Check if Red can checkmate us on next move
-    const redMoves = getAllPossibleMoves(newBoard, 'r');
-    let redCanCheckmate = false;
-    for (let move of redMoves) {
-        const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
-        if (isInCheck(testBoard, 'b')) {
-            // Red puts us in check - can we escape?
-            const ourEscapes = getAllPossibleMoves(testBoard, 'b');
-            let canEscape = false;
-            for (let escape of ourEscapes) {
-                const escapeBoard = makeMove(testBoard, escape.fromRow, escape.fromCol, escape.toRow, escape.toCol);
-                if (!isInCheck(escapeBoard, 'b')) {
-                    canEscape = true;
-                    break;
-                }
-            }
-            if (!canEscape) {
-                redCanCheckmate = true;
-                // Check if this move prevents that checkmate
-                // If we're capturing the threatening piece or blocking, big bonus
-                if (targetPiece && move.fromRow === toRow && move.fromCol === toCol) {
-                    score += 8000; // Capturing the threatening piece!
-                } else {
-                    score -= 7000; // This move doesn't prevent checkmate - bad!
-                }
-                break;
-            }
-        }
-    }
-
-    // DEFENSIVE: Evaluate what Red can capture after our move
-    let worstLoss = 0;
-    for (let move of redMoves) {
-        const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
-        const captured = newBoard[move.toRow][move.toCol];
-        if (captured && captured[0] === 'b') {
-            const lossValue = getPieceValue(captured);
-            if (lossValue > worstLoss) {
-                worstLoss = lossValue;
-            }
-        }
-    }
-
-    // Heavy penalty if Red can capture valuable pieces after this move
-    if (worstLoss > 0) {
-        score -= worstLoss * 80;
-    }
-
-    // OFFENSIVE: Evaluate material gain from capture
-    if (targetPiece && targetPiece[0] === 'r') {
-        const captureValue = getPieceValue(targetPiece);
-        const movingValue = getPieceValue(movingPiece);
-
-        // Check if the position we're moving to is safe
-        const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
-
-        if (isDestinationSafe) {
-            // Safe capture - full value
-            score += captureValue * 120;
-
-            // Extra bonus for capturing pieces that threaten us
-            const threatenedBefore = getThreatenedPieces(board, 'b');
-            const threatenedAfter = getThreatenedPieces(newBoard, 'b');
-            if (threatenedAfter.length < threatenedBefore.length) {
-                score += 200; // We reduced threats by capturing!
-            }
-        } else {
-            // Risky capture - only do it if it's a good trade
-            const tradeDiff = captureValue - movingValue;
-            if (tradeDiff >= 3) {
-                score += tradeDiff * 60; // Very good trade
-            } else if (tradeDiff > 0) {
-                score += tradeDiff * 30; // Good trade
-            } else if (tradeDiff === 0) {
-                score += 5; // Equal trade
-            } else {
-                score += tradeDiff * 150; // Bad trade - heavy penalty
-            }
-        }
-    } else {
-        // Non-capture move - check if destination is safe
-        const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
-        if (!isDestinationSafe) {
-            const movingValue = getPieceValue(movingPiece);
-            score -= movingValue * 70; // Heavy penalty for moving to attacked square
-        }
-    }
-
-    // DEFENSIVE: Check if we're saving a threatened piece
-    const threatenedBefore = getThreatenedPieces(board, 'b');
-    const threatenedAfter = getThreatenedPieces(newBoard, 'b');
-
-    for (let threatened of threatenedBefore) {
-        if (threatened.row === fromRow && threatened.col === fromCol) {
-            // We moved a threatened piece
-            const stillThreatened = threatenedAfter.find(t =>
-                t.row === toRow && t.col === toCol
-            );
-            if (!stillThreatened) {
-                score += threatened.value * 40; // Successfully saved the piece
-            }
-        }
-    }
-
-    // OFFENSIVE: Check if this move puts opponent in check
+    // ===== CHECKMATE DETECTION =====
+    // Check if this move delivers checkmate to Red
     if (isInCheck(newBoard, 'r')) {
-        score += 400; // Big bonus for checking opponent
-
-        // Extra bonus if opponent has no escape (checkmate)
-        const opponentMoves = getAllPossibleMoves(newBoard, 'r');
+        const redMoves = getAllPossibleMoves(newBoard, 'r');
         let hasEscape = false;
-        for (let move of opponentMoves) {
+        for (let move of redMoves) {
             const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
             if (!isInCheck(testBoard, 'r')) {
                 hasEscape = true;
@@ -713,34 +636,151 @@ function evaluateMove(fromRow, fromCol, toRow, toCol) {
             }
         }
         if (!hasEscape) {
-            score += 800000; // Checkmate!
+            return 900000; // Checkmate Red!
+        } else {
+            score += 500; // Check but not mate
         }
     }
 
-    // Positional evaluation
+    // ===== DEFEND AGAINST IMMEDIATE THREATS =====
+    // Analyze all Red's possible responses to find most dangerous ones
+    const redMoves = getAllPossibleMoves(newBoard, 'r');
+    let maxThreat = 0;
+    let canBeCheckmated = false;
+
+    for (let move of redMoves) {
+        const testBoard = makeMove(newBoard, move.fromRow, move.fromCol, move.toRow, move.toCol);
+
+        // Check if Red can checkmate us
+        if (isInCheck(testBoard, 'b')) {
+            const ourEscapes = getAllPossibleMoves(testBoard, 'b');
+            let hasEscape = false;
+            for (let escape of ourEscapes) {
+                const escapeBoard = makeMove(testBoard, escape.fromRow, escape.fromCol, escape.toRow, escape.toCol);
+                if (!isInCheck(escapeBoard, 'b')) {
+                    hasEscape = true;
+                    break;
+                }
+            }
+            if (!hasEscape) {
+                canBeCheckmated = true;
+                // If we're capturing the threatening piece, that's good!
+                if (move.fromRow === toRow && move.fromCol === toCol && targetPiece) {
+                    score += 15000; // Capture threatening piece!
+                    canBeCheckmated = false;
+                }
+                break;
+            }
+        }
+
+        // Check what Red can capture
+        const captured = newBoard[move.toRow][move.toCol];
+        if (captured && captured[0] === 'b') {
+            const captureValue = getPieceValue(captured);
+            if (captureValue > maxThreat) {
+                maxThreat = captureValue;
+            }
+        }
+    }
+
+    if (canBeCheckmated) {
+        score -= 50000; // This move leads to checkmate!
+    }
+
+    // Penalty for leaving pieces hanging
+    if (maxThreat > 0) {
+        score -= maxThreat * 100;
+    }
+
+    // ===== OFFENSIVE: CAPTURE EVALUATION =====
+    if (targetPiece && targetPiece[0] === 'r') {
+        const captureValue = getPieceValue(targetPiece);
+        const movingValue = getPieceValue(movingPiece);
+
+        // Check if destination is safe
+        const isDestinationSafe = !isPositionAttacked(newBoard, toRow, toCol, 'r');
+
+        if (isDestinationSafe) {
+            // Safe capture
+            score += captureValue * 150;
+
+            // Bonus for capturing attacking pieces
+            if (isPositionAttacked(board, toRow, toCol, 'r')) {
+                score += 250; // Captured an attacker
+            }
+        } else {
+            // Risky capture - evaluate trade
+            const tradeDiff = captureValue - movingValue;
+            if (tradeDiff >= 4) {
+                score += tradeDiff * 80; // Very good trade even if risky
+            } else if (tradeDiff >= 2) {
+                score += tradeDiff * 40; // Good trade
+            } else if (tradeDiff > 0) {
+                score += tradeDiff * 20; // Slight advantage
+            } else if (tradeDiff === 0) {
+                score -= 5; // Equal trade but risky - slightly negative
+            } else {
+                score += tradeDiff * 200; // Bad trade - heavy penalty
+            }
+        }
+    } else {
+        // Non-capture move - heavily penalize moving to attacked square
+        if (isPositionAttacked(newBoard, toRow, toCol, 'r')) {
+            const movingValue = getPieceValue(movingPiece);
+            score -= movingValue * 120;
+        }
+    }
+
+    // ===== DEFENSIVE: SAVE THREATENED PIECES =====
+    if (isPositionAttacked(board, fromRow, fromCol, 'r')) {
+        const movedPieceValue = getPieceValue(movingPiece);
+        if (!isPositionAttacked(newBoard, toRow, toCol, 'r')) {
+            score += movedPieceValue * 60; // Successfully saved piece
+        }
+    }
+
+    // ===== POSITIONAL SCORING =====
     const centerCols = [3, 4, 5];
-    const centerRows = [3, 4, 5, 6];
+    const centerRows = [4, 5, 6];
+
+    // Control center
     if (centerCols.includes(toCol) && centerRows.includes(toRow)) {
-        score += 4;
+        score += 8;
     }
 
-    // Advance pieces toward opponent
+    // Advance pieces (especially soldiers and attack pieces)
     if (toRow < fromRow) {
-        score += 3;
+        const pieceType = movingPiece.substring(1);
+        if (pieceType === '卒') {
+            score += 12; // Push soldiers forward
+        } else {
+            score += 5;
+        }
     }
 
-    // Protect general
+    // Keep strong pieces near general for defense
     const ourGeneral = findGeneral(newBoard, 'b');
     if (ourGeneral) {
         const distance = Math.abs(toRow - ourGeneral.row) + Math.abs(toCol - ourGeneral.col);
         const movingValue = getPieceValue(movingPiece);
+
         if (movingValue >= 4 && distance <= 3) {
-            score += 10; // Keep strong pieces near general
+            score += 15; // Keep valuable pieces near general
+        }
+
+        // But don't cluster too much
+        if (movingValue >= 4 && distance === 0) {
+            score -= 5; // Don't block the general
         }
     }
 
+    // Penalty for moving pieces backward (unless retreating from danger)
+    if (toRow > fromRow && !isPositionAttacked(board, fromRow, fromCol, 'r')) {
+        score -= 8;
+    }
+
     // Small random for variety
-    score += Math.random() * 0.1;
+    score += Math.random() * 0.5;
 
     return score;
 }
@@ -807,11 +847,48 @@ function checkGameOver() {
         }
     }
 
+    // Check if general is captured
     if (!redGeneral) {
-        alert('黑方胜利！Black wins!');
+        alert('黑方胜利！将军被擒！\nBlack wins! General captured!');
         resetGame();
+        return;
     } else if (!blackGeneral) {
-        alert('红方胜利！Red wins!');
+        alert('红方胜利！将军被擒！\nRed wins! General captured!');
+        resetGame();
+        return;
+    }
+
+    // Check if current player has any legal moves (checkmate or stalemate)
+    const currentColor = currentPlayer;
+    let hasLegalMove = false;
+
+    for (let row = 0; row < 10; row++) {
+        for (let col = 0; col < 9; col++) {
+            const piece = board[row][col];
+            if (piece && piece[0] === currentColor) {
+                const moves = getValidMoves(row, col);
+                for (let move of moves) {
+                    const testBoard = makeMove(board, row, col, move.row, move.col);
+                    if (!isInCheck(testBoard, currentColor)) {
+                        hasLegalMove = true;
+                        break;
+                    }
+                }
+                if (hasLegalMove) break;
+            }
+        }
+        if (hasLegalMove) break;
+    }
+
+    if (!hasLegalMove) {
+        if (isInCheck(board, currentColor)) {
+            // Checkmate
+            const winner = currentColor === 'r' ? '黑方 (Black)' : '红方 (Red)';
+            alert(`将死！${winner}胜利！\nCheckmate! ${winner} wins!`);
+        } else {
+            // Stalemate (rare in Chinese chess)
+            alert('和棋！无子可动！\nStalemate! No legal moves!');
+        }
         resetGame();
     }
 }
