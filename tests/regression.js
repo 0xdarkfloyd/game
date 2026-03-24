@@ -135,6 +135,22 @@ const scenarios = [
         }
     },
     {
+        name: 'horse opening after one horse should prefer second horse',
+        sequence: ['6,6-5,6', '0,1-2,2', '9,1-7,2'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bH', `expected horse, got ${result.move.piece}`);
+        }
+    },
+    {
+        name: 'mirror horse opening after one horse should prefer second horse',
+        sequence: ['6,2-5,2', '0,1-2,2', '9,7-7,6'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bH', `expected horse, got ${result.move.piece}`);
+        }
+    },
+    {
         name: 'after rook trade of tempo avoid early cannon follow-up',
         sequence: ['7,1-7,4', '0,0-1,0', '9,0-8,0'],
         check(result) {

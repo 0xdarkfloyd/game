@@ -128,6 +128,10 @@
             return countUndevelopedRooks(board, color) + countUndevelopedHorses(board, color);
         }
 
+        function hasCenteredCannon(board, color) {
+            return board[cannonRow(color)][4] === `${color}C`;
+        }
+
         function hasHomeRookDevelopment(board, color) {
             const row = homeRow(color);
             for (const rookCol of [0, 8]) {
@@ -312,7 +316,9 @@
             const row0 = homeRow(color);
             const undevelopedMajors = countUndevelopedMajors(board, color);
             const undevelopedRooks = countUndevelopedRooks(board, color);
+            const undevelopedHorses = countUndevelopedHorses(board, color);
             const developedHorses = countDevelopedHorses(board, color);
+            const centralCannonPressure = hasCenteredCannon(board, color) || hasCenteredCannon(board, otherColor(color));
             let score = -undevelopedMajors * 10;
 
             if (undevelopedRooks === 2 && developedHorses === 2) {
@@ -329,11 +335,17 @@
                     if (piece[1] === 'R' && !(row === row0 && (col === 0 || col === 8))) {
                         score += row === row0 ? 34 : 48;
                         score += Math.max(0, 12 - Math.abs(4 - col) * 3);
+                        if (undevelopedHorses === 1 && !centralCannonPressure) {
+                            score -= row === row0 ? 32 : 48;
+                        }
                     }
 
                     if (piece[1] === 'H') {
                         if (row === naturalHorseRow(color) && (col === 2 || col === 6)) {
                             score += 20;
+                            if (undevelopedHorses === 1 && !centralCannonPressure) {
+                                score += 28;
+                            }
                         } else if (row !== row0) {
                             score += 4;
                         }
@@ -543,6 +555,9 @@
             const rookMovesAvailable = openingContext.rookMovesAvailable;
             const lastOwnMove = openingContext.lastOwnMove;
             const previousOwnMove = openingContext.previousOwnMove;
+            const ownCenteredCannon = openingContext.ownCenteredCannon;
+            const opponentCenteredCannon = openingContext.opponentCenteredCannon;
+            const centralCannonPressure = ownCenteredCannon || opponentCenteredCannon;
             let score = 0;
 
             if (move.piece[1] === 'R' && move.fromRow === homeRow(color)) {
@@ -552,9 +567,17 @@
                 } else if (undevelopedHorses === 1 && move.toRow !== move.fromRow) {
                     score -= 20;
                 }
+                if (undevelopedHorses === 1 && !centralCannonPressure) {
+                    score -= move.toRow === move.fromRow ? 34 : 76;
+                } else if (opponentCenteredCannon && move.toRow !== move.fromRow) {
+                    score += 18;
+                }
             }
             if (!move.captured && move.piece[1] === 'R' && move.fromRow !== homeRow(color) && undevelopedMajors >= 1) {
                 score -= undevelopedMajors >= 3 ? 34 : undevelopedMajors === 2 ? 24 : 14;
+                if (undevelopedHorses === 1 && !centralCannonPressure) {
+                    score -= 34;
+                }
             }
 
             if (move.piece[1] === 'H' && move.fromRow === homeRow(color)) {
@@ -564,6 +587,8 @@
                 }
                 if (undevelopedHorses === 2) {
                     score += 18;
+                } else if (!centralCannonPressure) {
+                    score += 42;
                 }
             }
             if (!move.captured && move.piece[1] === 'H') {
@@ -602,6 +627,9 @@
                 if (move.fromRow !== cannonRow(color) && undevelopedMajors >= 1) {
                     score -= undevelopedMajors >= 3 ? 28 : undevelopedMajors === 2 ? 20 : 12;
                 }
+                if (undevelopedHorses === 1 && !centralCannonPressure) {
+                    score -= move.toCol === 4 ? 44 : 26;
+                }
             }
 
             if (!move.captured && move.piece[1] === 'S') {
@@ -624,6 +652,9 @@
             if (rookMovesAvailable && !move.captured) {
                 if (move.piece[1] === 'R' && move.fromRow === homeRow(color)) {
                     score += undevelopedRooks === 2 ? 36 : 18;
+                    if (undevelopedHorses === 1 && !centralCannonPressure) {
+                        score -= 30;
+                    }
                 } else if (developedHorses === 2) {
                     score -= move.piece[1] === 'S' ? 36 : 48;
                 } else if (move.piece[1] === 'C' || move.piece[1] === 'A' || move.piece[1] === 'E') {
@@ -720,6 +751,8 @@
                 undevelopedHorses: countUndevelopedHorses(board, color),
                 developedHorses: countDevelopedHorses(board, color),
                 rookMovesAvailable: countUndevelopedRooks(board, color) >= 1 && hasHomeRookDevelopment(board, color),
+                ownCenteredCannon: hasCenteredCannon(board, color),
+                opponentCenteredCannon: hasCenteredCannon(board, otherColor(color)),
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
                 previousOwnMove: sameSideMoves.length > 1 ? sameSideMoves[sameSideMoves.length - 2] : null
             };
