@@ -126,6 +126,14 @@ const OPENING_BOOK = {
         { fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, name: '\u53f3\u99ac\u51fa\u52d5' },
         { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' }
     ],
+    [`${BLACK_COLOR}|6,6-5,6/0,7-2,6/9,1-7,2/0,1-2,2/7,7-7,5`]: [
+        { fromRow: 3, fromCol: 6, toRow: 4, toCol: 6, name: '\u53523\u90321' },
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' }
+    ],
+    [`${BLACK_COLOR}|6,6-5,6/0,7-2,6/9,1-7,2/0,1-2,2/7,7-7,5/3,6-4,6/7,1-7,0`]: [
+        { fromRow: 3, fromCol: 2, toRow: 4, toCol: 2, name: '\u53527\u90321' },
+        { fromRow: 3, fromCol: 4, toRow: 4, toCol: 4, name: '\u53525\u90321' }
+    ],
     [`${BLACK_COLOR}|9,6-7,4`]: [
         { fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, name: '\u98db\u76f8\u5c0d\u5c4f\u98a8\u99ac' },
         { fromRow: 2, fromCol: 1, toRow: 2, toCol: 5, name: '\u904e\u5bae\u70ae' },
@@ -1012,6 +1020,7 @@ function evaluateOpeningDevelopment(activeBoard, color) {
     const homeRow = color === RED_COLOR ? 9 : 0;
     const soldierRow = color === RED_COLOR ? 6 : 3;
     const cannonRow = color === RED_COLOR ? 7 : 2;
+    const naturalHorseRow = color === RED_COLOR ? 7 : 2;
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
     let score = -undevelopedMajors * 14;
 
@@ -1027,8 +1036,15 @@ function evaluateOpeningDevelopment(activeBoard, color) {
                 continue;
             }
 
-            if (piece[1] === 'H' && row !== homeRow) {
-                score += 18;
+            if (piece[1] === 'H') {
+                if (row === naturalHorseRow && (col === 2 || col === 6)) {
+                    score += 22;
+                } else if (row !== homeRow) {
+                    score += 6;
+                }
+                if (Math.abs(col - 4) <= 1 && Math.abs(row - homeRow) === 1) {
+                    score -= 30;
+                }
             }
             if (piece[1] === 'H' && row === homeRow && col !== 1 && col !== 7) {
                 score -= 26;
@@ -1084,6 +1100,7 @@ function getOpeningMoveBonus(activeBoard, move) {
     const homeRow = color === RED_COLOR ? 9 : 0;
     const soldierRow = color === RED_COLOR ? 6 : 3;
     const cannonRow = color === RED_COLOR ? 7 : 2;
+    const naturalHorseRow = color === RED_COLOR ? 7 : 2;
     const undevelopedMajors = countUndevelopedMajors(activeBoard, color);
     let score = 0;
 
@@ -1093,10 +1110,14 @@ function getOpeningMoveBonus(activeBoard, move) {
     if (move.piece[1] === 'H' && !move.captured) {
         const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
         if (!forward && move.fromRow !== homeRow) {
-            score -= undevelopedMajors >= 2 ? 34 : 16;
+            score -= undevelopedMajors >= 2 ? 46 : 20;
         }
         if (move.toRow === homeRow && move.toCol !== move.fromCol) {
-            score -= 22;
+            score -= 28;
+        }
+        if (move.fromRow === naturalHorseRow && (move.fromCol === 2 || move.fromCol === 6) &&
+            Math.abs(move.toCol - 4) <= 1 && Math.abs(move.toRow - homeRow) === 1) {
+            score -= 56;
         }
     }
 
