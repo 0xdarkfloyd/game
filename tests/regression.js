@@ -119,6 +119,15 @@ const scenarios = [
         }
     },
     {
+        name: 'after rook trade of tempo avoid early cannon follow-up',
+        sequence: ['7,1-7,4', '0,0-1,0', '9,0-8,0'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.notStrictEqual(result.move.piece, 'bC', `expected non-cannon reply, got ${result.move.piece}`);
+            assert.strictEqual(result.move.piece, 'bH', `expected horse development, got ${result.move.piece}`);
+        }
+    },
+    {
         name: 'flank cannon after both horses avoids elephant retreat',
         sequence: ['7,1-7,4', '0,7-2,6', '9,1-7,2', '0,1-2,2', '6,2-5,2'],
         check(result) {

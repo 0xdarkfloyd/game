@@ -538,6 +538,7 @@
 
             const undevelopedMajors = openingContext.undevelopedMajors;
             const undevelopedRooks = openingContext.undevelopedRooks;
+            const undevelopedHorses = openingContext.undevelopedHorses;
             const developedHorses = openingContext.developedHorses;
             const rookMovesAvailable = openingContext.rookMovesAvailable;
             const lastOwnMove = openingContext.lastOwnMove;
@@ -550,6 +551,9 @@
 
             if (move.piece[1] === 'H' && move.fromRow === homeRow(color)) {
                 score += 18;
+                if (undevelopedHorses >= 1) {
+                    score += 14;
+                }
             }
             if (!move.captured && move.piece[1] === 'H') {
                 const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
@@ -577,6 +581,13 @@
                         score -= 22;
                     }
                 }
+
+                if (undevelopedHorses >= 1 && move.toCol !== 4) {
+                    score -= undevelopedHorses === 2 ? 46 : 28;
+                }
+                if (undevelopedHorses === 2 && move.toRow !== cannonRow(color)) {
+                    score -= 22;
+                }
             }
 
             if (!move.captured && move.piece[1] === 'S') {
@@ -603,6 +614,14 @@
                     score -= move.piece[1] === 'S' ? 36 : 48;
                 } else if (move.piece[1] === 'C' || move.piece[1] === 'A' || move.piece[1] === 'E') {
                     score -= 26;
+                }
+            }
+
+            if (undevelopedHorses >= 1 && !move.captured) {
+                if (move.piece[1] === 'C') {
+                    score -= undevelopedHorses === 2 ? 24 : 10;
+                } else if (move.piece[1] === 'H' && move.fromRow === homeRow(color)) {
+                    score += undevelopedHorses === 2 ? 10 : 6;
                 }
             }
 
@@ -682,6 +701,7 @@
             const openingContext = {
                 undevelopedMajors: countUndevelopedMajors(board, color),
                 undevelopedRooks: countUndevelopedRooks(board, color),
+                undevelopedHorses: countUndevelopedHorses(board, color),
                 developedHorses: countDevelopedHorses(board, color),
                 rookMovesAvailable: countUndevelopedRooks(board, color) >= 1 && hasHomeRookDevelopment(board, color),
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
