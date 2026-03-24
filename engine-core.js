@@ -399,6 +399,50 @@
             return Math.round(score);
         }
 
+        function evaluateInitiative(board, color, stage) {
+            if (stage.middlegame < 0.12 && stage.endgame < 0.18) {
+                return 0;
+            }
+
+            const row0 = homeRow(color);
+            const developedHorses = countDevelopedHorses(board, color);
+            let score = 0;
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const piece = board[row][col];
+                    if (!piece || piece[0] !== color) {
+                        continue;
+                    }
+
+                    const centerDistance = Math.abs(4 - col);
+                    const forwardProgress = color === RED_COLOR ? row0 - row : row - row0;
+
+                    if (piece[1] === 'R') {
+                        score += forwardProgress * stageWeight(stage, 1, 4, 2);
+                        score += Math.max(0, 10 - centerDistance * 2) * stageWeight(stage, 0.2, 1.1, 0.4);
+                        if (row === row0 && developedHorses === 2) {
+                            score -= stageWeight(stage, 0, 16, 4);
+                        }
+                    } else if (piece[1] === 'C') {
+                        if (row !== cannonRow(color)) {
+                            score += stageWeight(stage, 0, 8, 3);
+                        }
+                        score += Math.max(0, 8 - centerDistance * 2) * stageWeight(stage, 0.4, 1, 0.3);
+                    } else if (piece[1] === 'H') {
+                        if (row !== row0) {
+                            score += stageWeight(stage, 2, 8, 10);
+                        }
+                        if (centerDistance <= 2) {
+                            score += stageWeight(stage, 2, 6, 4);
+                        }
+                    }
+                }
+            }
+
+            return Math.round(score);
+        }
+
         function evaluateDevelopment(board, color, stage) {
             if (stage.opening < 0.14) {
                 return 0;
@@ -590,6 +634,7 @@
             score += evaluateKingSafety(board, color, stage);
             score += evaluateSoldiers(board, color, stage);
             score += evaluateRookPressure(board, color, stage);
+            score += evaluateInitiative(board, color, stage);
             return score;
         }
 
@@ -928,6 +973,36 @@
             return penalty;
         }
 
+        function getRootPassivityPenalty(board, nextBoard, move, color, stage, openingContext) {
+            if (move.captured || stage.middlegame < 0.2) {
+                return 0;
+            }
+
+            const backward = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+            const repeatedPiece = openingContext.lastOwnMove &&
+                openingContext.lastOwnMove.toRow === move.fromRow &&
+                openingContext.lastOwnMove.toCol === move.fromCol;
+            let penalty = 0;
+
+            if (move.piece[1] === 'R' && backward) {
+                penalty += stageWeight(stage, 0, 20, 8);
+            } else if (move.piece[1] === 'C' && backward) {
+                penalty += stageWeight(stage, 0, 14, 5);
+            } else if (move.piece[1] === 'H' && backward && move.fromRow !== homeRow(color)) {
+                penalty += stageWeight(stage, 0, 14, 5);
+            }
+
+            if (repeatedPiece) {
+                penalty += stageWeight(stage, 0, 16, 6);
+            }
+
+            if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+                penalty += stageWeight(stage, 0, 10, 4);
+            }
+
+            return Math.round(penalty);
+        }
+
         function getRootContinuationBias(board, nextBoard, move, color, history, stage) {
             if (stage.opening < 0.16 && stage.middlegame < 0.28) {
                 return 0;
@@ -1005,11 +1080,12 @@
                     ? Math.round(stageWeight(searchConfig.stage, 20, 30, 28))
                     : 0;
                 const safetyPenalty = getImmediateRiskPenalty(nextBoard, entry.move, color, searchConfig.stage);
+                const passivityPenalty = getRootPassivityPenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias - safetyPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) - Math.round(safetyPenalty * 0.8)
+                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias - safetyPenalty - passivityPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) - Math.round(safetyPenalty * 0.8) - Math.round(passivityPenalty * 0.9)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
 
