@@ -1609,7 +1609,22 @@
                     score += centerGain * stageWeight(stage, 8, 14, 10);
                 }
             }
-
+            if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
+                const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
+                const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
+                if (wasAttacked && !nowAttacked) {
+                    score += stageWeight(stage, 0, 34, 18);
+                }
+            }
+            if (move.piece[1] === 'C' && !move.captured && move.toCol === 4 && move.toRow === move.fromRow) {
+                score += stageWeight(stage, 0, 12, 4);
+            }
+            if (move.piece[1] === 'S' && !move.captured && move.fromRow === move.toRow && hasCrossedRiver(color, move.fromRow)) {
+                if ((move.toCol > 0 && nextBoard[move.toRow][move.toCol - 1] === `${color}S`) ||
+                    (move.toCol < 8 && nextBoard[move.toRow][move.toCol + 1] === `${color}S`)) {
+                    score += stageWeight(stage, 0, 4, 12);
+                }
+            }
             return Math.round(score);
         }
 
