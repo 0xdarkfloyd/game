@@ -18,6 +18,11 @@
                         <button id="side-red" type="button" class="side-button active" onclick="setHumanSide('r')">&#x57f7;&#32005;&#20808;&#25163;</button>
                         <button id="side-black" type="button" class="side-button" onclick="setHumanSide('b')">&#x57f7;&#40657;&#24460;&#25163;</button>
                     </div>
+                    <div class="difficulty-picker" role="group" aria-label="Choose difficulty">
+                        <button id="level-beginner" type="button" class="difficulty-button" onclick="setAiLevel('beginner')">&#x521d;&#32026;</button>
+                        <button id="level-intermediate" type="button" class="difficulty-button active" onclick="setAiLevel('intermediate')">&#x4e2d;&#32026;</button>
+                        <button id="level-advanced" type="button" class="difficulty-button" onclick="setAiLevel('advanced')">&#x9ad8;&#32026;</button>
+                    </div>
                 </div>
                 <div id="board" class="board" aria-label="Xiangqi board"></div>
                 <div class="action-row">

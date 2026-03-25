@@ -3,11 +3,30 @@ const BLACK_COLOR = 'b';
 const MATE_SCORE = 900000;
 const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
-const AI_WORKER_TIMEOUT_MS = 2600;
-const OPENING_SEARCH_TIME_MS = 1000;
-const MIDGAME_SEARCH_TIME_MS = 1100;
-const ENDGAME_SEARCH_TIME_MS = 1200;
+const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
+const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
+const AI_LEVELS = {
+    beginner: {
+        label: '\u521d\u7d1a',
+        opening: 1200,
+        middlegame: 1350,
+        endgame: 1500
+    },
+    intermediate: {
+        label: '\u4e2d\u7d1a',
+        opening: 2200,
+        middlegame: 2600,
+        endgame: 3000
+    },
+    advanced: {
+        label: '\u9ad8\u7d1a',
+        opening: 3600,
+        middlegame: 4300,
+        endgame: 5000
+    }
+};
+const DEFAULT_AI_LEVEL = 'intermediate';
 const RED_NUMERALS = ['', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d'];
 const BLACK_NUMERALS = ['', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const OPENING_BOOK = {
@@ -279,6 +298,7 @@ const BOARD_SVG = buildBoardSvg();
 let board = cloneBoard(initialBoard);
 let humanColor = RED_COLOR;
 let computerColor = BLACK_COLOR;
+let aiLevel = DEFAULT_AI_LEVEL;
 let currentPlayer = RED_COLOR;
 let selectedCell = null;
 let validMoves = [];
@@ -320,6 +340,10 @@ function otherColor(color) {
 
 function colorName(color) {
     return color === 'r' ? '\u7d05\u65b9' : '\u9ed1\u65b9';
+}
+
+function getAiLevelLabel(level = aiLevel) {
+    return (AI_LEVELS[level] || AI_LEVELS[DEFAULT_AI_LEVEL]).label;
 }
 
 function isInsideBoard(row, col) {
@@ -403,7 +427,7 @@ function mirrorMoveKey(moveKey) {
 }
 
 function getStartStatusMessage() {
-    return `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u65b9\uff08\u5148\u624b\uff09' : '\u4f60\u57f7\u9ed1\u65b9\uff08\u5f8c\u624b\uff09'}\uff0c${computerColor === RED_COLOR ? '\u96fb\u8166\u57f7\u7d05\u65b9' : '\u96fb\u8166\u57f7\u9ed1\u65b9'}\u3002`;
+    return `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u65b9\uff08\u5148\u624b\uff09' : '\u4f60\u57f7\u9ed1\u65b9\uff08\u5f8c\u624b\uff09'}\uff0c${computerColor === RED_COLOR ? '\u96fb\u8166\u57f7\u7d05\u65b9' : '\u96fb\u8166\u57f7\u9ed1\u65b9'}\u3002\u96e3\u5ea6\uff1a${getAiLevelLabel()}\u3002`;
 }
 
 function updateSideButtons() {
@@ -419,6 +443,21 @@ function updateSideButtons() {
 
     redButton.classList.toggle('active', humanColor === RED_COLOR);
     blackButton.classList.toggle('active', humanColor === BLACK_COLOR);
+}
+
+function updateDifficultyButtons() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    for (const [levelKey] of Object.entries(AI_LEVELS)) {
+        const button = document.getElementById(`level-${levelKey}`);
+        if (!button) {
+            continue;
+        }
+
+        button.classList.toggle('active', aiLevel === levelKey);
+    }
 }
 
 function getBoardKey(activeBoard, color) {
@@ -982,17 +1021,18 @@ function ensureEngineCore() {
 }
 
 function getSearchTimeBudget(activeBoard, legalMoves) {
+    const levelConfig = AI_LEVELS[aiLevel] || AI_LEVELS[DEFAULT_AI_LEVEL];
     const pieceCount = countPieces(activeBoard);
 
     if (pieceCount >= 28 || legalMoves.length >= 34) {
-        return OPENING_SEARCH_TIME_MS;
+        return levelConfig.opening;
     }
 
     if (pieceCount >= 18) {
-        return MIDGAME_SEARCH_TIME_MS;
+        return levelConfig.middlegame;
     }
 
-    return ENDGAME_SEARCH_TIME_MS;
+    return levelConfig.endgame;
 }
 
 function beginSearchBudget(activeBoard, legalMoves) {
@@ -2234,7 +2274,7 @@ function requestComputerMove(activeBoard, color, historySequence = moveSequence)
             pendingAiJob = null;
             disposeAiWorker();
             resolve(job.fallbackMove);
-        }, Math.max(AI_WORKER_TIMEOUT_MS, timeBudgetMs + 400));
+        }, Math.max(AI_WORKER_TIMEOUT_FLOOR_MS, timeBudgetMs + AI_WORKER_TIMEOUT_PADDING_MS));
 
         pendingAiJob = {
             requestId,
@@ -2818,6 +2858,25 @@ function setHumanSide(color) {
     resetGame();
 }
 
+function setAiLevel(level) {
+    if (!AI_LEVELS[level] || aiLevel === level) {
+        return;
+    }
+
+    aiLevel = level;
+    cancelPendingAiJob();
+    aiThinking = false;
+    statusMessage = getStartStatusMessage();
+    updateDifficultyButtons();
+    updateStatus();
+
+    if (gameActive && currentPlayer === computerColor && typeof window !== 'undefined') {
+        aiThinking = true;
+        updateStatus();
+        window.setTimeout(computerMove, AI_THINK_DELAY_MS);
+    }
+}
+
 function resetGame() {
     cancelPendingAiJob();
     board = cloneBoard(initialBoard);
@@ -2837,6 +2896,7 @@ function resetGame() {
     createBoard();
     renderMoveLog();
     updateSideButtons();
+    updateDifficultyButtons();
     updateStatus();
 
     if (currentPlayer === computerColor && typeof window !== 'undefined') {
@@ -2850,12 +2910,15 @@ if (typeof window !== 'undefined') {
     window.resetGame = resetGame;
     window.undoMove = undoMove;
     window.setHumanSide = setHumanSide;
+    window.setAiLevel = setAiLevel;
     resetGame();
 }
 
 if (typeof module !== 'undefined') {
     module.exports = {
+        AI_LEVELS,
         BLACK_COLOR,
+        DEFAULT_AI_LEVEL,
         RED_COLOR,
         initialBoard,
         applyMoveToBoard,
@@ -2871,6 +2934,7 @@ if (typeof module !== 'undefined') {
         filterPlayableMoves,
         formatMoveNotation,
         getBoardKey,
+        getSearchTimeBudget,
         getMoveKey,
         getAllLegalMoves,
         getGameState,
@@ -2878,6 +2942,7 @@ if (typeof module !== 'undefined') {
         hasCrossedRiver,
         isInCheck,
         otherColor,
+        setAiLevel,
         setHumanSide,
         undoMove
     };
