@@ -837,6 +837,16 @@
                 }
             }
 
+            if (move.captured && move.piece[1] === 'C') {
+                const deepRaid = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
+                if (deepRaid && undevelopedMajors >= 2 && move.captured[1] !== 'R') {
+                    score -= move.captured[1] === 'H' ? 34 : 18;
+                }
+                if (move.captured[1] === 'H' && undevelopedRooks >= 1 && undevelopedHorses >= 1 && !centralCannonPressure) {
+                    score -= 18;
+                }
+            }
+
             if (!move.captured && move.piece[1] === 'S') {
                 if (move.fromRow !== soldierRow(color)) {
                     score -= move.fromCol === 4 ? 14 : 30;
@@ -881,6 +891,18 @@
                 score -= move.piece[1] === 'R' ? 12 : 36;
                 if (isExactReverseMove(lastOwnMove, move)) {
                     score -= move.piece[1] === 'R' ? 22 : 58;
+                }
+            }
+            if (!move.captured &&
+                move.piece[1] === 'R' &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === move.fromRow &&
+                lastOwnMove &&
+                lastOwnMove.toRow === move.fromRow &&
+                lastOwnMove.toCol === move.fromCol) {
+                score -= undevelopedMajors >= 2 ? 68 : 32;
+                if (isExactReverseMove(lastOwnMove, move)) {
+                    score -= undevelopedMajors >= 2 ? 102 : 54;
                 }
             }
             if (previousOwnMove &&
@@ -1019,6 +1041,16 @@
 
             if (repeatedPiece) {
                 penalty += stageWeight(stage, 0, 16, 6);
+            }
+
+            if (move.piece[1] === 'R' &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === move.fromRow &&
+                repeatedPiece) {
+                penalty += stageWeight(stage, 28, 18, 6);
+                if (isExactReverseMove(openingContext.lastOwnMove, move)) {
+                    penalty += stageWeight(stage, 54, 30, 10);
+                }
             }
 
             if (move.piece[1] === 'A' || move.piece[1] === 'E') {
