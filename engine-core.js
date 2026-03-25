@@ -209,6 +209,13 @@
         function getOpeningPlanMode(openingContext) {
             const centralCannonPressure = openingContext.ownCenteredCannon || openingContext.opponentCenteredCannon;
 
+            if (openingContext.undevelopedRooks === 1 &&
+                openingContext.undevelopedHorses === 1 &&
+                openingContext.opponentCenteredCannon &&
+                !openingContext.ownCenteredCannon) {
+                return 'second-horse';
+            }
+
             if (openingContext.undevelopedRooks >= 1 && openingContext.horizontalRookMovesAvailable) {
                 if (openingContext.developedHorses === 2) {
                     return 'horizontal-rook';
@@ -807,6 +814,9 @@
                 if (undevelopedHorses === 1 && horizontalRookMovesAvailable && opponentCenteredCannon) {
                     score -= 42;
                 }
+                if (undevelopedRooks === 1 && undevelopedHorses === 1 && opponentCenteredCannon && !ownCenteredCannon) {
+                    score += 58;
+                }
             }
             if (!move.captured && move.piece[1] === 'H') {
                 const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
@@ -846,6 +856,9 @@
                 }
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
                     score -= move.toCol === 4 ? 44 : 26;
+                }
+                if (undevelopedRooks === 1 && undevelopedHorses === 1 && opponentCenteredCannon && !ownCenteredCannon && !move.captured) {
+                    score -= move.fromRow === cannonRow(color) && move.toCol === 4 ? 112 : 86;
                 }
                 if (deepRaid && undevelopedRooks >= 1) {
                     score -= move.captured ? 72 : 96;
@@ -1123,6 +1136,17 @@
                         ? stageWeight(stage, 30, 16, 6)
                         : stageWeight(stage, 46, 22, 8);
                 }
+            }
+
+            if (move.piece[1] === 'C' &&
+                !move.captured &&
+                openingContext.undevelopedRooks === 1 &&
+                openingContext.undevelopedHorses === 1 &&
+                openingContext.opponentCenteredCannon &&
+                !openingContext.ownCenteredCannon) {
+                penalty += move.fromRow === cannonRow(color) && move.toCol === 4
+                    ? stageWeight(stage, 54, 26, 8)
+                    : stageWeight(stage, 36, 18, 6);
             }
 
             if (move.piece[1] === 'A' || move.piece[1] === 'E') {
