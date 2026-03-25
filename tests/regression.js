@@ -318,4 +318,17 @@ for (const scenario of scenarios) {
     assert.notStrictEqual(game.getMoveKey(result.move), '2,4-5,4', 'should avoid hanging rook capture');
 }
 
+{
+    assert.strictEqual(
+        game.formatMoveNotation(game.initialBoard, { piece: 'bR', fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, captured: '' }),
+        '車9平8',
+        'black rook notation should count from the right'
+    );
+    assert.strictEqual(
+        game.formatMoveNotation(game.initialBoard, { piece: 'bH', fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, captured: '' }),
+        '馬2進3',
+        'black horse notation should count from the right'
+    );
+}
+
 console.log(`regression scenarios passed: ${scenarios.length} + 2 tactical`);

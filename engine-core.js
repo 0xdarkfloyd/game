@@ -1239,6 +1239,17 @@
                     continue;
                 }
 
+                const escapeMoves = filterPlayableMoves(
+                    replyBoard,
+                    color,
+                    getAllLegalMoves(replyBoard, color),
+                    nextPositionHistory.concat(getBoardKey(replyBoard, color)),
+                    nextHistory.concat(getMoveKey(reply))
+                );
+                if (escapeMoves.length === 0) {
+                    return MATE_SCORE * 0.75;
+                }
+
                 checks++;
                 let threat = stageWeight(stage, 14, 12, 8);
                 if (reply.piece[1] === 'R') {
