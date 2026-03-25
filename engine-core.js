@@ -209,6 +209,14 @@
         function getOpeningPlanMode(openingContext) {
             const centralCannonPressure = openingContext.ownCenteredCannon || openingContext.opponentCenteredCannon;
 
+            if (openingContext.undevelopedRooks === 2 &&
+                openingContext.undevelopedHorses === 1 &&
+                openingContext.opponentCenteredCannon &&
+                !openingContext.ownCenteredCannon &&
+                openingContext.opponentDevelopedHorses === 0) {
+                return 'second-horse';
+            }
+
             if (openingContext.undevelopedRooks >= 1 && openingContext.horizontalRookMovesAvailable) {
                 if (openingContext.developedHorses === 2) {
                     return 'horizontal-rook';
@@ -805,6 +813,14 @@
                 if (opponentCenteredCannon && horizontalDeployment) {
                     score += 26;
                 }
+                if (horizontalDeployment &&
+                    undevelopedRooks === 2 &&
+                    undevelopedHorses === 1 &&
+                    opponentCenteredCannon &&
+                    !ownCenteredCannon &&
+                    openingContext.opponentDevelopedHorses === 0) {
+                    score -= 74;
+                }
                 if (!horizontalDeployment && !opponentCenteredCannon) {
                     score -= 24;
                 } else if (!horizontalDeployment && opponentCenteredCannon) {
@@ -840,6 +856,13 @@
                 if (undevelopedHorses === 1 && horizontalRookMovesAvailable && opponentCenteredCannon) {
                     score -= 42;
                 }
+                if (undevelopedRooks === 2 &&
+                    undevelopedHorses === 1 &&
+                    opponentCenteredCannon &&
+                    !ownCenteredCannon &&
+                    openingContext.opponentDevelopedHorses === 0) {
+                    score += 52;
+                }
             }
             if (!move.captured && move.piece[1] === 'H') {
                 const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
@@ -851,6 +874,9 @@
                 }
                 if ((move.toCol === 0 || move.toCol === 8) && move.toRow !== homeRow(color)) {
                     score -= undevelopedRooks >= 1 ? 42 : 16;
+                }
+                if (Math.abs(4 - move.toCol) <= 1 && move.toRow !== homeRow(color)) {
+                    score += 18;
                 }
             }
 
@@ -1287,6 +1313,7 @@
             if (!move.captured) {
                 score += (evaluateDevelopment(nextBoard, color, stage) - evaluateDevelopment(board, color, stage)) * 0.55;
                 score += (evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage)) * 0.75;
+                score += (evaluateInitiative(nextBoard, color, stage) - evaluateInitiative(board, color, stage)) * 0.65;
                 score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
             }
             if (move.piece[1] === 'R' && countUndevelopedRooks(nextBoard, color) < countUndevelopedRooks(board, color)) {
@@ -1296,6 +1323,11 @@
             }
             if (move.piece[1] === 'H' && countUndevelopedHorses(nextBoard, color) < countUndevelopedHorses(board, color)) {
                 score += stageWeight(stage, 12, 8, 4);
+            } else if (move.piece[1] === 'H' && !move.captured) {
+                const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                if (centerGain > 0) {
+                    score += centerGain * stageWeight(stage, 8, 14, 10);
+                }
             }
 
             return Math.round(score);
@@ -1309,6 +1341,7 @@
                 undevelopedRooks: countUndevelopedRooks(board, color),
                 undevelopedHorses: countUndevelopedHorses(board, color),
                 developedHorses: countDevelopedHorses(board, color),
+                opponentDevelopedHorses: countDevelopedHorses(board, otherColor(color)),
                 rookMovesAvailable: countUndevelopedRooks(board, color) >= 1 && hasHomeRookDevelopment(board, color),
                 horizontalRookMovesAvailable: hasHomeHorizontalRookDevelopment(board, color),
                 ownCenteredCannon: hasCenteredCannon(board, color),

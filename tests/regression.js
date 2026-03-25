@@ -100,6 +100,14 @@ const scenarios = [
         }
     },
     {
+        name: 'centered cannon with no opposing horse developed should prefer second horse',
+        sequence: ['7,1-7,4', '0,1-2,2', '6,6-5,6', '3,2-4,2', '9,0-8,0'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bH', `expected horse development, got ${result.move.piece}`);
+        }
+    },
+    {
         name: 'opening avoids immediate rook shuffle reversal',
         sequence: ['7,7-7,4', '0,1-2,2', '9,7-7,6', '0,7-2,6', '6,6-5,6', '0,0-0,1', '6,2-5,2'],
         check(result) {
