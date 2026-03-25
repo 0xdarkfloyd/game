@@ -963,14 +963,39 @@
                 penalty += stageWeight(stage, 36, 44, 40);
             }
 
-            if (move.piece[1] !== 'G' && isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color))) {
-                penalty += Math.round(pieceValue(move.piece[1], stage) * (move.captured ? 0.08 : 0.14));
-                if (move.captured) {
-                    penalty += 12;
+            if (move.piece[1] === 'G' || !isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color))) {
+                return Math.round(penalty);
+            }
+
+            const attackers = getAttackerValues(nextBoard, move.toRow, move.toCol, otherColor(color));
+            const defenders = getAttackerValues(nextBoard, move.toRow, move.toCol, color);
+            const moverValue = pieceValue(move.piece[1], stage);
+            const capturedValue = move.captured ? pieceValue(move.captured[1], stage) : 0;
+
+            if (attackers.length === 0) {
+                return Math.round(penalty);
+            }
+
+            if (defenders.length === 0) {
+                penalty += Math.round(moverValue * (move.captured ? 0.2 : 0.3));
+            } else {
+                const leastAttacker = attackers[0];
+                const leastDefender = defenders[0];
+
+                if (leastAttacker < moverValue && leastAttacker <= leastDefender) {
+                    penalty += Math.round((moverValue - leastAttacker) * (move.captured ? 0.4 : 0.55));
+                } else if (attackers.length > defenders.length) {
+                    penalty += 10 * Math.min(3, attackers.length - defenders.length);
+                } else if (!move.captured) {
+                    penalty += Math.round(moverValue * 0.04);
                 }
             }
 
-            return penalty;
+            if (move.captured && capturedValue < attackers[0]) {
+                penalty += Math.round((attackers[0] - capturedValue) * 0.2);
+            }
+
+            return Math.round(penalty);
         }
 
         function getRootPassivityPenalty(board, nextBoard, move, color, stage, openingContext) {
@@ -1045,19 +1070,25 @@
                 ? getOpeningPlanMode(openingContext)
                 : 'balanced';
             const quickEntries = legalMoves.map(move => {
+                const nextBoard = applyMoveToBoard(board, move);
                 const bookBias = suggestions.get(getMoveKey(move)) || 0;
                 const practicalBias = getPracticalOpeningBias(board, move, color, history, openingContext);
+                const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
+                const safetyPenalty = getImmediateRiskPenalty(nextBoard, move, color, searchConfig.stage);
                 const quietCenter = move.captured ? 0 : Math.max(0, 4 - Math.abs(4 - move.toCol)) * 3;
                 return {
                     move,
-                    quickScore: bookBias + practicalBias + quietCenter,
-                    policyBias: bookBias + practicalBias
+                    nextBoard,
+                    tacticalBias,
+                    safetyPenalty,
+                    quickScore: bookBias + practicalBias + quietCenter + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
+                    policyBias: bookBias + practicalBias + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
             const shortlist = quickEntries.slice(0, Math.min(legalMoves.length, Math.max(searchConfig.rootLimit * 2, 12)));
             const entries = shortlist.map(entry => {
-                const nextBoard = applyMoveToBoard(board, entry.move);
+                const nextBoard = entry.nextBoard;
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
                 let captureBias = entry.move.captured
                     ? Math.round(pieceValue(entry.move.captured[1], searchConfig.stage) * 0.22 - pieceValue(entry.move.piece[1], searchConfig.stage) * 0.05)
@@ -1079,13 +1110,14 @@
                 const checkBias = isInCheck(nextBoard, otherColor(color))
                     ? Math.round(stageWeight(searchConfig.stage, 20, 30, 28))
                     : 0;
-                const safetyPenalty = getImmediateRiskPenalty(nextBoard, entry.move, color, searchConfig.stage);
+                const safetyPenalty = entry.safetyPenalty;
                 const passivityPenalty = getRootPassivityPenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
+                const tacticalBias = entry.tacticalBias;
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias - safetyPenalty - passivityPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) - Math.round(safetyPenalty * 0.8) - Math.round(passivityPenalty * 0.9)
+                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - passivityPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - Math.round(passivityPenalty * 0.9)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
 

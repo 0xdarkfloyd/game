@@ -106,6 +106,16 @@ h1 {
     background: rgba(120, 53, 15, 0.12);
 }
 
+.difficulty-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.difficulty-button:disabled:hover {
+    background: transparent;
+}
+
 .side-button.active {
     background: #9a3412;
     color: #fff;
@@ -119,6 +129,9 @@ h1 {
 }
 
 .board {
+    --board-inset: 18px;
+    --piece-size: min(78%, 56px);
+    --piece-font-size: clamp(26px, 3.8vw, 32px);
     width: min(100%, 640px);
     aspect-ratio: 9 / 10;
     margin: 0 auto;
@@ -148,15 +161,15 @@ h1 {
 
 .board-svg {
     position: absolute;
-    inset: 18px;
-    width: calc(100% - 36px);
-    height: calc(100% - 36px);
+    inset: var(--board-inset);
+    width: calc(100% - var(--board-inset) * 2);
+    height: calc(100% - var(--board-inset) * 2);
     z-index: 0;
 }
 
 .board-grid {
     position: absolute;
-    inset: 18px;
+    inset: var(--board-inset);
     display: grid;
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(10, 1fr);
@@ -165,6 +178,8 @@ h1 {
 
 .cell {
     position: relative;
+    min-width: 0;
+    min-height: 0;
     cursor: pointer;
 }
 
@@ -225,23 +240,24 @@ h1 {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(78%, 56px);
-    height: min(78%, 56px);
+    transform: translate3d(-50%, -50%, 0);
+    width: var(--piece-size);
+    height: var(--piece-size);
     border-radius: 999px;
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
     user-select: none;
-    font-size: clamp(26px, 3.8vw, 32px);
+    font-size: var(--piece-font-size);
     font-weight: 700;
     line-height: 1;
     box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+    will-change: transform;
 }
 
 .board.flipped .piece {
-    transform: translate(-50%, -50%) rotate(180deg);
+    transform: translate3d(-50%, -50%, 0) rotate(180deg);
 }
 
 .piece.red {
@@ -370,15 +386,10 @@ button:hover {
         gap: 18px;
     }
 
-    .board-svg,
-    .board-grid {
-        inset: 12px;
-    }
-
-    .piece {
-        width: min(80%, 44px);
-        height: min(80%, 44px);
-        font-size: clamp(22px, 5vw, 28px);
+    .board {
+        --board-inset: 14px;
+        --piece-size: min(74%, 42px);
+        --piece-font-size: clamp(22px, 5vw, 27px);
     }
 
     .action-row {

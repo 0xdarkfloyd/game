@@ -244,7 +244,7 @@ const OPENING_BOOK = {
 };
 
 const PIECE_LABELS = {
-    rR: '\u8eca',
+    rR: '\u4fe5',
     rH: '\u99ac',
     rE: '\u76f8',
     rA: '\u4ed5',
@@ -450,6 +450,7 @@ function updateDifficultyButtons() {
         return;
     }
 
+    const locked = isDifficultyLocked();
     for (const [levelKey] of Object.entries(AI_LEVELS)) {
         const button = document.getElementById(`level-${levelKey}`);
         if (!button) {
@@ -457,6 +458,8 @@ function updateDifficultyButtons() {
         }
 
         button.classList.toggle('active', aiLevel === levelKey);
+        button.disabled = locked;
+        button.setAttribute('aria-disabled', locked ? 'true' : 'false');
     }
 }
 
@@ -465,8 +468,18 @@ function getBoardKey(activeBoard, color) {
 }
 
 function getPieceTransform(shiftX = 0, shiftY = 0) {
-    const translate = `translate(calc(-50% + ${shiftX}px), calc(-50% + ${shiftY}px))`;
+    const adjustedX = humanColor === BLACK_COLOR ? -shiftX : shiftX;
+    const adjustedY = humanColor === BLACK_COLOR ? -shiftY : shiftY;
+    const translate = `translate3d(calc(-50% + ${adjustedX}px), calc(-50% + ${adjustedY}px), 0)`;
     return humanColor === BLACK_COLOR ? `${translate} rotate(180deg)` : translate;
+}
+
+function shouldLockDifficulty(moveCount, thinking, active = true) {
+    return Boolean(active && (moveCount > 0 || thinking));
+}
+
+function isDifficultyLocked() {
+    return shouldLockDifficulty(moveSequence.length, aiThinking, gameActive);
 }
 
 function ensureAudioContext() {
@@ -573,6 +586,10 @@ function findGeneral(activeBoard, color) {
 }
 
 function clearPathStraight(activeBoard, fromRow, fromCol, toRow, toCol) {
+    if (fromRow === toRow && fromCol === toCol) {
+        return false;
+    }
+
     if (fromRow === toRow) {
         const step = fromCol < toCol ? 1 : -1;
         for (let col = fromCol + step; col !== toCol; col += step) {
@@ -597,6 +614,10 @@ function clearPathStraight(activeBoard, fromRow, fromCol, toRow, toCol) {
 }
 
 function countPiecesBetween(activeBoard, fromRow, fromCol, toRow, toCol) {
+    if (fromRow === toRow && fromCol === toCol) {
+        return 0;
+    }
+
     let count = 0;
 
     if (fromRow === toRow) {
@@ -785,6 +806,10 @@ function getPseudoMoves(activeBoard, row, col) {
 }
 
 function pieceThreatensSquare(activeBoard, fromRow, fromCol, targetRow, targetCol) {
+    if (fromRow === targetRow && fromCol === targetCol) {
+        return false;
+    }
+
     const piece = activeBoard[fromRow][fromCol];
     if (!piece) {
         return false;
@@ -2699,6 +2724,7 @@ function updateStatus() {
 
     const turnElement = document.getElementById('turn');
     const statusElement = document.getElementById('status');
+    updateDifficultyButtons();
 
     if (gameActive) {
         const suffix = aiThinking ? ' \u96fb\u8166\u601d\u8003\u4e2d...' : '';
@@ -2859,7 +2885,7 @@ function setHumanSide(color) {
 }
 
 function setAiLevel(level) {
-    if (!AI_LEVELS[level] || aiLevel === level) {
+    if (!AI_LEVELS[level] || aiLevel === level || isDifficultyLocked()) {
         return;
     }
 
@@ -2919,6 +2945,7 @@ if (typeof module !== 'undefined') {
         AI_LEVELS,
         BLACK_COLOR,
         DEFAULT_AI_LEVEL,
+        PIECE_LABELS,
         RED_COLOR,
         initialBoard,
         applyMoveToBoard,
@@ -2934,6 +2961,7 @@ if (typeof module !== 'undefined') {
         filterPlayableMoves,
         formatMoveNotation,
         getBoardKey,
+        getPieceTransform,
         getSearchTimeBudget,
         getMoveKey,
         getAllLegalMoves,
@@ -2944,6 +2972,7 @@ if (typeof module !== 'undefined') {
         otherColor,
         setAiLevel,
         setHumanSide,
+        shouldLockDifficulty,
         undoMove
     };
 }

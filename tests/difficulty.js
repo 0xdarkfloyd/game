@@ -32,4 +32,16 @@ game.setAiLevel('advanced');
 assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 3600);
 assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 5000);
 
+assert.strictEqual(game.PIECE_LABELS.rR, '俥');
+assert.strictEqual(game.shouldLockDifficulty(0, false, true), false);
+assert.strictEqual(game.shouldLockDifficulty(1, false, true), true);
+assert.strictEqual(game.shouldLockDifficulty(0, true, true), true);
+
+game.setHumanSide('b');
+assert.strictEqual(
+    game.getPieceTransform(12, 18),
+    'translate3d(calc(-50% + -12px), calc(-50% + -18px), 0) rotate(180deg)'
+);
+game.setHumanSide('r');
+
 console.log('difficulty budgets passed');

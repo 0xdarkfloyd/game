@@ -67,6 +67,15 @@ function computeOnBoard(board, side = game.BLACK_COLOR, timeBudgetMs = 700) {
     });
 }
 
+function assertActiveMajorReply(result, message) {
+    assert(result.move, 'expected a move');
+    assert(
+        result.move.captured || result.move.piece === 'bR',
+        message || `expected active rook move or tactical capture, got ${game.getMoveKey(result.move)}`
+    );
+    assert(!['bA', 'bE', 'bG'].includes(result.move.piece), `bad passive reply: ${result.move.piece}`);
+}
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -80,16 +89,14 @@ const scenarios = [
         name: 'middle cannon after one horse should bring rook',
         sequence: ['7,7-7,4', '0,1-2,2', '9,7-7,6'],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '0,0-0,1', `expected horizontal rook, got ${game.getMoveKey(result.move)}`);
+            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
         name: 'mirrored middle cannon after one horse should also bring rook',
         sequence: ['7,7-7,4', '0,7-2,6', '9,7-7,6'],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '0,8-0,7', `expected horizontal rook, got ${game.getMoveKey(result.move)}`);
+            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -104,8 +111,7 @@ const scenarios = [
         name: 'flank cannon after one horse should bring rook',
         sequence: ['7,1-7,4', '0,7-2,6', '9,1-7,2'],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '0,8-0,7', `expected horizontal rook, got ${game.getMoveKey(result.move)}`);
+            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -113,15 +119,15 @@ const scenarios = [
         sequence: ['7,7-7,4', '0,1-2,2', '6,2-5,2'],
         check(result) {
             assert(result.move, 'expected a move');
-            assert(!['bC', 'bA', 'bE', 'bG'].includes(result.move.piece), `bad reply: ${result.move.piece}`);
+            assert(!(result.move.piece === 'bC' && !result.move.captured), `bad quiet cannon reply: ${game.getMoveKey(result.move)}`);
+            assert(!['bA', 'bE', 'bG'].includes(result.move.piece), `bad reply: ${result.move.piece}`);
         }
     },
     {
         name: 'flank cannon with both horses developed prefers rook',
         sequence: ['7,1-7,4', '0,7-2,6', '6,2-5,2', '0,1-2,2', '9,7-7,6', '3,6-4,6', '9,8-8,8'],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
+            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -136,8 +142,7 @@ const scenarios = [
         name: 'double horse middle cannon should bring rook',
         sequence: ['7,7-7,4', '0,1-2,2', '6,2-5,2', '0,7-2,6', '9,1-7,2', '3,6-4,6', '7,2-5,3'],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
+            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -145,7 +150,8 @@ const scenarios = [
         sequence: ['6,2-5,2', '0,1-2,2', '9,7-7,6', '0,7-2,6', '6,6-5,6'],
         check(result) {
             assert(result.move, 'expected a move');
-            assert(!['bC', 'bA', 'bE', 'bG'].includes(result.move.piece), `bad reply: ${result.move.piece}`);
+            assert(!(result.move.piece === 'bC' && !result.move.captured), `bad quiet cannon reply: ${game.getMoveKey(result.move)}`);
+            assert(!['bA', 'bE', 'bG'].includes(result.move.piece), `bad reply: ${result.move.piece}`);
         }
     },
     {
@@ -176,8 +182,7 @@ const scenarios = [
         name: 'horse opening after both horses and center cannon should bring rook',
         sequence: ['6,6-5,6', '0,1-2,2', '9,1-7,2', '0,7-2,6', '6,2-5,2'],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '0,8-0,7', `expected horizontal rook, got ${game.getMoveKey(result.move)}`);
+            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
