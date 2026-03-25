@@ -685,6 +685,7 @@
             score += evaluateSoldiers(board, color, stage);
             score += evaluateRookPressure(board, color, stage);
             score += evaluateInitiative(board, color, stage);
+            score += evaluateExchangeSafety(board, color, stage);
             return score;
         }
 
@@ -819,7 +820,7 @@
                     opponentCenteredCannon &&
                     !ownCenteredCannon &&
                     openingContext.opponentDevelopedHorses === 0) {
-                    score -= 74;
+                    score -= 122;
                 }
                 if (!horizontalDeployment && !opponentCenteredCannon) {
                     score -= 24;
@@ -861,7 +862,7 @@
                     opponentCenteredCannon &&
                     !ownCenteredCannon &&
                     openingContext.opponentDevelopedHorses === 0) {
-                    score += 52;
+                    score += 96;
                 }
             }
             if (!move.captured && move.piece[1] === 'H') {
@@ -1315,6 +1316,7 @@
                 score += (evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage)) * 0.75;
                 score += (evaluateInitiative(nextBoard, color, stage) - evaluateInitiative(board, color, stage)) * 0.65;
                 score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
+                score += (evaluateExchangeSafety(nextBoard, color, stage) - evaluateExchangeSafety(board, color, stage)) * 1.05;
             }
             if (move.piece[1] === 'R' && countUndevelopedRooks(nextBoard, color) < countUndevelopedRooks(board, color)) {
                 score += move.toRow === move.fromRow
