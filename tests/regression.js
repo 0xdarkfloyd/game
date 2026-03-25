@@ -143,6 +143,15 @@ const scenarios = [
         }
     },
     {
+        name: 'opening avoids cannon-for-horse trade that activates enemy rook',
+        sequence: ['7,1-7,4', '0,1-2,2', '9,1-7,2', '0,0-0,1', '9,0-9,1'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.notStrictEqual(game.getMoveKey(result.move), '2,7-9,7', `expected non-cannon horse raid, got ${game.getMoveKey(result.move)}`);
+            assert.notStrictEqual(result.move.piece, 'bC', `expected non-cannon reply, got ${result.move.piece}`);
+        }
+    },
+    {
         name: 'flank cannon opening prefers horse development',
         sequence: ['7,1-7,4'],
         check(result) {
