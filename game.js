@@ -1834,7 +1834,7 @@ function orderMoves(activeBoard, moves, ttMove) {
 }
 
 function isPerpetualCheckViolation(activeBoard, move, color, history = positionHistory) {
-    if (!history || history.length < 4) {
+    if (!history || history.length < 5) {
         return false;
     }
 
@@ -1845,18 +1845,7 @@ function isPerpetualCheckViolation(activeBoard, move, color, history = positionH
     }
 
     const nextKey = getBoardKey(nextBoard, opponent);
-    let occurrences = 0;
-
-    for (const key of history) {
-        if (key === nextKey) {
-            occurrences++;
-            if (occurrences >= 2) {
-                return true;
-            }
-        }
-    }
-
-    return false;
+    return repeatsRecentCyclePosition(nextKey, history);
 }
 
 function getThreatenedTargetKeys(activeBoard, row, col) {
@@ -1892,26 +1881,21 @@ function isExactReverseMove(previousMove, move) {
         previousMove.toCol === move.fromCol;
 }
 
+function repeatsRecentCyclePosition(nextKey, history = positionHistory) {
+    return Boolean(history) &&
+        history.length >= 5 &&
+        nextKey === history[history.length - 4];
+}
+
 function isPerpetualChaseViolation(activeBoard, move, color, history = positionHistory, historySequence = moveSequence) {
-    if (!history || history.length < 4 || !historySequence || historySequence.length < 2 || move.captured) {
+    if (!history || history.length < 5 || !historySequence || historySequence.length < 2 || move.captured) {
         return false;
     }
 
     const nextBoard = applyMoveToBoard(activeBoard, move);
     const opponent = otherColor(color);
     const nextKey = getBoardKey(nextBoard, opponent);
-    let occurrences = 0;
-
-    for (const key of history) {
-        if (key === nextKey) {
-            occurrences++;
-            if (occurrences >= 1) {
-                break;
-            }
-        }
-    }
-
-    if (occurrences < 1) {
+    if (!repeatsRecentCyclePosition(nextKey, history)) {
         return false;
     }
 
@@ -1929,15 +1913,7 @@ function isPerpetualChaseViolation(activeBoard, move, color, history = positionH
     if (currentTargets.length > 0) {
         return true;
     }
-
-    const opponentMoves = historySequence.filter((_, index) => (index % 2 === 0) === (opponent === RED_COLOR));
-    if (opponentMoves.length < 2) {
-        return false;
-    }
-
-    const lastOpponentMove = parseMoveKey(opponentMoves[opponentMoves.length - 1]);
-    const previousOpponentMove = parseMoveKey(opponentMoves[opponentMoves.length - 2]);
-    return isExactReverseMove(previousOpponentMove, lastOpponentMove);
+    return false;
 }
 
 function filterPlayableMoves(activeBoard, color, moves, history = positionHistory, historySequence = moveSequence) {
@@ -2969,7 +2945,10 @@ if (typeof module !== 'undefined') {
         getLegalMovesForPiece,
         hasCrossedRiver,
         isInCheck,
+        isPerpetualCheckViolation,
+        isPerpetualChaseViolation,
         otherColor,
+        repeatsRecentCyclePosition,
         setAiLevel,
         setHumanSide,
         shouldLockDifficulty,
