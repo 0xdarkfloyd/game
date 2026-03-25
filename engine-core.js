@@ -189,6 +189,15 @@
                 !move.captured;
         }
 
+        function isHomeCornerRookRetreat(move, color) {
+            return move.piece === `${color}R` &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === move.fromRow &&
+                (move.toCol === 0 || move.toCol === 8) &&
+                move.fromCol !== move.toCol &&
+                !move.captured;
+        }
+
         function isNaturalHorseDevelopment(move, color) {
             return move.piece === `${color}H` &&
                 move.fromRow === homeRow(color) &&
@@ -772,6 +781,12 @@
                     score -= 72;
                 }
             }
+            if (isHomeCornerRookRetreat(move, color)) {
+                score -= undevelopedMajors >= 2 ? 112 : undevelopedMajors === 1 ? 72 : 28;
+                if (openingPlanMode === 'horizontal-rook') {
+                    score -= 96;
+                }
+            }
             if (!move.captured && move.piece[1] === 'R' && move.fromRow !== homeRow(color) && undevelopedMajors >= 1) {
                 score -= undevelopedMajors >= 3 ? 34 : undevelopedMajors === 2 ? 24 : 14;
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
@@ -1074,6 +1089,16 @@
                 penalty += stageWeight(stage, 22, 12, 4);
                 if (isExactReverseMove(openingContext.previousOwnMove, move)) {
                     penalty += stageWeight(stage, 42, 24, 8);
+                }
+            }
+
+            if (isHomeCornerRookRetreat(move, color)) {
+                penalty += stageWeight(stage, 34, 18, 6);
+                if (openingContext.lastOwnMove && isExactReverseMove(openingContext.lastOwnMove, move)) {
+                    penalty += stageWeight(stage, 92, 48, 14);
+                }
+                if (openingContext.previousOwnMove && isExactReverseMove(openingContext.previousOwnMove, move)) {
+                    penalty += stageWeight(stage, 56, 28, 10);
                 }
             }
 
