@@ -905,6 +905,18 @@
                     score -= undevelopedMajors >= 2 ? 102 : 54;
                 }
             }
+            if (!move.captured &&
+                move.piece[1] === 'R' &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === move.fromRow &&
+                previousOwnMove &&
+                previousOwnMove.toRow === move.fromRow &&
+                previousOwnMove.toCol === move.fromCol) {
+                score -= undevelopedMajors >= 2 ? 44 : 20;
+                if (isExactReverseMove(previousOwnMove, move)) {
+                    score -= undevelopedMajors >= 2 ? 84 : 40;
+                }
+            }
             if (previousOwnMove &&
                 previousOwnMove.toRow === move.fromRow &&
                 previousOwnMove.toCol === move.fromCol &&
@@ -1050,6 +1062,18 @@
                 penalty += stageWeight(stage, 28, 18, 6);
                 if (isExactReverseMove(openingContext.lastOwnMove, move)) {
                     penalty += stageWeight(stage, 54, 30, 10);
+                }
+            }
+
+            if (move.piece[1] === 'R' &&
+                move.fromRow === homeRow(color) &&
+                move.toRow === move.fromRow &&
+                openingContext.previousOwnMove &&
+                openingContext.previousOwnMove.toRow === move.fromRow &&
+                openingContext.previousOwnMove.toCol === move.fromCol) {
+                penalty += stageWeight(stage, 22, 12, 4);
+                if (isExactReverseMove(openingContext.previousOwnMove, move)) {
+                    penalty += stageWeight(stage, 42, 24, 8);
                 }
             }
 

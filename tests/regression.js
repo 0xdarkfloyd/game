@@ -108,6 +108,14 @@ const scenarios = [
         }
     },
     {
+        name: 'opening avoids rook reversal after one intervening move',
+        sequence: ['7,7-7,4', '0,1-2,2', '9,7-7,6', '0,0-0,1', '6,6-5,6', '3,6-4,6', '6,2-5,2'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.notStrictEqual(game.getMoveKey(result.move), '0,1-0,0', `expected non-reversing rook reply, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
         name: 'flank cannon opening prefers horse development',
         sequence: ['7,1-7,4'],
         check(result) {
