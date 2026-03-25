@@ -209,13 +209,6 @@
         function getOpeningPlanMode(openingContext) {
             const centralCannonPressure = openingContext.ownCenteredCannon || openingContext.opponentCenteredCannon;
 
-            if (openingContext.undevelopedRooks === 1 &&
-                openingContext.undevelopedHorses === 1 &&
-                openingContext.opponentCenteredCannon &&
-                !openingContext.ownCenteredCannon) {
-                return 'second-horse';
-            }
-
             if (openingContext.undevelopedRooks >= 1 && openingContext.horizontalRookMovesAvailable) {
                 if (openingContext.developedHorses === 2) {
                     return 'horizontal-rook';
@@ -847,9 +840,6 @@
                 if (undevelopedHorses === 1 && horizontalRookMovesAvailable && opponentCenteredCannon) {
                     score -= 42;
                 }
-                if (undevelopedRooks === 1 && undevelopedHorses === 1 && opponentCenteredCannon && !ownCenteredCannon) {
-                    score += 58;
-                }
             }
             if (!move.captured && move.piece[1] === 'H') {
                 const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
@@ -1225,6 +1215,58 @@
             return Math.round(penalty);
         }
 
+        function getOpponentCheckThreatPenalty(nextBoard, move, color, stage, history, positionHistory) {
+            if (stage.opening < 0.12 && stage.middlegame < 0.18) {
+                return 0;
+            }
+
+            const opponent = otherColor(color);
+            const nextHistory = history.concat(getMoveKey(move));
+            const nextPositionHistory = positionHistory.concat(getBoardKey(nextBoard, opponent));
+            const opponentMoves = filterPlayableMoves(
+                nextBoard,
+                opponent,
+                getAllLegalMoves(nextBoard, opponent),
+                nextPositionHistory,
+                nextHistory
+            );
+            let checks = 0;
+            let strongest = 0;
+
+            for (const reply of opponentMoves) {
+                const replyBoard = applyMoveToBoard(nextBoard, reply);
+                if (!isInCheck(replyBoard, color)) {
+                    continue;
+                }
+
+                checks++;
+                let threat = stageWeight(stage, 14, 12, 8);
+                if (reply.piece[1] === 'R') {
+                    threat += stageWeight(stage, 32, 28, 16);
+                } else if (reply.piece[1] === 'C') {
+                    threat += stageWeight(stage, 30, 26, 14);
+                } else if (reply.piece[1] === 'H') {
+                    threat += stageWeight(stage, 22, 20, 12);
+                } else if (reply.piece[1] === 'S') {
+                    threat += stageWeight(stage, 10, 12, 10);
+                }
+                if (reply.captured) {
+                    threat += Math.round(pieceValue(reply.captured[1], stage) * 0.12);
+                }
+                strongest = Math.max(strongest, threat);
+
+                if (checks >= 4) {
+                    break;
+                }
+            }
+
+            if (checks === 0) {
+                return 0;
+            }
+
+            return Math.round(strongest + stageWeight(stage, 16, 12, 6) * Math.max(0, checks - 1));
+        }
+
         function getRootContinuationBias(board, nextBoard, move, color, history, stage) {
             if (stage.opening < 0.16 && stage.middlegame < 0.28) {
                 return 0;
@@ -1309,13 +1351,14 @@
                     : 0;
                 const safetyPenalty = entry.safetyPenalty;
                 const tradePenalty = getOpeningTradePenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
+                const checkThreatPenalty = getOpponentCheckThreatPenalty(nextBoard, entry.move, color, searchConfig.stage, history, positionHistory);
                 const passivityPenalty = getRootPassivityPenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
                 const tacticalBias = entry.tacticalBias;
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - passivityPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(passivityPenalty * 0.9)
+                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - checkThreatPenalty - passivityPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(checkThreatPenalty * 0.85) - Math.round(passivityPenalty * 0.9)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
 
