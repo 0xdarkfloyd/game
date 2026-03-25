@@ -850,6 +850,14 @@
                 if (deepRaid && undevelopedRooks >= 1) {
                     score -= move.captured ? 72 : 96;
                 }
+                if (undevelopedRooks >= 1 && developedHorses === 2 && !centralCannonPressure) {
+                    if (move.fromRow === cannonRow(color) && move.toRow !== cannonRow(color)) {
+                        score -= horizontalRookMovesAvailable ? 92 : 64;
+                    }
+                    if (move.fromRow !== cannonRow(color)) {
+                        score -= move.toCol === 4 ? 54 : 72;
+                    }
+                }
             }
 
             if (move.captured && move.piece[1] === 'C') {
@@ -1099,6 +1107,21 @@
                 }
                 if (openingContext.previousOwnMove && isExactReverseMove(openingContext.previousOwnMove, move)) {
                     penalty += stageWeight(stage, 56, 28, 10);
+                }
+            }
+
+            if (move.piece[1] === 'C' &&
+                openingContext.undevelopedRooks >= 1 &&
+                openingContext.developedHorses === 2 &&
+                !openingContext.ownCenteredCannon &&
+                !openingContext.opponentCenteredCannon) {
+                if (move.fromRow === cannonRow(color) && move.toRow !== cannonRow(color)) {
+                    penalty += stageWeight(stage, 42, 20, 8);
+                }
+                if (move.fromRow !== cannonRow(color) && !move.captured) {
+                    penalty += move.toCol === 4
+                        ? stageWeight(stage, 30, 16, 6)
+                        : stageWeight(stage, 46, 22, 8);
                 }
             }
 

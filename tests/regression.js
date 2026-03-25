@@ -116,6 +116,24 @@ const scenarios = [
         }
     },
     {
+        name: 'horse opening with one rook out avoids early cannon drift',
+        sequence: ['9,1-7,2', '0,7-2,6', '7,7-7,8', '0,1-2,2', '9,7-7,6', '0,8-0,7', '6,2-5,2'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.notStrictEqual(game.getMoveKey(result.move), '2,1-4,1', `expected non-cannon drift, got ${game.getMoveKey(result.move)}`);
+            assert.notStrictEqual(result.move.piece, 'bC', `expected non-cannon reply, got ${result.move.piece}`);
+        }
+    },
+    {
+        name: 'flank cannon with left horse out should bring rook instead of cannon',
+        sequence: ['7,1-7,4', '0,1-2,2', '9,1-7,2'],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(result.move.piece, 'bR', `expected rook, got ${result.move.piece}`);
+            assert.notStrictEqual(game.getMoveKey(result.move), '2,7-2,4', `expected non-cannon centralization, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
         name: 'flank cannon opening prefers horse development',
         sequence: ['7,1-7,4'],
         check(result) {
