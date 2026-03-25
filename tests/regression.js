@@ -327,6 +327,8 @@ for (const scenario of scenarios) {
 }
 
 {
+    assert.strictEqual(game.PIECE_LABELS.rH, '\u508c', 'red horse should render as 傌');
+    assert.strictEqual(game.PIECE_LABELS.bH, '\u99ac', 'black horse should render as 馬');
     assert.strictEqual(
         game.formatMoveNotation(game.initialBoard, { piece: 'bR', fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, captured: '' }),
         '\u8eca1\u5e732',

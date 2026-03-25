@@ -6,7 +6,7 @@ const MOVE_ANIMATION_MS = 220;
 const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260325-notation2';
+const ASSET_VERSION = '20260325-horsechar1';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -246,7 +246,7 @@ const OPENING_BOOK = {
 
 const PIECE_LABELS = {
     rR: '\u4fe5',
-    rH: '\u99ac',
+    rH: '\u508c',
     rE: '\u76f8',
     rA: '\u4ed5',
     rG: '\u5e25',
