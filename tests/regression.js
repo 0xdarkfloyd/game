@@ -1,4 +1,4 @@
-const assert = require('assert');
+﻿const assert = require('assert');
 const game = require('../game.js');
 
 const engine = game.ensureEngineCore();
@@ -329,14 +329,25 @@ for (const scenario of scenarios) {
 {
     assert.strictEqual(
         game.formatMoveNotation(game.initialBoard, { piece: 'bR', fromRow: 0, fromCol: 0, toRow: 0, toCol: 1, captured: '' }),
-        '車9平8',
-        'black rook notation should count from the right'
+        '\u8eca1\u5e732',
+        'black left rook notation should count from black side'
+    );
+    assert.strictEqual(
+        game.formatMoveNotation(game.initialBoard, { piece: 'bR', fromRow: 0, fromCol: 8, toRow: 1, toCol: 8, captured: '' }),
+        '\u8eca9\u90321',
+        'black right rook vertical notation should count from black side'
+    );
+    assert.strictEqual(
+        game.formatMoveNotation(game.initialBoard, { piece: 'bH', fromRow: 0, fromCol: 1, toRow: 2, toCol: 2, captured: '' }),
+        '\u99ac2\u90323',
+        'black left horse notation should count from black side'
     );
     assert.strictEqual(
         game.formatMoveNotation(game.initialBoard, { piece: 'bH', fromRow: 0, fromCol: 7, toRow: 2, toCol: 6, captured: '' }),
-        '馬2進3',
-        'black horse notation should count from the right'
+        '\u99ac8\u90327',
+        'black right horse notation should count from black side'
     );
 }
 
 console.log(`regression scenarios passed: ${scenarios.length} + 2 tactical`);
+

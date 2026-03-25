@@ -6,6 +6,7 @@ const MOVE_ANIMATION_MS = 220;
 const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
+const ASSET_VERSION = '20260325-notation2';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -387,8 +388,8 @@ function clonePositionHistory(entries) {
     return entries.slice();
 }
 
-function getFileNumber(col) {
-    return 9 - col;
+function getFileNumber(color, col) {
+    return color === RED_COLOR ? 9 - col : col + 1;
 }
 
 function formatNumber(color, value) {
@@ -2218,7 +2219,7 @@ function ensureAiWorker() {
     }
 
     try {
-        aiWorker = new Worker('ai-worker.js');
+        aiWorker = new Worker(`ai-worker.js?v=${ASSET_VERSION}`);
     } catch (error) {
         aiWorker = null;
         return null;
@@ -2359,7 +2360,7 @@ function getMoveAction(color, move) {
 
 function getMoveTarget(color, pieceType, move) {
     if (move.fromRow === move.toRow || pieceType === 'H' || pieceType === 'E' || pieceType === 'A') {
-        return formatNumber(color, getFileNumber(move.toCol));
+        return formatNumber(color, getFileNumber(color, move.toCol));
     }
 
     return formatNumber(color, Math.abs(move.toRow - move.fromRow));
@@ -2370,7 +2371,7 @@ function formatMoveNotation(activeBoard, move) {
     const color = piece[0];
     const pieceName = PIECE_LABELS[piece];
     const prefix = getPiecePrefix(activeBoard, piece, move.fromRow, move.fromCol);
-    const source = prefix || `${pieceName}${formatNumber(color, getFileNumber(move.fromCol))}`;
+    const source = prefix || `${pieceName}${formatNumber(color, getFileNumber(color, move.fromCol))}`;
     const action = getMoveAction(color, move);
     const target = getMoveTarget(color, piece[1], move);
 

@@ -1,4 +1,4 @@
-importScripts('engine-core.js', 'game.js');
+importScripts('engine-core.js?v=20260325-notation2', 'game.js?v=20260325-notation2');
 
 self.onmessage = event => {
     const data = event.data || {};
