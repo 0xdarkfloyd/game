@@ -257,6 +257,40 @@
             return blockers;
         }
 
+        function getSingleScreenOnFile(board, col, startRow, endRow) {
+            let screen = null;
+            const step = startRow < endRow ? 1 : -1;
+
+            for (let row = startRow + step; row !== endRow; row += step) {
+                if (!board[row][col]) {
+                    continue;
+                }
+                if (screen) {
+                    return null;
+                }
+                screen = { row, col, piece: board[row][col] };
+            }
+
+            return screen;
+        }
+
+        function getSingleScreenOnRow(board, row, startCol, endCol) {
+            let screen = null;
+            const step = startCol < endCol ? 1 : -1;
+
+            for (let col = startCol + step; col !== endCol; col += step) {
+                if (!board[row][col]) {
+                    continue;
+                }
+                if (screen) {
+                    return null;
+                }
+                screen = { row, col, piece: board[row][col] };
+            }
+
+            return screen;
+        }
+
         function hasImmediateRookCapture(board, row, col, color) {
             const rook = `${color}R`;
 
@@ -277,6 +311,156 @@
             }
 
             return false;
+        }
+
+        function getHomeRookCannonExposures(board, color) {
+            const opponent = otherColor(color);
+            const enemyCannon = `${opponent}C`;
+            const exposures = [];
+
+            for (let rookRow = 0; rookRow < 10; rookRow++) {
+                for (let rookCol = 0; rookCol < 9; rookCol++) {
+                    if (board[rookRow][rookCol] !== `${color}R` || rookRow !== homeRow(color)) {
+                        continue;
+                    }
+
+                    for (let row = 0; row < 10; row++) {
+                        for (let col = 0; col < 9; col++) {
+                            if (board[row][col] !== enemyCannon) {
+                                continue;
+                            }
+
+                            let screen = null;
+                            let axis = '';
+                            if (col === rookCol && row !== rookRow && countPiecesBetweenOnFile(board, rookCol, row, rookRow) === 1) {
+                                screen = getSingleScreenOnFile(board, rookCol, row, rookRow);
+                                axis = 'file';
+                            } else if (row === rookRow && col !== rookCol && countPiecesBetweenOnRow(board, rookRow, col, rookCol) === 1) {
+                                screen = getSingleScreenOnRow(board, rookRow, col, rookCol);
+                                axis = 'row';
+                            }
+
+                            if (!screen) {
+                                continue;
+                            }
+
+                            exposures.push({
+                                rookRow,
+                                rookCol,
+                                cannonRow: row,
+                                cannonCol: col,
+                                screenRow: screen.row,
+                                screenCol: screen.col,
+                                screenPiece: screen.piece,
+                                axis
+                            });
+                        }
+                    }
+                }
+            }
+
+            return exposures;
+        }
+
+        function evaluateHomeRookCannonExposure(board, color, stage) {
+            let score = 0;
+
+            for (const exposure of getHomeRookCannonExposures(board, color)) {
+                let penalty = stageWeight(stage, 96, 58, 14);
+                if (exposure.screenPiece[0] === color) {
+                    penalty += stageWeight(stage, 22, 16, 4);
+                }
+                if (exposure.screenPiece === `${color}C`) {
+                    penalty += stageWeight(stage, 132, 86, 20);
+                } else if (exposure.screenPiece[1] === 'H') {
+                    penalty += stageWeight(stage, 34, 22, 6);
+                } else if (exposure.screenPiece[1] === 'A' || exposure.screenPiece[1] === 'E') {
+                    penalty += stageWeight(stage, 18, 10, 2);
+                }
+
+                score -= Math.round(penalty);
+            }
+
+            return score;
+        }
+
+        function getHomeRookCannonReliefBias(board, nextBoard, move, color, stage) {
+            if (stage.opening < 0.18) {
+                return 0;
+            }
+
+            const before = getHomeRookCannonExposures(board, color);
+            const ownCannonScreens = before.filter(exposure => exposure.screenPiece === `${color}C`);
+            if (ownCannonScreens.length === 0) {
+                return 0;
+            }
+
+            const after = getHomeRookCannonExposures(nextBoard, color);
+            const reducedExposure = after.length < before.length;
+            const movedScreenCannon = ownCannonScreens.some(exposure =>
+                exposure.screenRow === move.fromRow &&
+                exposure.screenCol === move.fromCol &&
+                move.piece === `${color}C`
+            );
+            const movedExposedRook = ownCannonScreens.some(exposure =>
+                exposure.rookRow === move.fromRow &&
+                exposure.rookCol === move.fromCol &&
+                move.piece === `${color}R`
+            );
+
+            if (movedScreenCannon && reducedExposure) {
+                return stageWeight(stage, 428, 252, 52);
+            }
+
+            if (reducedExposure && move.piece[1] === 'R' && !movedExposedRook) {
+                return -stageWeight(stage, 188, 112, 26);
+            }
+
+            if (!reducedExposure && !movedScreenCannon && !movedExposedRook) {
+                return -stageWeight(stage, move.captured ? 184 : 236, move.captured ? 112 : 142, move.captured ? 28 : 34);
+            }
+
+            return 0;
+        }
+
+        function getUrgentHomeRookScreenRepairMoves(board, color, legalMoves) {
+            const exposures = getHomeRookCannonExposures(board, color)
+                .filter(exposure => exposure.screenPiece === `${color}C`);
+            if (exposures.length === 0) {
+                return new Set();
+            }
+
+            const cannonRepairs = new Set();
+            const rookRepairs = new Set();
+            for (const move of legalMoves) {
+                const relevantCannon = exposures.some(exposure =>
+                    exposure.screenRow === move.fromRow &&
+                    exposure.screenCol === move.fromCol &&
+                    move.piece === `${color}C`
+                );
+                const relevantRook = exposures.some(exposure =>
+                    exposure.rookRow === move.fromRow &&
+                    exposure.rookCol === move.fromCol &&
+                    move.piece === `${color}R`
+                );
+                const relevant = relevantCannon || relevantRook;
+                if (!relevant) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                const remaining = getHomeRookCannonExposures(nextBoard, color)
+                    .filter(exposure => exposure.screenPiece === `${color}C`);
+                if (remaining.length < exposures.length) {
+                    if (relevantCannon) {
+                        cannonRepairs.add(getMoveKey(move));
+                    } else if (relevantRook) {
+                        rookRepairs.add(getMoveKey(move));
+                    }
+                }
+            }
+
+            return cannonRepairs.size > 0 ? cannonRepairs : rookRepairs;
         }
 
         function pieceValue(type, stageOrPhase) {
@@ -686,6 +870,7 @@
             score += evaluateRookPressure(board, color, stage);
             score += evaluateInitiative(board, color, stage);
             score += evaluateExchangeSafety(board, color, stage);
+            score += evaluateHomeRookCannonExposure(board, color, stage);
             return score;
         }
 
@@ -760,9 +945,36 @@
             const previousOwnMove = openingContext.previousOwnMove;
             const ownCenteredCannon = openingContext.ownCenteredCannon;
             const opponentCenteredCannon = openingContext.opponentCenteredCannon;
+            const homeRookCannonExposures = openingContext.homeRookCannonExposures;
             const centralCannonPressure = ownCenteredCannon || opponentCenteredCannon;
             const openingPlanMode = getOpeningPlanMode(openingContext);
             let score = 0;
+
+            const ownCannonHomeRookExposures = homeRookCannonExposures.filter(
+                exposure => exposure.screenPiece === `${color}C`
+            );
+            if (ownCannonHomeRookExposures.length > 0) {
+                const movesScreenCannon = ownCannonHomeRookExposures.some(exposure =>
+                    exposure.screenRow === move.fromRow &&
+                    exposure.screenCol === move.fromCol &&
+                    move.piece === `${color}C`
+                );
+                const movesExposedHomeRook = ownCannonHomeRookExposures.some(exposure =>
+                    exposure.rookRow === move.fromRow &&
+                    exposure.rookCol === move.fromCol &&
+                    move.piece === `${color}R`
+                );
+
+                if (movesScreenCannon) {
+                    score += move.toRow === move.fromRow
+                        ? 432 - Math.abs(4 - move.toCol) * 8
+                        : 328;
+                } else if (!movesExposedHomeRook) {
+                    score -= move.captured ? 336 : 432;
+                } else {
+                    score -= 104;
+                }
+            }
 
             if (!move.captured) {
                 if (openingPlanMode === 'horizontal-rook') {
@@ -777,7 +989,7 @@
                     } else if (move.piece[1] === 'C') {
                         score -= move.toCol === 4 ? 92 : 126;
                     } else if (move.piece[1] === 'S') {
-                        score -= move.toCol === 4 ? 34 : 78;
+                        score -= move.toCol === 4 ? 112 : 146;
                     } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
                         score -= 92;
                     }
@@ -1010,6 +1222,18 @@
                 score -= 12;
             }
 
+            if (!move.captured && move.piece[1] === 'R' && move.fromRow === homeRow(color)) {
+                if (isHomeCornerRookRetreat(move, color)) {
+                    score -= undevelopedMajors >= 2 ? 176 : 92;
+                }
+                if (lastOwnMove && isExactReverseMove(lastOwnMove, move)) {
+                    score -= undevelopedMajors >= 2 ? 218 : 118;
+                }
+                if (previousOwnMove && isExactReverseMove(previousOwnMove, move)) {
+                    score -= undevelopedMajors >= 2 ? 152 : 82;
+                }
+            }
+
             return score;
         }
 
@@ -1162,7 +1386,7 @@
                 repeatedPiece) {
                 penalty += stageWeight(stage, 28, 18, 6);
                 if (isExactReverseMove(openingContext.lastOwnMove, move)) {
-                    penalty += stageWeight(stage, 54, 30, 10);
+                    penalty += stageWeight(stage, 132, 72, 20);
                 }
             }
 
@@ -1174,17 +1398,17 @@
                 openingContext.previousOwnMove.toCol === move.fromCol) {
                 penalty += stageWeight(stage, 22, 12, 4);
                 if (isExactReverseMove(openingContext.previousOwnMove, move)) {
-                    penalty += stageWeight(stage, 42, 24, 8);
+                    penalty += stageWeight(stage, 98, 56, 16);
                 }
             }
 
             if (isHomeCornerRookRetreat(move, color)) {
                 penalty += stageWeight(stage, 34, 18, 6);
                 if (openingContext.lastOwnMove && isExactReverseMove(openingContext.lastOwnMove, move)) {
-                    penalty += stageWeight(stage, 92, 48, 14);
+                    penalty += stageWeight(stage, 184, 102, 28);
                 }
                 if (openingContext.previousOwnMove && isExactReverseMove(openingContext.previousOwnMove, move)) {
-                    penalty += stageWeight(stage, 56, 28, 10);
+                    penalty += stageWeight(stage, 126, 72, 22);
                 }
             }
 
@@ -1242,9 +1466,9 @@
             return Math.round(penalty);
         }
 
-        function getOpponentCheckThreatPenalty(nextBoard, move, color, stage, history, positionHistory) {
+        function getOpponentReplyThreats(nextBoard, move, color, stage, history, positionHistory) {
             if (stage.opening < 0.12 && stage.middlegame < 0.18) {
-                return 0;
+                return { checkPenalty: 0, capturePenalty: 0 };
             }
 
             const opponent = otherColor(color);
@@ -1258,9 +1482,37 @@
                 nextHistory
             );
             let checks = 0;
-            let strongest = 0;
+            let strongestCheck = 0;
+            let strongestCapture = 0;
 
             for (const reply of opponentMoves) {
+                if (reply.captured && reply.captured[0] === color) {
+                    const targetType = reply.captured[1];
+                    let captureThreat = 0;
+
+                    if (targetType === 'R') {
+                        captureThreat += stageWeight(stage, 236, 214, 132);
+                    } else if (targetType === 'C') {
+                        captureThreat += stageWeight(stage, 164, 148, 92);
+                    } else if (targetType === 'H') {
+                        captureThreat += stageWeight(stage, 112, 106, 78);
+                    }
+
+                    if (captureThreat > 0) {
+                        if (reply.piece[1] === 'C') {
+                            captureThreat += targetType === 'R'
+                                ? stageWeight(stage, 122, 88, 24)
+                                : stageWeight(stage, 44, 34, 10);
+                        } else if (reply.piece[1] === 'R') {
+                            captureThreat += stageWeight(stage, 28, 22, 8);
+                        } else if (reply.piece[1] === 'H') {
+                            captureThreat += stageWeight(stage, 18, 16, 8);
+                        }
+
+                        strongestCapture = Math.max(strongestCapture, captureThreat);
+                    }
+                }
+
                 const replyBoard = applyMoveToBoard(nextBoard, reply);
                 if (!isInCheck(replyBoard, color)) {
                     continue;
@@ -1274,35 +1526,39 @@
                     nextHistory.concat(getMoveKey(reply))
                 );
                 if (escapeMoves.length === 0) {
-                    return MATE_SCORE * 0.75;
+                    return {
+                        checkPenalty: MATE_SCORE * 0.75,
+                        capturePenalty: Math.round(strongestCapture)
+                    };
                 }
 
                 checks++;
-                let threat = stageWeight(stage, 14, 12, 8);
+                let checkThreat = stageWeight(stage, 14, 12, 8);
                 if (reply.piece[1] === 'R') {
-                    threat += stageWeight(stage, 32, 28, 16);
+                    checkThreat += stageWeight(stage, 32, 28, 16);
                 } else if (reply.piece[1] === 'C') {
-                    threat += stageWeight(stage, 30, 26, 14);
+                    checkThreat += stageWeight(stage, 30, 26, 14);
                 } else if (reply.piece[1] === 'H') {
-                    threat += stageWeight(stage, 22, 20, 12);
+                    checkThreat += stageWeight(stage, 22, 20, 12);
                 } else if (reply.piece[1] === 'S') {
-                    threat += stageWeight(stage, 10, 12, 10);
+                    checkThreat += stageWeight(stage, 10, 12, 10);
                 }
                 if (reply.captured) {
-                    threat += Math.round(pieceValue(reply.captured[1], stage) * 0.12);
+                    checkThreat += Math.round(pieceValue(reply.captured[1], stage) * 0.12);
                 }
-                strongest = Math.max(strongest, threat);
+                strongestCheck = Math.max(strongestCheck, checkThreat);
 
                 if (checks >= 4) {
                     break;
                 }
             }
 
-            if (checks === 0) {
-                return 0;
-            }
-
-            return Math.round(strongest + stageWeight(stage, 16, 12, 6) * Math.max(0, checks - 1));
+            return {
+                checkPenalty: checks === 0
+                    ? 0
+                    : Math.round(strongestCheck + stageWeight(stage, 16, 12, 6) * Math.max(0, checks - 1)),
+                capturePenalty: Math.round(strongestCapture)
+            };
         }
 
         function getRootContinuationBias(board, nextBoard, move, color, history, stage) {
@@ -1312,11 +1568,33 @@
 
             let score = 0;
             if (!move.captured) {
+                const homeRookExposures = getHomeRookCannonExposures(board, color);
+                const nextHomeRookExposures = getHomeRookCannonExposures(nextBoard, color);
                 score += (evaluateDevelopment(nextBoard, color, stage) - evaluateDevelopment(board, color, stage)) * 0.55;
                 score += (evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage)) * 0.75;
                 score += (evaluateInitiative(nextBoard, color, stage) - evaluateInitiative(board, color, stage)) * 0.65;
                 score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
                 score += (evaluateExchangeSafety(nextBoard, color, stage) - evaluateExchangeSafety(board, color, stage)) * 1.05;
+                score += (evaluateHomeRookCannonExposure(nextBoard, color, stage) - evaluateHomeRookCannonExposure(board, color, stage)) * 1.15;
+
+                if (homeRookExposures.length > nextHomeRookExposures.length) {
+                    const relievedByMovingScreen = homeRookExposures.some(exposure =>
+                        exposure.screenRow === move.fromRow &&
+                        exposure.screenCol === move.fromCol &&
+                        exposure.screenPiece === move.piece
+                    );
+                    const preservedOwnCannonScreen = homeRookExposures.some(exposure =>
+                        exposure.screenPiece === `${color}C` &&
+                        nextBoard[exposure.screenRow][exposure.screenCol] === exposure.screenPiece &&
+                        nextBoard[exposure.rookRow][exposure.rookCol] === `${color}R`
+                    );
+
+                    if (relievedByMovingScreen && move.piece[1] === 'C') {
+                        score += stageWeight(stage, 118, 74, 16);
+                    } else if (move.piece[1] === 'R' && preservedOwnCannonScreen) {
+                        score -= stageWeight(stage, 44, 26, 6);
+                    }
+                }
             }
             if (move.piece[1] === 'R' && countUndevelopedRooks(nextBoard, color) < countUndevelopedRooks(board, color)) {
                 score += move.toRow === move.fromRow
@@ -1338,6 +1616,7 @@
         function buildRootEntries(board, color, history, positionHistory, searchConfig, legalMoves) {
             const suggestions = getOpeningSuggestionMap(board, color, history, legalMoves);
             const sameSideMoves = getSideHistoryMoves(history, color);
+            const urgentHomeRookRepairs = getUrgentHomeRookScreenRepairMoves(board, color, legalMoves);
             const openingContext = {
                 undevelopedMajors: countUndevelopedMajors(board, color),
                 undevelopedRooks: countUndevelopedRooks(board, color),
@@ -1348,6 +1627,7 @@
                 horizontalRookMovesAvailable: hasHomeHorizontalRookDevelopment(board, color),
                 ownCenteredCannon: hasCenteredCannon(board, color),
                 opponentCenteredCannon: hasCenteredCannon(board, otherColor(color)),
+                homeRookCannonExposures: getHomeRookCannonExposures(board, color),
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
                 previousOwnMove: sameSideMoves.length > 1 ? sameSideMoves[sameSideMoves.length - 2] : null
             };
@@ -1371,10 +1651,14 @@
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
-            const shortlist = quickEntries.slice(0, Math.min(legalMoves.length, Math.max(searchConfig.rootLimit * 2, 12)));
+            const shortlistSource = urgentHomeRookRepairs.size > 0
+                ? quickEntries.filter(entry => urgentHomeRookRepairs.has(getMoveKey(entry.move)))
+                : quickEntries;
+            const shortlist = shortlistSource.slice(0, Math.min(shortlistSource.length, Math.max(searchConfig.rootLimit * 2, 12)));
             const entries = shortlist.map(entry => {
                 const nextBoard = entry.nextBoard;
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
+                const homeRookReliefBias = getHomeRookCannonReliefBias(board, nextBoard, entry.move, color, searchConfig.stage);
                 let captureBias = entry.move.captured
                     ? Math.round(pieceValue(entry.move.captured[1], searchConfig.stage) * 0.22 - pieceValue(entry.move.piece[1], searchConfig.stage) * 0.05)
                     : 0;
@@ -1397,16 +1681,25 @@
                     : 0;
                 const safetyPenalty = entry.safetyPenalty;
                 const tradePenalty = getOpeningTradePenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
-                const checkThreatPenalty = getOpponentCheckThreatPenalty(nextBoard, entry.move, color, searchConfig.stage, history, positionHistory);
+                const replyThreats = getOpponentReplyThreats(nextBoard, entry.move, color, searchConfig.stage, history, positionHistory);
+                const checkThreatPenalty = replyThreats.checkPenalty;
+                const captureThreatPenalty = replyThreats.capturePenalty;
                 const passivityPenalty = getRootPassivityPenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
                 const tacticalBias = entry.tacticalBias;
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - checkThreatPenalty - passivityPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(checkThreatPenalty * 0.85) - Math.round(passivityPenalty * 0.9)
+                    sortScore: entry.quickScore + continuationBias + homeRookReliefBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - checkThreatPenalty - captureThreatPenalty - passivityPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
+
+            if (urgentHomeRookRepairs.size > 0) {
+                const repairEntries = entries.filter(entry => urgentHomeRookRepairs.has(getMoveKey(entry.move)));
+                if (repairEntries.length > 0) {
+                    return repairEntries.slice(0, Math.min(searchConfig.rootLimit, repairEntries.length));
+                }
+            }
 
             const bestScore = entries[0] ? entries[0].sortScore : 0;
             const filtered = [];
