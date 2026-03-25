@@ -289,6 +289,32 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '2,7-2,8', `expected 砲8平9, got ${game.getMoveKey(result.move)}`);
         }
+    },
+    {
+        name: 'middlegame should take the advanced horse instead of drifting the cannon screen',
+        sequence: [
+            '7,1-7,4', '0,7-2,6',
+            '9,7-7,6', '0,1-2,2',
+            '9,0-8,0', '0,0-0,1',
+            '6,6-5,6', '0,8-1,8',
+            '6,2-5,2', '2,1-5,1',
+            '9,6-7,8', '2,7-6,7',
+            '9,8-8,8', '5,1-5,6',
+            '9,1-7,2', '1,8-1,5',
+            '8,8-8,5', '1,5-8,5',
+            '8,0-8,5', '0,1-4,1',
+            '8,5-5,5', '5,6-6,6',
+            '5,5-5,6', '6,6-6,5',
+            '5,6-3,6', '2,6-1,4',
+            '7,6-5,5', '6,7-2,7',
+            '7,2-5,3', '6,5-6,0',
+            '5,3-3,4', '2,2-3,4',
+            '7,4-3,4'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '1,4-3,3', `expected 馬5進4, got ${game.getMoveKey(result.move)}`);
+        }
     }
 ];
 
