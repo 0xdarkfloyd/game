@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260327-multiponder2', 'game.js?v=20260327-multiponder2');
+importScripts('engine-core.js?v=20260327-undo1', 'game.js?v=20260327-undo1');
 
 function getPonderMoveKey(move) {
     return move ? getMoveKey(move) : '';

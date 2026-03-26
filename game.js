@@ -7,22 +7,25 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260327-multiponder2';
+const ASSET_VERSION = '20260327-undo1';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
+        undoLimit: Infinity,
         opening: 1200,
         middlegame: 1350,
         endgame: 1500
     },
     intermediate: {
         label: '\u4e2d\u7d1a',
+        undoLimit: 3,
         opening: 3600,
         middlegame: 4300,
         endgame: 5000
     },
     advanced: {
         label: '\u9ad8\u7d1a',
+        undoLimit: 0,
         opening: 6500,
         middlegame: 8000,
         endgame: 10000
@@ -312,6 +315,7 @@ let moveHistory = [];
 let moveLog = [];
 let moveSequence = [];
 let positionHistory = [];
+let remainingUndos = Infinity;
 let pendingAnimatedMove = null;
 let setupOpen = true;
 let audioContext = null;
@@ -442,7 +446,7 @@ function getSetupStatusMessage() {
         return '\u8acb\u5148\u9078\u64c7\u96e3\u5ea6\uff0c\u518d\u958b\u59cb\u5c0d\u5c40\u3002';
     }
 
-    return `${humanColor === RED_COLOR ? '\u4f60\u5c07\u57f7\u7d05\u5148\u624b' : '\u4f60\u5c07\u57f7\u9ed1\u5f8c\u624b'}\uff0c\u96e3\u5ea6\uff1a${getAiLevelLabel(aiLevel)}\u3002`;
+    return `${humanColor === RED_COLOR ? '\u4f60\u5c07\u57f7\u7d05\u5148\u624b' : '\u4f60\u5c07\u57f7\u9ed1\u5f8c\u624b'}\uff0c\u96e3\u5ea6\uff1a${getAiLevelLabel(aiLevel)}\uff0c${getUndoSummaryText(getUndoLimit(aiLevel), getUndoLimit(aiLevel), false)}\u3002`;
 }
 
 function getAiLevelTimeRange(level = aiLevel) {
@@ -452,6 +456,39 @@ function getAiLevelTimeRange(level = aiLevel) {
     }
 
     return `${config.opening}-${config.endgame}ms`;
+}
+
+function getUndoLimit(level = aiLevel) {
+    const config = AI_LEVELS[level];
+    return config ? config.undoLimit : 0;
+}
+
+function getUndoSummaryText(limit = remainingUndos, baseLimit = getUndoLimit(), showRemaining = true) {
+    if (baseLimit === 0) {
+        return '\u4e0d\u53ef\u6094\u68cb';
+    }
+
+    if (!Number.isFinite(baseLimit)) {
+        return '\u6094\u68cb\u4e0d\u9650';
+    }
+
+    if (!showRemaining) {
+        return `\u6094\u68cb ${baseLimit} \u6b21`;
+    }
+
+    return `\u6094\u68cb ${Math.max(0, limit)}/${baseLimit}`;
+}
+
+function canUndoMove() {
+    if (setupOpen || aiThinking || moveHistory.length === 0) {
+        return false;
+    }
+
+    if (!Number.isFinite(remainingUndos)) {
+        return true;
+    }
+
+    return remainingUndos > 0;
 }
 
 function updateSideButtons() {
@@ -528,7 +565,33 @@ function updateGameSettings() {
         return;
     }
 
-    summary.textContent = `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u5148\u624b' : '\u4f60\u57f7\u9ed1\u5f8c\u624b'} \u00b7 ${getAiLevelLabel(aiLevel)} \u00b7 ${getAiLevelTimeRange(aiLevel)}`;
+    summary.textContent = `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u5148\u624b' : '\u4f60\u57f7\u9ed1\u5f8c\u624b'} \u00b7 ${getAiLevelLabel(aiLevel)} \u00b7 ${getAiLevelTimeRange(aiLevel)} \u00b7 ${getUndoSummaryText()}`;
+}
+
+function updateUndoButton() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const undoButton = document.getElementById('undo-button');
+    if (!undoButton) {
+        return;
+    }
+
+    const baseLimit = getUndoLimit();
+    const canUndo = canUndoMove();
+    undoButton.disabled = !canUndo;
+    undoButton.setAttribute('aria-disabled', canUndo ? 'false' : 'true');
+
+    if (baseLimit === 0) {
+        undoButton.textContent = '\u4e0d\u53ef\u6094\u68cb';
+    } else if (!Number.isFinite(baseLimit)) {
+        undoButton.textContent = '\u6094\u68cb';
+    } else {
+        undoButton.textContent = `\u6094\u68cb\uff08${Math.max(0, remainingUndos)}\uff09`;
+    }
+
+    undoButton.title = getUndoSummaryText();
 }
 
 function getBoardKey(activeBoard, color) {
@@ -2781,12 +2844,12 @@ function drawMarker({ row, col, left, right }) {
     };
 
     if (left) {
-        appendCorner(x - gap, -1, 1);
-        appendCorner(x - gap, 1, 1);
+        appendCorner(x - gap, -1, -1);
+        appendCorner(x - gap, 1, -1);
     }
     if (right) {
-        appendCorner(x + gap, -1, -1);
-        appendCorner(x + gap, 1, -1);
+        appendCorner(x + gap, -1, 1);
+        appendCorner(x + gap, 1, 1);
     }
 
     return segments.join('');
@@ -2940,6 +3003,7 @@ function snapshotState() {
         lastMove: lastMove ? { ...lastMove } : null,
         gameActive,
         aiThinking,
+        remainingUndos,
         statusMessage,
         moveLog: cloneMoveLog(moveLog),
         moveSequence: cloneMoveSequence(moveSequence),
@@ -2955,6 +3019,7 @@ function restoreState(snapshot) {
     lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
     gameActive = snapshot.gameActive;
     aiThinking = snapshot.aiThinking;
+    remainingUndos = snapshot.remainingUndos ?? getUndoLimit();
     statusMessage = snapshot.statusMessage;
     moveLog = cloneMoveLog(snapshot.moveLog || []);
     moveSequence = cloneMoveSequence(snapshot.moveSequence || []);
@@ -2981,6 +3046,7 @@ function updateStatus() {
     updateDifficultyButtons();
     updateGameSettings();
     updateSetupPanel();
+    updateUndoButton();
 
     if (setupOpen) {
         turnElement.textContent = '\u5c0d\u5c40\u8a2d\u5b9a';
@@ -3151,7 +3217,7 @@ function startConfiguredGame() {
 }
 
 function undoMove() {
-    if (aiThinking || moveHistory.length === 0) {
+    if (!canUndoMove()) {
         return;
     }
 
@@ -3166,6 +3232,10 @@ function undoMove() {
 
     if (snapshot) {
         restoreState(snapshot);
+        if (Number.isFinite(remainingUndos)) {
+            remainingUndos = Math.max(0, remainingUndos - 1);
+        }
+        updateStatus();
     }
 }
 
@@ -3238,6 +3308,7 @@ function resetGame() {
     moveLog = [];
     moveSequence = [];
     positionHistory = [getBoardKey(board, currentPlayer)];
+    remainingUndos = getUndoLimit();
     pendingAnimatedMove = null;
     transpositionTable.clear();
     statusMessage = getStartStatusMessage();
@@ -3293,6 +3364,8 @@ if (typeof module !== 'undefined') {
         getPieceTransform,
         getPonderBudgets,
         getSearchTimeBudget,
+        getUndoLimit,
+        getUndoSummaryText,
         getMoveKey,
         getAllLegalMoves,
         getGameState,
@@ -3308,6 +3381,8 @@ if (typeof module !== 'undefined') {
         setAiLevel,
         setHumanSide,
         shouldLockDifficulty,
+        canUndoMove,
+        drawMarker,
         undoMove
     };
 }

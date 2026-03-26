@@ -489,6 +489,17 @@ button:hover {
     background: #44403c;
 }
 
+.secondary-button:disabled {
+    background: #a8a29e;
+    color: rgba(255, 255, 255, 0.78);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.secondary-button:disabled:hover {
+    background: #a8a29e;
+}
+
 @media (max-width: 640px) {
     body {
         padding: 12px;

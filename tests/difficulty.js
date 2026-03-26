@@ -23,6 +23,7 @@ const endgameLegal = game.getAllLegalMoves(endgameBoard, game.RED_COLOR);
 game.setAiLevel('beginner');
 assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 1200);
 assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 1500);
+assert.strictEqual(game.getUndoLimit(), Infinity);
 assert.deepStrictEqual(game.getPonderBudgets(openingBoard, openingLegal), {
     candidateCount: 1,
     predictTimeBudgetMs: 350,
@@ -37,6 +38,7 @@ assert.deepStrictEqual(game.getPonderBudgets(endgameBoard, endgameLegal), {
 game.setAiLevel('intermediate');
 assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 3600);
 assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 5000);
+assert.strictEqual(game.getUndoLimit(), 3);
 assert.deepStrictEqual(game.getPonderBudgets(openingBoard, openingLegal), {
     candidateCount: 2,
     predictTimeBudgetMs: 1224,
@@ -51,6 +53,7 @@ assert.deepStrictEqual(game.getPonderBudgets(endgameBoard, endgameLegal), {
 game.setAiLevel('advanced');
 assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 6500);
 assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 10000);
+assert.strictEqual(game.getUndoLimit(), 0);
 assert.deepStrictEqual(game.getPonderBudgets(openingBoard, openingLegal), {
     candidateCount: 3,
     predictTimeBudgetMs: 2600,
@@ -66,6 +69,8 @@ assert.strictEqual(game.PIECE_LABELS.rR, '俥');
 assert.strictEqual(game.shouldLockDifficulty(0, false, true), false);
 assert.strictEqual(game.shouldLockDifficulty(1, false, true), true);
 assert.strictEqual(game.shouldLockDifficulty(0, true, true), true);
+assert.ok(game.drawMarker({ row: 3, col: 2, left: true, right: true }).includes('l -0.22 0'));
+assert.ok(game.drawMarker({ row: 3, col: 2, left: true, right: true }).includes('l 0.22 0'));
 
 game.setHumanSide('b');
 assert.strictEqual(
