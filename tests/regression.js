@@ -37,6 +37,30 @@ function playSequence(sequence) {
     return state;
 }
 
+function applyMoveNotation(state, notation) {
+    const legal = game.filterPlayableMoves(
+        state.board,
+        state.side,
+        game.getAllLegalMoves(state.board, state.side),
+        state.positionHistory,
+        state.history
+    );
+    const move = legal.find(candidate => game.formatMoveNotation(state.board, candidate) === notation);
+    assert(move, `notation not found: ${notation}`);
+
+    state.board = game.applyMoveToBoard(state.board, move);
+    state.history.push(game.getMoveKey(move));
+    state.side = game.otherColor(state.side);
+    state.positionHistory.push(game.getBoardKey(state.board, state.side));
+    return move;
+}
+
+function playNotationSequence(sequence) {
+    const state = createState();
+    sequence.forEach(notation => applyMoveNotation(state, notation));
+    return state;
+}
+
 function compute(state, timeBudgetMs = 900) {
     const startedAt = Date.now();
     const result = engine.computeBestMove({
@@ -105,6 +129,60 @@ const scenarios = [
         sequence: ['7,7-7,4', '0,7-2,6', '9,7-7,6'],
         check(result) {
             assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'latest file-race line should keep the rook active on round 17',
+        timeBudgetMs: 5000,
+        notationSequence: [
+            '兵三進一','馬8進7','炮八平五','馬2進3','傌二進三','車1平2','傌八進七','車9進1','俥九平八','卒3進1',
+            '傌三進四','砲8進4','仕六進五','車2進1','相七進九','砲8平3','俥八進三','砲3退1','俥八進三','車9平8',
+            '炮二平四','砲3平7','炮五進四','馬3進5','炮四平五','砲2平3','俥八平七','車2平3','俥一進二','車8進1',
+            '傌四進五'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assertOneOfMoveKeys(
+                result,
+                ['2,7-4,7', '2,6-3,4'],
+                `expected a practical active continuation, got ${game.getMoveKey(result.move)}`
+            );
+        }
+    },
+    {
+        name: 'latest file-race line should keep the rook initiative on round 32',
+        timeBudgetMs: 5000,
+        notationSequence: [
+            '兵三進一','馬8進7','炮八平五','馬2進3','傌二進三','車1平2','傌八進七','車9進1','俥九平八','卒3進1',
+            '傌三進四','砲8進4','仕六進五','車2進1','相七進九','砲8平3','俥八進三','砲3退1','俥八進三','車9平8',
+            '炮二平四','砲3平7','炮五進四','馬3進5','炮四平五','砲2平3','俥八平七','車2平3','俥一進二','車8進1',
+            '傌四進五','馬7進5','傌七進六','車3平2','俥七平五','士4進5','俥五平七','車2進8','相九退七','車2平3',
+            '仕五退六','象3進1','傌六進四','將5平4','炮五平六','車3退3','俥七平六','將4平5','炮六進二','車8平6',
+            '俥六退一','車3平1','炮六平五','士5進4','俥六平五','士6進5','俥五平七','將5平6','俥七平六','砲3進7',
+            '仕六進五'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,0-9,0', `expected 車1進3, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'latest file-race line should find the late rook thrust on round 42',
+        timeBudgetMs: 5000,
+        notationSequence: [
+            '兵三進一','馬8進7','炮八平五','馬2進3','傌二進三','車1平2','傌八進七','車9進1','俥九平八','卒3進1',
+            '傌三進四','砲8進4','仕六進五','車2進1','相七進九','砲8平3','俥八進三','砲3退1','俥八進三','車9平8',
+            '炮二平四','砲3平7','炮五進四','馬3進5','炮四平五','砲2平3','俥八平七','車2平3','俥一進二','車8進1',
+            '傌四進五','馬7進5','傌七進六','車3平2','俥七平五','士4進5','俥五平七','車2進8','相九退七','車2平3',
+            '仕五退六','象3進1','傌六進四','將5平4','炮五平六','車3退3','俥七平六','將4平5','炮六進二','車8平6',
+            '俥六退一','車3平1','炮六平五','士5進4','俥六平五','士6進5','俥五平七','將5平6','俥七平六','砲3進7',
+            '仕六進五','砲3退6','俥一平八','車1進3','仕五退六','砲3進6','帥五進一','車1退1','俥六退四','車1退3',
+            '俥八進七','將6進1','傌四退二','卒7進1','相三進五','砲3平6','俥六進五','車1進3','俥六退五','車1退4',
+            '相五進三','車6進4','俥六進五'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,0-8,0', `expected 車1進4, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -643,7 +721,9 @@ const scenarios = [
 ];
 
 for (const scenario of scenarios) {
-    const state = playSequence(scenario.sequence);
+    const state = scenario.notationSequence
+        ? playNotationSequence(scenario.notationSequence)
+        : playSequence(scenario.sequence);
     const budget = scenario.timeBudgetMs || 900;
     const result = compute(state, budget);
     scenario.check(result);
