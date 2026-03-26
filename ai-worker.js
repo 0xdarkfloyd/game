@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260325-logic1', 'game.js?v=20260325-logic1');
+importScripts('engine-core.js?v=20260326-rooksafe1', 'game.js?v=20260326-rooksafe1');
 
 self.onmessage = event => {
     const data = event.data || {};

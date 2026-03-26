@@ -930,7 +930,7 @@
             return suggestions;
         }
 
-        function getPracticalOpeningBias(board, move, color, history, openingContext) {
+        function getPracticalOpeningBias(board, nextBoard, move, color, history, openingContext) {
             if (getPhase(board, history) !== 'opening') {
                 return 0;
             }
@@ -1053,6 +1053,14 @@
                 score -= undevelopedMajors >= 3 ? 34 : undevelopedMajors === 2 ? 24 : 14;
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
                     score -= 34;
+                }
+                const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
+                const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
+                if (wasAttacked && !nowAttacked) {
+                    const retreating = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+                    score += retreating ? 264 : 112;
+                } else if (wasAttacked && nowAttacked) {
+                    score -= 164;
                 }
             }
 
@@ -1613,7 +1621,16 @@
                 const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
                 const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
                 if (wasAttacked && !nowAttacked) {
-                    score += stageWeight(stage, 0, 34, 18);
+                    score += stageWeight(stage, 0, 46, 24);
+                    const retreating = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+                    if (retreating) {
+                        score += stageWeight(stage, 0, 64, 34);
+                    }
+                    if (Math.abs(move.fromRow - homeRow(color)) >= 2) {
+                        score += stageWeight(stage, 0, 24, 14);
+                    }
+                } else if (wasAttacked && nowAttacked) {
+                    score -= stageWeight(stage, 0, 54, 28);
                 }
             }
             if (move.piece[1] === 'C' && !move.captured && move.toCol === 4 && move.toRow === move.fromRow) {
@@ -1652,7 +1669,7 @@
             const quickEntries = legalMoves.map(move => {
                 const nextBoard = applyMoveToBoard(board, move);
                 const bookBias = suggestions.get(getMoveKey(move)) || 0;
-                const practicalBias = getPracticalOpeningBias(board, move, color, history, openingContext);
+                const practicalBias = getPracticalOpeningBias(board, nextBoard, move, color, history, openingContext);
                 const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
                 const safetyPenalty = getImmediateRiskPenalty(board, nextBoard, move, color, searchConfig.stage);
                 const quietCenter = move.captured ? 0 : Math.max(0, 4 - Math.abs(4 - move.toCol)) * 3;
