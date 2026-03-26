@@ -2226,14 +2226,20 @@
                 orderedRootEntries.length >= 2 &&
                 Date.now() + 120 < context.deadline) {
                 const verifyCount = Math.min(
-                    searchConfig.phase === 'middlegame' ? 5 : 4,
+                    searchConfig.phase === 'middlegame'
+                        ? (searchConfig.time >= 2200 ? 6 : 5)
+                        : 4,
                     orderedRootEntries.length
                 );
                 const verifyDepth = Math.min(searchConfig.maxDepth, completedDepth + 1);
                 let verifyBestMove = bestMove;
                 let verifyBestScore = bestScore;
                 let verifyBestPv = bestPv;
-                const verifyPolicyWeight = searchConfig.phase === 'endgame' ? 0.55 : 0.35;
+                const verifyPolicyWeight = searchConfig.phase === 'endgame'
+                    ? 0.55
+                    : searchConfig.phase === 'middlegame'
+                        ? 0.25
+                        : 0.35;
 
                 for (let index = 0; index < verifyCount; index++) {
                     const entry = orderedRootEntries[index];
