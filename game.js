@@ -5,8 +5,9 @@ const AI_THINK_DELAY_MS = 260;
 const MOVE_ANIMATION_MS = 220;
 const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
+const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260326-advancedfix4';
+const ASSET_VERSION = '20260326-advancedfix5';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -317,6 +318,10 @@ const transpositionTable = new Map();
 let aiWorker = null;
 let aiRequestId = 0;
 let pendingAiJob = null;
+let ponderWorker = null;
+let ponderRequestId = 0;
+let pendingPonderJob = null;
+let ponderedReply = null;
 let searchDeadline = 0;
 let searchNodeCounter = 0;
 let searchTimedOut = false;
@@ -1059,6 +1064,29 @@ function getSearchTimeBudget(activeBoard, legalMoves) {
     }
 
     return levelConfig.endgame;
+}
+
+function getPonderBudgets(activeBoard, legalMoves) {
+    const searchBudget = getSearchTimeBudget(activeBoard, legalMoves);
+
+    if (aiLevel === 'advanced') {
+        return {
+            predictTimeBudgetMs: Math.max(1400, Math.round(searchBudget * 0.4)),
+            replyTimeBudgetMs: Math.max(2600, Math.round(searchBudget * 0.82))
+        };
+    }
+
+    if (aiLevel === 'intermediate') {
+        return {
+            predictTimeBudgetMs: Math.max(700, Math.round(searchBudget * 0.34)),
+            replyTimeBudgetMs: Math.max(1300, Math.round(searchBudget * 0.62))
+        };
+    }
+
+    return {
+        predictTimeBudgetMs: Math.max(350, Math.round(searchBudget * 0.28)),
+        replyTimeBudgetMs: Math.max(700, Math.round(searchBudget * 0.5))
+    };
 }
 
 function beginSearchBudget(activeBoard, legalMoves) {
@@ -2198,6 +2226,13 @@ function disposeAiWorker() {
     }
 }
 
+function disposePonderWorker() {
+    if (ponderWorker) {
+        ponderWorker.terminate();
+        ponderWorker = null;
+    }
+}
+
 function cancelPendingAiJob() {
     aiRequestId++;
     if (pendingAiJob) {
@@ -2206,6 +2241,24 @@ function cancelPendingAiJob() {
         }
         pendingAiJob = null;
         disposeAiWorker();
+    }
+}
+
+function clearPonderedReply() {
+    ponderedReply = null;
+}
+
+function cancelPendingPonderJob(clearCache = true) {
+    ponderRequestId++;
+    if (pendingPonderJob) {
+        if (pendingPonderJob.timeoutId) {
+            clearTimeout(pendingPonderJob.timeoutId);
+        }
+        pendingPonderJob = null;
+        disposePonderWorker();
+    }
+    if (clearCache) {
+        clearPonderedReply();
     }
 }
 
@@ -2253,11 +2306,153 @@ function ensureAiWorker() {
     return aiWorker;
 }
 
+function ensurePonderWorker() {
+    if (typeof Worker === 'undefined' || typeof window === 'undefined') {
+        return null;
+    }
+
+    if (ponderWorker) {
+        return ponderWorker;
+    }
+
+    try {
+        ponderWorker = new Worker(`ai-worker.js?v=${ASSET_VERSION}`);
+    } catch (error) {
+        ponderWorker = null;
+        return null;
+    }
+
+    ponderWorker.onmessage = event => {
+        const data = event.data || {};
+        if (!pendingPonderJob || data.requestId !== pendingPonderJob.requestId) {
+            return;
+        }
+
+        const job = pendingPonderJob;
+        pendingPonderJob = null;
+        clearTimeout(job.timeoutId);
+
+        if (
+            data.kind === 'ponder' &&
+            data.result &&
+            data.result.replyMove &&
+            data.result.targetBoardKey &&
+            gameActive &&
+            currentPlayer === humanColor &&
+            moveSequence.length === job.sourceHistoryLength &&
+            getBoardKey(board, currentPlayer) === job.sourceBoardKey
+        ) {
+            ponderedReply = {
+                sourceBoardKey: job.sourceBoardKey,
+                sourceHistoryLength: job.sourceHistoryLength,
+                targetBoardKey: data.result.targetBoardKey,
+                targetHistoryLength: data.result.targetHistoryLength,
+                predictedMove: data.result.predictedMove,
+                replyMove: data.result.replyMove
+            };
+        }
+    };
+
+    ponderWorker.onerror = () => {
+        if (!pendingPonderJob) {
+            disposePonderWorker();
+            return;
+        }
+
+        const job = pendingPonderJob;
+        pendingPonderJob = null;
+        clearTimeout(job.timeoutId);
+        disposePonderWorker();
+    };
+
+    return ponderWorker;
+}
+
+function consumePonderedReply(activeBoard, color, historySequence = moveSequence, legalMoves = null) {
+    if (!ponderedReply) {
+        return null;
+    }
+
+    const activeBoardKey = getBoardKey(activeBoard, color);
+    if (ponderedReply.targetBoardKey !== activeBoardKey || ponderedReply.targetHistoryLength !== historySequence.length) {
+        if (ponderedReply.targetHistoryLength <= historySequence.length) {
+            clearPonderedReply();
+        }
+        return null;
+    }
+
+    const availableMoves = legalMoves || filterPlayableMoves(
+        activeBoard,
+        color,
+        getAllLegalMoves(activeBoard, color),
+        positionHistory,
+        historySequence
+    );
+    const matched = availableMoves.find(candidate => sameMove(candidate, ponderedReply.replyMove)) || null;
+    clearPonderedReply();
+    return matched;
+}
+
+function startPondering() {
+    if (typeof window === 'undefined' || !gameActive || currentPlayer !== humanColor) {
+        return;
+    }
+
+    const worker = ensurePonderWorker();
+    if (!worker) {
+        return;
+    }
+
+    const legalMoves = filterPlayableMoves(board, currentPlayer, getAllLegalMoves(board, currentPlayer), positionHistory, moveSequence);
+    if (legalMoves.length === 0) {
+        return;
+    }
+
+    cancelPendingPonderJob(false);
+
+    const budgets = getPonderBudgets(board, legalMoves);
+    const requestId = ++ponderRequestId;
+    const sourceBoardKey = getBoardKey(board, currentPlayer);
+    const timeoutId = window.setTimeout(() => {
+        if (!pendingPonderJob || pendingPonderJob.requestId !== requestId) {
+            return;
+        }
+
+        pendingPonderJob = null;
+        disposePonderWorker();
+    }, budgets.predictTimeBudgetMs + budgets.replyTimeBudgetMs + PONDER_TIMEOUT_PADDING_MS);
+
+    pendingPonderJob = {
+        requestId,
+        timeoutId,
+        sourceBoardKey,
+        sourceHistoryLength: moveSequence.length
+    };
+
+    worker.postMessage({
+        kind: 'ponder',
+        requestId,
+        board: cloneBoard(board),
+        currentPlayer,
+        history: cloneMoveSequence(moveSequence),
+        positionHistory: clonePositionHistory(positionHistory),
+        predictTimeBudgetMs: budgets.predictTimeBudgetMs,
+        replyTimeBudgetMs: budgets.replyTimeBudgetMs
+    });
+}
+
 function requestComputerMove(activeBoard, color, historySequence = moveSequence) {
     const fallbackMove = getFallbackMove(activeBoard, color, historySequence);
-    const worker = ensureAiWorker();
     const legalMoves = filterPlayableMoves(activeBoard, color, getAllLegalMoves(activeBoard, color), positionHistory, historySequence);
     const timeBudgetMs = getSearchTimeBudget(activeBoard, legalMoves);
+    const cachedMove = consumePonderedReply(activeBoard, color, historySequence, legalMoves);
+    if (cachedMove) {
+        return Promise.resolve(cachedMove);
+    }
+
+    cancelPendingPonderJob(false);
+
+    const worker = ensureAiWorker();
 
     if (!worker || typeof window === 'undefined') {
         return Promise.resolve(fallbackMove);
@@ -2286,6 +2481,7 @@ function requestComputerMove(activeBoard, color, historySequence = moveSequence)
         };
 
         worker.postMessage({
+            kind: 'bestMove',
             requestId,
             board: cloneBoard(activeBoard),
             currentPlayer: color,
@@ -2677,6 +2873,7 @@ function snapshotState() {
 
 function restoreState(snapshot) {
     cancelPendingAiJob();
+    cancelPendingPonderJob();
     board = cloneBoard(snapshot.board);
     currentPlayer = snapshot.currentPlayer;
     lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
@@ -2692,6 +2889,10 @@ function restoreState(snapshot) {
     renderMoveLog();
     updateSideButtons();
     updateStatus();
+
+    if (gameActive && currentPlayer === humanColor) {
+        startPondering();
+    }
 }
 
 function updateStatus() {
@@ -2718,6 +2919,7 @@ function finalizeMove() {
     if (gameState) {
         gameActive = false;
         aiThinking = false;
+        cancelPendingPonderJob();
         statusMessage = gameState.message;
         createBoard();
         renderMoveLog();
@@ -2744,15 +2946,22 @@ function finalizeMove() {
     }
 
     if (gameActive && currentPlayer === computerColor) {
+        cancelPendingPonderJob(false);
         aiThinking = true;
         updateStatus();
         if (typeof window !== 'undefined') {
             window.setTimeout(computerMove, AI_THINK_DELAY_MS);
         }
+    } else if (gameActive && currentPlayer === humanColor) {
+        startPondering();
     }
 }
 
 function performMove(move) {
+    if (currentPlayer === humanColor) {
+        cancelPendingPonderJob(false);
+    }
+
     moveHistory.push(snapshotState());
     appendMoveLog(formatMoveNotation(board, move), currentPlayer);
     moveSequence.push(getMoveKey(move));
@@ -2868,6 +3077,7 @@ function setAiLevel(level) {
 
     aiLevel = level;
     cancelPendingAiJob();
+    cancelPendingPonderJob();
     aiThinking = false;
     statusMessage = getStartStatusMessage();
     updateDifficultyButtons();
@@ -2877,11 +3087,14 @@ function setAiLevel(level) {
         aiThinking = true;
         updateStatus();
         window.setTimeout(computerMove, AI_THINK_DELAY_MS);
+    } else if (gameActive && currentPlayer === humanColor) {
+        startPondering();
     }
 }
 
 function resetGame() {
     cancelPendingAiJob();
+    cancelPendingPonderJob();
     board = cloneBoard(initialBoard);
     currentPlayer = RED_COLOR;
     selectedCell = null;
@@ -2906,6 +3119,8 @@ function resetGame() {
         aiThinking = true;
         updateStatus();
         window.setTimeout(computerMove, AI_THINK_DELAY_MS);
+    } else if (currentPlayer === humanColor) {
+        startPondering();
     }
 }
 
@@ -2939,6 +3154,7 @@ if (typeof module !== 'undefined') {
         formatMoveNotation,
         getBoardKey,
         getPieceTransform,
+        getPonderBudgets,
         getSearchTimeBudget,
         getMoveKey,
         getAllLegalMoves,
