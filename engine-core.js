@@ -847,6 +847,24 @@
             return score;
         }
 
+        function hasAttackerType(board, row, col, attackerColor, targetTypes) {
+            for (let scanRow = 0; scanRow < 10; scanRow++) {
+                for (let scanCol = 0; scanCol < 9; scanCol++) {
+                    const piece = board[scanRow][scanCol];
+                    if (!piece || piece[0] !== attackerColor || !targetTypes.includes(piece[1])) {
+                        continue;
+                    }
+
+                    const pseudoMoves = getPseudoMoves(board, scanRow, scanCol);
+                    if (pseudoMoves.some(move => move.toRow === row && move.toCol === col)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         function evaluateSide(board, color, stage) {
             let score = 0;
 
@@ -1345,6 +1363,18 @@
 
             if (move.captured && capturedValue < attackers[0]) {
                 penalty += Math.round((attackers[0] - capturedValue) * 0.2);
+            }
+
+            if (!move.captured &&
+                ['R', 'H', 'C'].includes(move.piece[1]) &&
+                hasAttackerType(nextBoard, move.toRow, move.toCol, otherColor(color), ['S'])) {
+                if (move.piece[1] === 'R') {
+                    penalty += stageWeight(stage, 16, 44, 18);
+                } else if (move.piece[1] === 'C') {
+                    penalty += stageWeight(stage, 34, 118, 36);
+                } else {
+                    penalty += stageWeight(stage, 14, 36, 18);
+                }
             }
 
             if (move.piece[1] === 'C' &&
@@ -2076,16 +2106,20 @@
                 completedDepth >= 2 &&
                 orderedRootEntries.length >= 2 &&
                 Date.now() + 120 < context.deadline) {
-                const verifyCount = Math.min(3, orderedRootEntries.length);
+                const verifyCount = Math.min(
+                    searchConfig.phase === 'middlegame' ? 5 : 4,
+                    orderedRootEntries.length
+                );
                 const verifyDepth = Math.min(searchConfig.maxDepth, completedDepth + 1);
                 let verifyBestMove = bestMove;
                 let verifyBestScore = bestScore;
                 let verifyBestPv = bestPv;
+                const verifyPolicyWeight = searchConfig.phase === 'endgame' ? 0.55 : 0.35;
 
                 for (let index = 0; index < verifyCount; index++) {
                     const entry = orderedRootEntries[index];
                     const result = negamax(entry.nextBoard, otherColor(color), verifyDepth - 1, -Infinity, Infinity, context, history.concat(getMoveKey(entry.move)), 1);
-                    const score = -result.score + entry.policyBias * (policyWeight * 0.55);
+                    const score = -result.score + entry.policyBias * (policyWeight * verifyPolicyWeight);
                     if (score > verifyBestScore) {
                         verifyBestScore = score;
                         verifyBestMove = entry.move;
