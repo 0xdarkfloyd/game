@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260326-advancedfix6', 'game.js?v=20260326-advancedfix6');
+importScripts('engine-core.js?v=20260326-timelevels1', 'game.js?v=20260326-timelevels1');
 
 self.onmessage = event => {
     const data = event.data || {};

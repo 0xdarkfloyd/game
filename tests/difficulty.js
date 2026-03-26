@@ -25,19 +25,19 @@ assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 1200);
 assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 1500);
 
 game.setAiLevel('intermediate');
-assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 2200);
-assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 3000);
-
-game.setAiLevel('advanced');
 assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 3600);
 assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 5000);
+
+game.setAiLevel('advanced');
+assert.strictEqual(game.getSearchTimeBudget(openingBoard, openingLegal), 6500);
+assert.strictEqual(game.getSearchTimeBudget(endgameBoard, endgameLegal), 10000);
 assert.deepStrictEqual(game.getPonderBudgets(openingBoard, openingLegal), {
-    predictTimeBudgetMs: 1440,
-    replyTimeBudgetMs: 2952
+    predictTimeBudgetMs: 2600,
+    replyTimeBudgetMs: 5330
 });
 assert.deepStrictEqual(game.getPonderBudgets(endgameBoard, endgameLegal), {
-    predictTimeBudgetMs: 2000,
-    replyTimeBudgetMs: 4100
+    predictTimeBudgetMs: 4000,
+    replyTimeBudgetMs: 8200
 });
 
 assert.strictEqual(game.PIECE_LABELS.rR, '俥');

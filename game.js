@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260326-setupflow1';
+const ASSET_VERSION = '20260326-timelevels1';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -17,15 +17,15 @@ const AI_LEVELS = {
     },
     intermediate: {
         label: '\u4e2d\u7d1a',
-        opening: 2200,
-        middlegame: 2600,
-        endgame: 3000
-    },
-    advanced: {
-        label: '\u9ad8\u7d1a',
         opening: 3600,
         middlegame: 4300,
         endgame: 5000
+    },
+    advanced: {
+        label: '\u9ad8\u7d1a',
+        opening: 6500,
+        middlegame: 8000,
+        endgame: 10000
     }
 };
 const DEFAULT_AI_LEVEL = 'intermediate';

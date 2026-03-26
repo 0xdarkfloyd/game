@@ -119,6 +119,20 @@
                 quiescenceLimit += 1;
             }
 
+            if (overrideTimeBudgetMs >= 6000) {
+                maxDepth += phase === 'opening' ? 1 : 2;
+                rootLimit += 1;
+                branchLimit += 1;
+                quiescenceLimit += 1;
+            }
+
+            if (overrideTimeBudgetMs >= 9000) {
+                maxDepth += 1;
+                rootLimit += 1;
+                branchLimit += 1;
+                quiescenceLimit += 1;
+            }
+
             return {
                 phase,
                 stage,
