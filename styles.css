@@ -28,6 +28,10 @@ body {
     align-items: start;
 }
 
+.game-layout.hidden {
+    display: none;
+}
+
 .board-column {
     min-width: 0;
 }
@@ -38,6 +42,52 @@ h1 {
     color: #7c2d12;
     font-size: clamp(26px, 4vw, 38px);
     letter-spacing: 0.14em;
+}
+
+.setup-panel {
+    max-width: 760px;
+    margin: 0 auto 22px;
+    padding: 22px;
+    border-radius: 22px;
+    border: 1px solid rgba(120, 53, 15, 0.16);
+    background:
+        linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 244, 214, 0.95)),
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.44), transparent 52%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.setup-panel.hidden {
+    display: none;
+}
+
+.setup-title {
+    margin: 0;
+    text-align: center;
+    color: #7c2d12;
+    font-size: clamp(22px, 3vw, 28px);
+    letter-spacing: 0.08em;
+}
+
+.setup-copy {
+    margin: 10px auto 0;
+    max-width: 560px;
+    text-align: center;
+    color: #57534e;
+    font-size: 15px;
+    line-height: 1.65;
+}
+
+.setup-group {
+    margin-top: 18px;
+}
+
+.setup-label {
+    margin-bottom: 8px;
+    text-align: center;
+    color: #7c2d12;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
 }
 
 .info-panel {
@@ -56,6 +106,13 @@ h1 {
     margin-top: 8px;
     color: #7c2d12;
     font-size: 15px;
+}
+
+.game-settings {
+    margin-top: 12px;
+    color: #57534e;
+    font-size: 14px;
+    font-weight: 600;
 }
 
 .side-picker {
@@ -98,6 +155,39 @@ h1 {
     box-shadow: none;
 }
 
+.setup-difficulty-picker {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+    background: transparent;
+}
+
+.setup-difficulty-picker .difficulty-button {
+    min-height: 88px;
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 18px;
+    border: 1px solid rgba(120, 53, 15, 0.12);
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.difficulty-name {
+    display: block;
+    font-size: 16px;
+}
+
+.difficulty-time {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #78716c;
+}
+
 .side-button:hover {
     background: rgba(120, 53, 15, 0.12);
 }
@@ -126,6 +216,34 @@ h1 {
     background: #7c2d12;
     color: #fff;
     box-shadow: 0 8px 16px rgba(122, 45, 18, 0.18);
+}
+
+.difficulty-button.active .difficulty-time {
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.setup-status {
+    min-height: 24px;
+    margin-top: 16px;
+    text-align: center;
+    color: #7c2d12;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.start-game-button {
+    margin: 14px auto 0;
+}
+
+.start-game-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #78716c;
+    box-shadow: none;
+}
+
+.start-game-button:disabled:hover {
+    background: #78716c;
 }
 
 .board {
@@ -390,6 +508,15 @@ button:hover {
         --board-inset: 14px;
         --piece-size: min(74%, 42px);
         --piece-font-size: clamp(22px, 5vw, 27px);
+    }
+
+    .setup-panel {
+        padding: 18px 14px;
+        border-radius: 18px;
+    }
+
+    .setup-difficulty-picker {
+        grid-template-columns: 1fr;
     }
 
     .action-row {

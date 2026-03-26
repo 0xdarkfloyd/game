@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260326-advancedfix6';
+const ASSET_VERSION = '20260326-setupflow1';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -300,12 +300,12 @@ const BOARD_SVG = buildBoardSvg();
 let board = cloneBoard(initialBoard);
 let humanColor = RED_COLOR;
 let computerColor = BLACK_COLOR;
-let aiLevel = DEFAULT_AI_LEVEL;
+let aiLevel = null;
 let currentPlayer = RED_COLOR;
 let selectedCell = null;
 let validMoves = [];
 let lastMove = null;
-let gameActive = true;
+let gameActive = false;
 let aiThinking = false;
 let statusMessage = '';
 let moveHistory = [];
@@ -313,6 +313,7 @@ let moveLog = [];
 let moveSequence = [];
 let positionHistory = [];
 let pendingAnimatedMove = null;
+let setupOpen = true;
 let audioContext = null;
 const transpositionTable = new Map();
 let aiWorker = null;
@@ -349,7 +350,7 @@ function colorName(color) {
 }
 
 function getAiLevelLabel(level = aiLevel) {
-    return (AI_LEVELS[level] || AI_LEVELS[DEFAULT_AI_LEVEL]).label;
+    return AI_LEVELS[level] ? AI_LEVELS[level].label : '\u672a\u9078\u64c7';
 }
 
 function isInsideBoard(row, col) {
@@ -436,6 +437,23 @@ function getStartStatusMessage() {
     return `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u65b9\uff08\u5148\u624b\uff09' : '\u4f60\u57f7\u9ed1\u65b9\uff08\u5f8c\u624b\uff09'}\uff0c${computerColor === RED_COLOR ? '\u96fb\u8166\u57f7\u7d05\u65b9' : '\u96fb\u8166\u57f7\u9ed1\u65b9'}\u3002\u96e3\u5ea6\uff1a${getAiLevelLabel()}\u3002`;
 }
 
+function getSetupStatusMessage() {
+    if (!AI_LEVELS[aiLevel]) {
+        return '\u8acb\u5148\u9078\u64c7\u96e3\u5ea6\uff0c\u518d\u958b\u59cb\u5c0d\u5c40\u3002';
+    }
+
+    return `${humanColor === RED_COLOR ? '\u4f60\u5c07\u57f7\u7d05\u5148\u624b' : '\u4f60\u5c07\u57f7\u9ed1\u5f8c\u624b'}\uff0c\u96e3\u5ea6\uff1a${getAiLevelLabel(aiLevel)}\u3002`;
+}
+
+function getAiLevelTimeRange(level = aiLevel) {
+    const config = AI_LEVELS[level];
+    if (!config) {
+        return '\u672a\u9078\u64c7';
+    }
+
+    return `${config.opening}-${config.endgame}ms`;
+}
+
 function updateSideButtons() {
     if (typeof document === 'undefined') {
         return;
@@ -456,7 +474,7 @@ function updateDifficultyButtons() {
         return;
     }
 
-    const locked = isDifficultyLocked();
+    const locked = setupOpen ? false : isDifficultyLocked();
     for (const [levelKey] of Object.entries(AI_LEVELS)) {
         const button = document.getElementById(`level-${levelKey}`);
         if (!button) {
@@ -467,6 +485,50 @@ function updateDifficultyButtons() {
         button.disabled = locked;
         button.setAttribute('aria-disabled', locked ? 'true' : 'false');
     }
+}
+
+function updateSetupPanel() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const panel = document.getElementById('setup-panel');
+    const layout = document.getElementById('game-layout');
+    const startButton = document.getElementById('start-game-button');
+    const setupStatus = document.getElementById('setup-status');
+
+    if (panel) {
+        panel.classList.toggle('hidden', !setupOpen);
+    }
+    if (layout) {
+        layout.classList.toggle('hidden', setupOpen);
+    }
+    if (startButton) {
+        const ready = Boolean(AI_LEVELS[aiLevel]);
+        startButton.disabled = !ready;
+        startButton.setAttribute('aria-disabled', ready ? 'false' : 'true');
+    }
+    if (setupStatus) {
+        setupStatus.textContent = getSetupStatusMessage();
+    }
+}
+
+function updateGameSettings() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const summary = document.getElementById('game-settings');
+    if (!summary) {
+        return;
+    }
+
+    if (setupOpen || !AI_LEVELS[aiLevel]) {
+        summary.textContent = '';
+        return;
+    }
+
+    summary.textContent = `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u5148\u624b' : '\u4f60\u57f7\u9ed1\u5f8c\u624b'} \u00b7 ${getAiLevelLabel(aiLevel)} \u00b7 ${getAiLevelTimeRange(aiLevel)}`;
 }
 
 function getBoardKey(activeBoard, color) {
@@ -485,6 +547,9 @@ function shouldLockDifficulty(moveCount, thinking, active = true) {
 }
 
 function isDifficultyLocked() {
+    if (setupOpen) {
+        return false;
+    }
     return shouldLockDifficulty(moveSequence.length, aiThinking, gameActive);
 }
 
@@ -2903,6 +2968,14 @@ function updateStatus() {
     const turnElement = document.getElementById('turn');
     const statusElement = document.getElementById('status');
     updateDifficultyButtons();
+    updateGameSettings();
+    updateSetupPanel();
+
+    if (setupOpen) {
+        turnElement.textContent = '\u5c0d\u5c40\u8a2d\u5b9a';
+        statusElement.textContent = getSetupStatusMessage();
+        return;
+    }
 
     if (gameActive) {
         const suffix = aiThinking ? ' \u96fb\u8166\u601d\u8003\u4e2d...' : '';
@@ -3041,6 +3114,31 @@ async function computerMove() {
     }
 }
 
+function openSetupPanel() {
+    cancelPendingAiJob();
+    cancelPendingPonderJob();
+    aiThinking = false;
+    gameActive = false;
+    setupOpen = true;
+    pendingAnimatedMove = null;
+    clearSelection();
+    statusMessage = getSetupStatusMessage();
+    createBoard();
+    renderMoveLog();
+    updateSideButtons();
+    updateStatus();
+}
+
+function startConfiguredGame() {
+    if (!AI_LEVELS[aiLevel]) {
+        updateStatus();
+        return;
+    }
+
+    setupOpen = false;
+    resetGame();
+}
+
 function undoMove() {
     if (aiThinking || moveHistory.length === 0) {
         return;
@@ -3067,6 +3165,13 @@ function setHumanSide(color) {
 
     humanColor = color;
     computerColor = otherColor(color);
+
+    if (setupOpen) {
+        updateSideButtons();
+        updateStatus();
+        return;
+    }
+
     resetGame();
 }
 
@@ -3079,9 +3184,12 @@ function setAiLevel(level) {
     cancelPendingAiJob();
     cancelPendingPonderJob();
     aiThinking = false;
-    statusMessage = getStartStatusMessage();
-    updateDifficultyButtons();
+    statusMessage = setupOpen ? getSetupStatusMessage() : getStartStatusMessage();
     updateStatus();
+
+    if (setupOpen) {
+        return;
+    }
 
     if (gameActive && currentPlayer === computerColor && typeof window !== 'undefined') {
         aiThinking = true;
@@ -3093,6 +3201,18 @@ function setAiLevel(level) {
 }
 
 function resetGame() {
+    if (!AI_LEVELS[aiLevel]) {
+        setupOpen = true;
+        gameActive = false;
+        aiThinking = false;
+        statusMessage = getSetupStatusMessage();
+        createBoard();
+        renderMoveLog();
+        updateSideButtons();
+        updateStatus();
+        return;
+    }
+
     cancelPendingAiJob();
     cancelPendingPonderJob();
     board = cloneBoard(initialBoard);
@@ -3100,6 +3220,7 @@ function resetGame() {
     selectedCell = null;
     validMoves = [];
     lastMove = null;
+    setupOpen = false;
     gameActive = true;
     aiThinking = false;
     moveHistory = [];
@@ -3125,11 +3246,16 @@ function resetGame() {
 }
 
 if (typeof window !== 'undefined') {
+    window.openSetupPanel = openSetupPanel;
+    window.startConfiguredGame = startConfiguredGame;
     window.resetGame = resetGame;
     window.undoMove = undoMove;
     window.setHumanSide = setHumanSide;
     window.setAiLevel = setAiLevel;
-    resetGame();
+    createBoard();
+    renderMoveLog();
+    updateSideButtons();
+    updateStatus();
 }
 
 if (typeof module !== 'undefined') {
@@ -3166,6 +3292,8 @@ if (typeof module !== 'undefined') {
         isPerpetualChaseViolation,
         otherColor,
         repeatsRecentCyclePosition,
+        openSetupPanel,
+        startConfiguredGame,
         setAiLevel,
         setHumanSide,
         shouldLockDifficulty,
