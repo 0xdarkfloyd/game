@@ -53,6 +53,14 @@ function compute(state, timeBudgetMs = 900) {
     };
 }
 
+function assertOneOfMoveKeys(result, expectedKeys, message) {
+    assert(result.move, 'expected a move');
+    assert(
+        expectedKeys.includes(game.getMoveKey(result.move)),
+        message || `expected one of ${expectedKeys.join(', ')}, got ${game.getMoveKey(result.move)}`
+    );
+}
+
 function createEmptyBoard() {
     return Array.from({ length: 10 }, () => Array(9).fill(''));
 }
@@ -478,14 +486,54 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '2,2-0,3', `expected 馬3退4, got ${game.getMoveKey(result.move)}`);
         }
+    },
+    {
+        name: 'high-budget defense should avoid the tempting horse jump',
+        timeBudgetMs: 2200,
+        sequence: [
+            '7,7-7,4', '0,1-2,2',
+            '9,1-7,2', '0,0-1,0',
+            '7,1-7,0', '0,8-1,8',
+            '9,0-9,1', '0,7-2,8',
+            '9,7-7,6', '2,7-2,6',
+            '6,2-5,2', '1,8-1,3',
+            '9,1-3,1', '1,3-8,3',
+            '9,8-8,8', '8,3-8,8',
+            '7,6-8,8', '2,1-2,0',
+            '7,2-5,3', '1,0-1,3',
+            '5,3-7,2', '2,8-1,6',
+            '3,1-3,2', '1,6-2,4',
+            '3,2-4,2', '2,0-2,1',
+            '6,6-5,6', '0,3-1,4',
+            '7,4-7,6', '2,6-2,5',
+            '8,8-6,7', '2,1-6,1',
+            '6,7-7,5', '6,1-6,8',
+            '4,2-4,5', '2,5-7,5',
+            '7,0-7,5', '1,3-6,3',
+            '5,6-4,6', '6,8-6,6',
+            '9,6-7,4', '3,6-4,6',
+            '4,5-4,6', '6,3-8,3',
+            '4,6-6,6', '0,6-2,8',
+            '7,5-1,5', '2,2-4,3',
+            '1,5-1,8'
+        ],
+        check(result) {
+            assertOneOfMoveKeys(
+                result,
+                ['1,4-0,3', '8,3-8,7'],
+                `expected a defensive reply, got ${game.getMoveKey(result.move)}`
+            );
+        }
     }
 ];
 
 for (const scenario of scenarios) {
     const state = playSequence(scenario.sequence);
-    const result = compute(state);
+    const budget = scenario.timeBudgetMs || 900;
+    const result = compute(state, budget);
     scenario.check(result);
-    assert(result.elapsed < 1800, `${scenario.name} exceeded budget: ${result.elapsed}ms`);
+    const elapsedLimit = Math.max(1800, budget + 600);
+    assert(result.elapsed < elapsedLimit, `${scenario.name} exceeded budget: ${result.elapsed}ms`);
 }
 
 {

@@ -1773,6 +1773,13 @@
                 if (reply.captured) {
                     checkThreat += Math.round(pieceValue(reply.captured[1], stage) * 0.12);
                 }
+                if (escapeMoves.length === 1) {
+                    checkThreat += stageWeight(stage, 40, 190, 72);
+                } else if (escapeMoves.length === 2) {
+                    checkThreat += stageWeight(stage, 18, 88, 34);
+                } else if (escapeMoves.length === 3) {
+                    checkThreat += stageWeight(stage, 8, 32, 14);
+                }
                 strongestCheck = Math.max(strongestCheck, checkThreat);
 
                 if (checks >= 4) {

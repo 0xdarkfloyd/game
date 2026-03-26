@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260326-endgamebias1', 'game.js?v=20260326-endgamebias1');
+importScripts('engine-core.js?v=20260326-escapewarn1', 'game.js?v=20260326-escapewarn1');
 
 self.onmessage = event => {
     const data = event.data || {};
