@@ -847,6 +847,55 @@
             return score;
         }
 
+        function countLooseHorses(board, color, stage) {
+            const opponent = otherColor(color);
+            let count = 0;
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (board[row][col] !== `${color}H` || !isSquareAttacked(board, row, col, opponent)) {
+                        continue;
+                    }
+
+                    const attackers = getAttackerValues(board, row, col, opponent);
+                    const defenders = getAttackerValues(board, row, col, color);
+                    if (attackers.length === 0) {
+                        continue;
+                    }
+
+                    const cheapest = attackers[0];
+                    const outnumbered = defenders.length === 0 || attackers.length > defenders.length;
+                    const pressuredByCheapAttack = cheapest <= stageWeight(stage, 95, 125, 165);
+                    if (outnumbered || pressuredByCheapAttack) {
+                        count += 1;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        function getLooseHorseReliefMoves(board, color, stage, legalMoves) {
+            const looseHorsesBefore = countLooseHorses(board, color, stage);
+            if (looseHorsesBefore === 0) {
+                return new Set();
+            }
+
+            const reliefs = new Set();
+            for (const move of legalMoves) {
+                if (move.piece !== `${color}H`) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                if (countLooseHorses(nextBoard, color, stage) < looseHorsesBefore) {
+                    reliefs.add(getMoveKey(move));
+                }
+            }
+
+            return reliefs;
+        }
+
         function hasAttackerType(board, row, col, attackerColor, targetTypes) {
             for (let scanRow = 0; scanRow < 10; scanRow++) {
                 for (let scanCol = 0; scanCol < 9; scanCol++) {
@@ -863,6 +912,25 @@
             }
 
             return false;
+        }
+
+        function countThreatenedEnemyMajors(board, color) {
+            const opponent = otherColor(color);
+            let count = 0;
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const piece = board[row][col];
+                    if (!piece || piece[0] !== opponent || !['R', 'H', 'C'].includes(piece[1])) {
+                        continue;
+                    }
+                    if (isSquareAttacked(board, row, col, color)) {
+                        count += 1;
+                    }
+                }
+            }
+
+            return count;
         }
 
         function evaluateSide(board, color, stage) {
@@ -1324,6 +1392,14 @@
                 }
             }
 
+            if (!move.captured && move.piece[1] === 'C') {
+                const beforeMajorPressure = countThreatenedEnemyMajors(board, color);
+                const afterMajorPressure = countThreatenedEnemyMajors(nextBoard, color);
+                if (afterMajorPressure > beforeMajorPressure) {
+                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(stage, 4, 26, 10);
+                }
+            }
+
             return Math.round(score);
         }
 
@@ -1365,8 +1441,7 @@
                 penalty += Math.round((attackers[0] - capturedValue) * 0.2);
             }
 
-            if (!move.captured &&
-                ['R', 'H', 'C'].includes(move.piece[1]) &&
+            if (['R', 'H', 'C'].includes(move.piece[1]) &&
                 hasAttackerType(nextBoard, move.toRow, move.toCol, otherColor(color), ['S'])) {
                 if (move.piece[1] === 'R') {
                     penalty += stageWeight(stage, 16, 44, 18);
@@ -1374,6 +1449,9 @@
                     penalty += stageWeight(stage, 34, 118, 36);
                 } else {
                     penalty += stageWeight(stage, 14, 36, 18);
+                }
+                if (move.captured && move.piece[1] === 'C') {
+                    penalty += stageWeight(stage, 18, 52, 18);
                 }
             }
 
@@ -1534,6 +1612,10 @@
                         captureThreat += stageWeight(stage, 164, 148, 92);
                     } else if (targetType === 'H') {
                         captureThreat += stageWeight(stage, 112, 106, 78);
+                    } else if (targetType === 'E') {
+                        captureThreat += stageWeight(stage, 34, 62, 22);
+                    } else if (targetType === 'A') {
+                        captureThreat += stageWeight(stage, 28, 54, 20);
                     }
 
                     if (captureThreat > 0) {
@@ -1647,6 +1729,17 @@
                     score += centerGain * stageWeight(stage, 8, 14, 10);
                 }
             }
+            const looseHorsesBefore = countLooseHorses(board, color, stage);
+            const looseHorsesAfter = countLooseHorses(nextBoard, color, stage);
+            if (looseHorsesAfter < looseHorsesBefore) {
+                score += (looseHorsesBefore - looseHorsesAfter) * stageWeight(stage, 0, 58, 28);
+            } else if (looseHorsesBefore > 0 && !move.captured) {
+                if (move.piece[1] === 'S') {
+                    score -= looseHorsesBefore * stageWeight(stage, 0, 48, 20);
+                } else if (move.piece[1] === 'A' || move.piece[1] === 'E') {
+                    score -= looseHorsesBefore * stageWeight(stage, 0, 34, 16);
+                }
+            }
             if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
                 const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
                 const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
@@ -1679,6 +1772,7 @@
             const suggestions = getOpeningSuggestionMap(board, color, history, legalMoves);
             const sameSideMoves = getSideHistoryMoves(history, color);
             const urgentHomeRookRepairs = getUrgentHomeRookScreenRepairMoves(board, color, legalMoves);
+            const urgentLooseHorseReliefs = getLooseHorseReliefMoves(board, color, searchConfig.stage, legalMoves);
             const openingContext = {
                 undevelopedMajors: countUndevelopedMajors(board, color),
                 undevelopedRooks: countUndevelopedRooks(board, color),
@@ -1698,18 +1792,36 @@
                 : 'balanced';
             const quickEntries = legalMoves.map(move => {
                 const nextBoard = applyMoveToBoard(board, move);
-                const bookBias = suggestions.get(getMoveKey(move)) || 0;
+                const moveKey = getMoveKey(move);
+                const bookBias = suggestions.get(moveKey) || 0;
                 const practicalBias = getPracticalOpeningBias(board, nextBoard, move, color, history, openingContext);
                 const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
                 const safetyPenalty = getImmediateRiskPenalty(board, nextBoard, move, color, searchConfig.stage);
+                let looseHorseBias = 0;
+                if (urgentLooseHorseReliefs.size > 0) {
+                    if (urgentLooseHorseReliefs.has(moveKey)) {
+                        looseHorseBias += stageWeight(searchConfig.stage, 0, 138, 64);
+                    } else if (!move.captured) {
+                        if (move.piece[1] === 'S') {
+                            looseHorseBias -= stageWeight(searchConfig.stage, 0, 124, 48);
+                        } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                            looseHorseBias -= stageWeight(searchConfig.stage, 0, 96, 38);
+                        } else if (move.piece[1] === 'C') {
+                            looseHorseBias -= stageWeight(searchConfig.stage, 0, 54, 20);
+                        } else if (move.piece[1] === 'R' &&
+                            !isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color))) {
+                            looseHorseBias -= stageWeight(searchConfig.stage, 0, 28, 12);
+                        }
+                    }
+                }
                 const quietCenter = move.captured ? 0 : Math.max(0, 4 - Math.abs(4 - move.toCol)) * 3;
                 return {
                     move,
                     nextBoard,
                     tacticalBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + quietCenter + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
-                    policyBias: bookBias + practicalBias + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
+                    quickScore: bookBias + practicalBias + looseHorseBias + quietCenter + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
+                    policyBias: bookBias + practicalBias + Math.round(looseHorseBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
@@ -1724,6 +1836,13 @@
                 let captureBias = entry.move.captured
                     ? Math.round(pieceValue(entry.move.captured[1], searchConfig.stage) * 0.22 - pieceValue(entry.move.piece[1], searchConfig.stage) * 0.05)
                     : 0;
+                if (entry.move.piece[1] === 'R' &&
+                    entry.move.captured &&
+                    entry.move.captured[1] === 'S' &&
+                    entry.move.fromRow !== homeRow(color) &&
+                    !isSquareAttacked(nextBoard, entry.move.toRow, entry.move.toCol, otherColor(color))) {
+                    captureBias += Math.round(stageWeight(searchConfig.stage, 12, 36, 14));
+                }
                 if (searchConfig.phase === 'opening' && entry.move.captured) {
                     if (openingPlanMode === 'horizontal-rook' && entry.move.piece[1] !== 'R') {
                         captureBias -= 86;
