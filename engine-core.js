@@ -98,10 +98,35 @@
         function getPhaseConfig(board, history, overrideTimeBudgetMs) {
             const phase = getPhase(board, history);
             const stage = getStageProfile(board, history);
+            const base = CONFIG.phase[phase];
+            let maxDepth = base.maxDepth;
+            let rootLimit = base.rootLimit;
+            let branchLimit = base.branchLimit;
+            let quiescenceLimit = base.quiescenceLimit;
+
+            if (overrideTimeBudgetMs >= 2200) {
+                if (phase === 'middlegame' || phase === 'endgame') {
+                    maxDepth += 1;
+                }
+                rootLimit += phase === 'middlegame' ? 2 : 1;
+                branchLimit += phase === 'middlegame' ? 2 : 1;
+                quiescenceLimit += phase === 'middlegame' ? 2 : 1;
+            }
+
+            if (overrideTimeBudgetMs >= 3600) {
+                rootLimit += 1;
+                branchLimit += phase === 'middlegame' ? 2 : 1;
+                quiescenceLimit += phase === 'middlegame' ? 2 : 1;
+            }
+
             return {
                 phase,
                 stage,
-                ...CONFIG.phase[phase],
+                ...base,
+                maxDepth,
+                rootLimit,
+                branchLimit,
+                quiescenceLimit,
                 time: overrideTimeBudgetMs || CONFIG.phase[phase].time
             };
         }
@@ -1368,6 +1393,81 @@
             return penalty;
         }
 
+        function getDeepRookRaidPenalty(board, nextBoard, move, color, stage) {
+            if (move.piece !== `${color}R` || !move.captured) {
+                return 0;
+            }
+
+            const inEnemyCamp = color === RED_COLOR ? move.toRow <= 2 : move.toRow >= 7;
+            if (!inEnemyCamp) {
+                return 0;
+            }
+
+            const mobilityBefore = getPseudoMoves(board, move.fromRow, move.fromCol).length;
+            const mobilityAfter = getPseudoMoves(nextBoard, move.toRow, move.toCol).length;
+            const attackers = getAttackerValues(nextBoard, move.toRow, move.toCol, otherColor(color));
+            const defenders = getAttackerValues(nextBoard, move.toRow, move.toCol, color);
+            const kingSafetyDelta = evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage);
+            let penalty = 0;
+
+            if (mobilityAfter <= 4 && mobilityAfter + 2 < mobilityBefore) {
+                penalty += stageWeight(stage, 6, 54, 22);
+            } else if (mobilityAfter <= 2) {
+                penalty += stageWeight(stage, 8, 72, 28);
+            }
+
+            if (attackers.length > defenders.length) {
+                penalty += stageWeight(stage, 10, 82, 34);
+            } else if (attackers.length > 0 && defenders.length === 0) {
+                penalty += stageWeight(stage, 14, 110, 42);
+            }
+
+            if (move.captured[1] !== 'R' && move.captured[1] !== 'G') {
+                penalty += stageWeight(stage, 4, 30, 12);
+                if (!isInCheck(nextBoard, otherColor(color))) {
+                    penalty += stageWeight(stage, 0, 118, 44);
+                }
+            }
+
+            if (kingSafetyDelta < 0) {
+                penalty += Math.round(-kingSafetyDelta * stageWeight(stage, 0.12, 0.55, 0.28));
+            }
+
+            return Math.round(penalty);
+        }
+
+        function getDefensiveRepairBias(board, nextBoard, move, color, stage) {
+            if (stage.middlegame < 0.2 && stage.endgame < 0.25) {
+                return 0;
+            }
+
+            const safetyDelta = evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage);
+            let score = 0;
+
+            if (safetyDelta > 0) {
+                score += Math.round(safetyDelta * stageWeight(stage, 0.16, 0.52, 0.72));
+            }
+
+            if (!move.captured && move.piece[1] === 'A') {
+                if (move.toCol === 4) {
+                    score += stageWeight(stage, 0, 68, 132);
+                }
+                if (safetyDelta > 0) {
+                    score += stageWeight(stage, 0, 28, 44);
+                }
+            } else if (!move.captured && move.piece[1] === 'E' && safetyDelta > 0) {
+                score += stageWeight(stage, 0, 14, 24);
+            } else if (!move.captured &&
+                move.piece[1] === 'C' &&
+                Math.abs(move.toCol - 4) < Math.abs(move.fromCol - 4)) {
+                score += safetyDelta > 0
+                    ? stageWeight(stage, 0, 18, 28)
+                    : stageWeight(stage, 0, 8, 14);
+            }
+
+            return Math.round(score);
+        }
+
         function getTacticalBias(board, nextBoard, move, color, history) {
             const stage = getStageProfile(board, history);
             const capturedValue = move.captured ? pieceValue(move.captured[1], stage) : 0;
@@ -1556,6 +1656,13 @@
 
             if (move.piece[1] === 'A' || move.piece[1] === 'E') {
                 penalty += stageWeight(stage, 0, 10, 4);
+                const safetyDelta = evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage);
+                if (safetyDelta > 0) {
+                    penalty -= stageWeight(stage, 0, 12, 18);
+                }
+                if (move.piece[1] === 'A' && move.toCol === 4) {
+                    penalty -= stageWeight(stage, 0, 18, 30);
+                }
             }
 
             return Math.round(penalty);
@@ -1833,6 +1940,7 @@
                 const nextBoard = entry.nextBoard;
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
                 const homeRookReliefBias = getHomeRookCannonReliefBias(board, nextBoard, entry.move, color, searchConfig.stage);
+                const defensiveRepairBias = getDefensiveRepairBias(board, nextBoard, entry.move, color, searchConfig.stage);
                 let captureBias = entry.move.captured
                     ? Math.round(pieceValue(entry.move.captured[1], searchConfig.stage) * 0.22 - pieceValue(entry.move.piece[1], searchConfig.stage) * 0.05)
                     : 0;
@@ -1862,6 +1970,7 @@
                     : 0;
                 const safetyPenalty = entry.safetyPenalty;
                 const tradePenalty = getOpeningTradePenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
+                const deepRookRaidPenalty = getDeepRookRaidPenalty(board, nextBoard, entry.move, color, searchConfig.stage);
                 const replyThreats = getOpponentReplyThreats(nextBoard, entry.move, color, searchConfig.stage, history, positionHistory);
                 const checkThreatPenalty = replyThreats.checkPenalty;
                 const captureThreatPenalty = replyThreats.capturePenalty;
@@ -1870,8 +1979,8 @@
                 return {
                     move: entry.move,
                     nextBoard,
-                    sortScore: entry.quickScore + continuationBias + homeRookReliefBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - checkThreatPenalty - captureThreatPenalty - passivityPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9)
+                    sortScore: entry.quickScore + continuationBias + homeRookReliefBias + defensiveRepairBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - deepRookRaidPenalty - checkThreatPenalty - captureThreatPenalty - passivityPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + Math.round(defensiveRepairBias * 0.8) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(deepRookRaidPenalty * 0.82) - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9)
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
 
