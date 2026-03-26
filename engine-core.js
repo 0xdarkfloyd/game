@@ -1073,6 +1073,24 @@
                 left.toCol === right.fromCol;
         }
 
+        function isRepeatedQuietCannonShuffle(move, lastOwnMove, previousOwnMove, color) {
+            if (!move || move.piece !== `${color}C` || move.captured) {
+                return false;
+            }
+
+            if (move.toRow !== move.fromRow || move.fromRow === cannonRow(color)) {
+                return false;
+            }
+
+            const references = [lastOwnMove, previousOwnMove];
+            return references.some(previousMove =>
+                previousMove &&
+                previousMove.toRow === move.fromRow &&
+                previousMove.toCol === move.fromCol &&
+                previousMove.toRow === previousMove.fromRow
+            );
+        }
+
         function getOpeningSuggestionMap(board, color, history, legalMoves) {
             const suggestions = new Map();
             if (!OPENING_BOOK || history.length >= 6) {
@@ -1538,7 +1556,9 @@
 
             if (!move.captured && move.piece[1] === 'A') {
                 if (move.toCol === 4) {
-                    score += stageWeight(stage, 0, 68, 132);
+                    score += safetyDelta > 4
+                        ? stageWeight(stage, 0, 54, 132)
+                        : stageWeight(stage, 0, 24, 72);
                 }
                 if (safetyDelta > 0) {
                     score += stageWeight(stage, 0, 28, 44);
@@ -1560,6 +1580,10 @@
             const stage = getStageProfile(board, history);
             const capturedValue = move.captured ? pieceValue(move.captured[1], stage) : 0;
             const moverValue = pieceValue(move.piece[1], stage);
+            const sameSideMoves = getSideHistoryMoves(history, color);
+            const lastOwnMove = sameSideMoves[sameSideMoves.length - 1] || null;
+            const previousOwnMove = sameSideMoves.length > 1 ? sameSideMoves[sameSideMoves.length - 2] : null;
+            const repeatedQuietCannonShuffle = isRepeatedQuietCannonShuffle(move, lastOwnMove, previousOwnMove, color);
             let score = move.captured ? capturedValue * 0.18 : 0;
 
             if (move.captured) {
@@ -1584,7 +1608,19 @@
                 const beforeMajorPressure = countThreatenedEnemyMajors(board, color);
                 const afterMajorPressure = countThreatenedEnemyMajors(nextBoard, color);
                 if (afterMajorPressure > beforeMajorPressure) {
-                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(stage, 2, 14, 6);
+                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(
+                        stage,
+                        2,
+                        repeatedQuietCannonShuffle ? 4 : 14,
+                        repeatedQuietCannonShuffle ? 2 : 6
+                    );
+                }
+
+                if (repeatedQuietCannonShuffle) {
+                    score -= stageWeight(stage, 0, 84, 24);
+                    if (Math.abs(move.toCol - 4) >= Math.abs(move.fromCol - 4)) {
+                        score -= stageWeight(stage, 0, 38, 12);
+                    }
                 }
             }
 
@@ -1704,6 +1740,12 @@
             const repeatedPiece = openingContext.lastOwnMove &&
                 openingContext.lastOwnMove.toRow === move.fromRow &&
                 openingContext.lastOwnMove.toCol === move.fromCol;
+            const repeatedQuietCannonShuffle = isRepeatedQuietCannonShuffle(
+                move,
+                openingContext.lastOwnMove,
+                openingContext.previousOwnMove,
+                color
+            );
             let penalty = 0;
 
             if (move.piece[1] === 'R' && backward) {
@@ -1792,10 +1834,30 @@
                         ? stageWeight(stage, 28, 118, 32)
                         : stageWeight(stage, 12, 44, 12);
                 }
+
+                if (stage.middlegame >= 0.55 && alreadyAdvanced) {
+                    if (move.toRow === move.fromRow && !isInCheck(nextBoard, otherColor(color))) {
+                        penalty += move.toCol === 4
+                            ? stageWeight(stage, 0, 34, 10)
+                            : stageWeight(stage, 0, 128, 36);
+                        if (Math.abs(move.toCol - 4) >= Math.abs(move.fromCol - 4)) {
+                            penalty += stageWeight(stage, 0, 72, 22);
+                        }
+                    } else if (forward && !move.captured) {
+                        penalty += stageWeight(stage, 0, 58, 18);
+                    }
+                }
             }
 
             if (isDelayedQuietCannonReverse(move, openingContext.previousOwnMove, color)) {
                 penalty += stageWeight(stage, 52, 136, 34);
+            }
+
+            if (repeatedQuietCannonShuffle) {
+                penalty += stageWeight(stage, 0, 112, 32);
+                if (Math.abs(move.toCol - 4) >= Math.abs(move.fromCol - 4)) {
+                    penalty += stageWeight(stage, 0, 44, 12);
+                }
             }
 
             if (move.piece[1] === 'A' || move.piece[1] === 'E') {
@@ -1803,9 +1865,15 @@
                 const safetyDelta = evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage);
                 if (safetyDelta > 0) {
                     penalty -= stageWeight(stage, 0, 12, 18);
+                } else {
+                    penalty += stageWeight(stage, 0, 34, 12);
                 }
                 if (move.piece[1] === 'A' && move.toCol === 4) {
-                    penalty -= stageWeight(stage, 0, 18, 30);
+                    if (safetyDelta > 4) {
+                        penalty -= stageWeight(stage, 0, 18, 30);
+                    } else {
+                        penalty += stageWeight(stage, 0, 18, 6);
+                    }
                 }
             }
 
@@ -2095,12 +2163,22 @@
 
         function getTimedOutRootSanityScore(entry, board, color, history, positionHistory, searchConfig) {
             const recentOwnMoves = getSideHistoryMoves(history, color);
+            const lastOwnMove = recentOwnMoves[recentOwnMoves.length - 1] || null;
+            const previousOwnMove = recentOwnMoves.length > 1 ? recentOwnMoves[recentOwnMoves.length - 2] : null;
             const delayedReversePenalty = isDelayedQuietCannonReverse(
                 entry.move,
-                recentOwnMoves.length > 1 ? recentOwnMoves[recentOwnMoves.length - 2] : null,
+                previousOwnMove,
                 color
             )
                 ? stageWeight(searchConfig.stage, 96, 168, 42)
+                : 0;
+            const repeatedQuietCannonPenalty = isRepeatedQuietCannonShuffle(
+                entry.move,
+                lastOwnMove,
+                previousOwnMove,
+                color
+            )
+                ? stageWeight(searchConfig.stage, 0, 188, 48)
                 : 0;
             const replyProbePenalty = getRootReplyProbePenalty(
                 entry.nextBoard,
@@ -2118,12 +2196,42 @@
                 history,
                 positionHistory
             );
+            let practicalAdjustment = 0;
+
+            if (!entry.move.captured && entry.move.piece[1] === 'R') {
+                const rookPressureDelta = evaluateRookPressure(entry.nextBoard, color, searchConfig.stage) - evaluateRookPressure(board, color, searchConfig.stage);
+                const initiativeDelta = evaluateInitiative(entry.nextBoard, color, searchConfig.stage) - evaluateInitiative(board, color, searchConfig.stage);
+                practicalAdjustment += Math.max(0, Math.round(rookPressureDelta * 0.6 + initiativeDelta * 0.35));
+            }
+
+            if (!entry.move.captured && (entry.move.piece[1] === 'A' || entry.move.piece[1] === 'E')) {
+                const safetyDelta = evaluateKingSafety(entry.nextBoard, color, searchConfig.stage) - evaluateKingSafety(board, color, searchConfig.stage);
+                if (safetyDelta <= 0) {
+                    practicalAdjustment -= stageWeight(searchConfig.stage, 0, 96, 28);
+                }
+            }
+
+            if (!entry.move.captured && entry.move.piece[1] === 'C') {
+                const alreadyAdvanced = entry.move.fromRow !== cannonRow(color);
+                const sideways = entry.move.toRow === entry.move.fromRow;
+                const forward = color === RED_COLOR ? entry.move.toRow < entry.move.fromRow : entry.move.toRow > entry.move.fromRow;
+                if (alreadyAdvanced && sideways && !isInCheck(entry.nextBoard, otherColor(color))) {
+                    practicalAdjustment -= stageWeight(searchConfig.stage, 0, 152, 36);
+                    if (Math.abs(entry.move.toCol - 4) >= Math.abs(entry.move.fromCol - 4)) {
+                        practicalAdjustment -= stageWeight(searchConfig.stage, 0, 86, 22);
+                    }
+                } else if (alreadyAdvanced && forward) {
+                    practicalAdjustment -= stageWeight(searchConfig.stage, 0, 72, 18);
+                }
+            }
 
             return entry.sortScore
+                + practicalAdjustment
                 - replyProbePenalty
                 - Math.round(replyThreats.checkPenalty * 0.9)
                 - Math.round(replyThreats.capturePenalty * 1.05)
-                - delayedReversePenalty;
+                - delayedReversePenalty
+                - repeatedQuietCannonPenalty;
         }
 
         function buildRootEntries(board, color, history, positionHistory, searchConfig, legalMoves) {
