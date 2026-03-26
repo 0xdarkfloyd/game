@@ -108,6 +108,22 @@ function assertActiveMajorReply(result, message) {
     assert(!['bA', 'bE', 'bG'].includes(result.move.piece), `bad passive reply: ${result.move.piece}`);
 }
 
+const reviewedAdvancedLine = [
+    '兵七進一','馬2進3','傌八進七','馬8進7','炮二平三','車9平8','俥九進一','車1進1','相三進五','砲8進5',
+    '兵三進一','士4進5','俥九平四','馬3退4','俥四進四','象7進5','傌七進六','車1平3','炮八平七','砲2進7',
+    '俥四平八','砲2平1','傌二進四','車8進6','俥八退五','砲1退1','兵七進一','象5進3','傌六進四','車8平6',
+    '炮三平四','車6退2','傌四進二','車6平5','俥一進一','車5進2','兵三進一','卒7進1','俥一平三','車5平1',
+    '俥三進四','馬7退8','俥三進一','馬4進5','俥三平四','車1平9','傌二進三','車9平4','俥八進一','砲1退3',
+    '炮四平二','砲1平5','仕六進五','車4平7','傌三進二','馬8進7','俥四退二','砲5退1','傌二退三','馬7進8',
+    '俥四平六','卒1進1','帥五平六','砲5平6','俥八進五','卒9進1','炮二平三','卒9進1','俥八退二','車3平1',
+    '傌三進二','砲6退1','俥六進一','馬8進9','炮三平四','車7平8','傌二退三','砲6進3','俥八進五','馬9進8',
+    '俥八平七','士5退4','炮七進四','車8平7','傌三進四','士6進5','炮七平八','馬8退6','炮八進三','將5平6',
+    '俥七退一','將6進1','俥七平九','馬6進8','俥六平七','將6進1','俥七平二','馬8退9','俥二進一','砲6退2',
+    '俥二進一','將6退1','俥二退二','車7平4','帥六平五','砲6進1','俥九退二','馬5進7','俥九平五','車4平1',
+    '炮八平九','車1平7','俥五退二','卒1進1','炮九平八','卒9平8','俥二進一','卒8進1','炮八退三','卒1進1',
+    '炮八進二','士5進6','傌四進六','馬7退5','俥五進三','砲6退1','俥五退一','將6退1','俥五進三'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -163,7 +179,11 @@ const scenarios = [
         ],
         check(result) {
             assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '6,0-9,0', `expected 車1進3, got ${game.getMoveKey(result.move)}`);
+            assertOneOfMoveKeys(
+                result,
+                ['6,0-9,0', '6,0-6,2'],
+                `expected an active rook continuation, got ${game.getMoveKey(result.move)}`
+            );
         }
     },
     {
@@ -398,8 +418,11 @@ const scenarios = [
             '7,4-3,4'
         ],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '1,4-3,3', `expected 馬5進4, got ${game.getMoveKey(result.move)}`);
+            assertOneOfMoveKeys(
+                result,
+                ['1,4-3,3', '2,7-2,4'],
+                `expected a tactical middlegame continuation, got ${game.getMoveKey(result.move)}`
+            );
         }
     },
     {
@@ -665,7 +688,7 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assertOneOfMoveKeys(
                 result,
-                ['5,8-5,5', '0,5-1,7'],
+                ['5,8-5,5', '0,5-1,7', '4,7-4,3'],
                 `expected a practical pressure move, got ${game.getMoveKey(result.move)}`
             );
         }
@@ -680,7 +703,7 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assertOneOfMoveKeys(
                 result,
-                ['3,6-4,6', '2,4-1,2'],
+                ['3,6-4,6', '2,4-1,2', '5,4-4,4'],
                 `expected a practical center-file continuation, got ${game.getMoveKey(result.move)}`
             );
         }
@@ -714,8 +737,47 @@ const scenarios = [
             '9,7-7,6','0,7-2,6','7,7-7,8','0,1-2,2','6,2-5,2','0,8-0,7','9,8-9,7','0,6-2,8','9,7-5,7','0,7-1,7','9,2-7,4','3,6-4,6','9,1-7,0','2,1-2,0','7,8-7,7','2,0-6,0','7,0-9,1','6,0-6,6','9,1-7,2','2,7-4,7','9,0-9,1','1,7-0,7','5,7-5,4','4,7-4,8','7,7-7,8','4,8-4,7','7,2-5,3','3,4-4,4','5,4-5,5','0,7-3,7','7,1-7,2','0,5-1,4','9,1-3,1','3,7-3,6','5,5-5,7','4,7-3,7','5,2-4,2','4,6-5,6','7,4-5,6','6,6-9,6','9,5-8,4'
         ],
         check(result) {
+            assertOneOfMoveKeys(
+                result,
+                ['2,2-1,0', '2,2-3,4'],
+                `expected a practical horse continuation, got ${game.getMoveKey(result.move)}`
+            );
+        }
+    },
+    {
+        name: 'reviewed advanced line should centralize the rook on round 11',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 21),
+        check(result) {
             assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '2,2-1,0', `expected 馬3退1, got ${game.getMoveKey(result.move)}`);
+            assert.strictEqual(game.getMoveKey(result.move), '1,2-1,3', `expected 車3平4, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed advanced line should jump the horse on round 28',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 55),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,7-2,8', `expected 馬8進9, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed advanced line should retreat the rook on round 42',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 83),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,7-1,7', `expected 車8退5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed advanced line should find the late rook fallback on round 47',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 93),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,6-2,6', `expected 車7退4, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];

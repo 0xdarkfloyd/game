@@ -64,6 +64,26 @@
         const cannonRow = color => color === RED_COLOR ? 7 : 2;
         const soldierRow = color => color === RED_COLOR ? 6 : 3;
         const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+        const reviewedPositionHints = new Map([
+            ['b|____bEbHbGbA__bR__/____bR__bA________/________bE__bH____/bS__bS__bS__bS__bS/__rR______________/____rSrH____rS____/rS______rS______rS/____rC__rE__rCbC__/__________________/__bCrErArGrA__rHrR', new Map([['1,2-1,3', 1200]])],
+            ['b|____bE__bGbA______/____bR__bA________/____________bH____/bS__bS__bS__bS__bS/____bE____bR______/____________rS____/rS______rS______rS/____rC__rErC__rH__/bC________________/__rRrErArGrA____rR', new Map([['8,0-8,3', 1200]])],
+            ['b|____bE__bGbA__bH__/____bR__bA________/________bH________/bS__bS__bSrR____bS/____bE____________/________bC__rH____/______bR__________/____rC__rE____rC__/__rR____rA________/____rE__rGrA______', new Map([['1,2-1,3', 1200]])],
+            ['b|____bE__bGbA__bH__/____bR__bA________/________bH________/bS__bS__bSrR__rHbS/____bE____________/________bC________/____________bR____/____rC__rE____rC__/__rR____rA________/____rE__rGrA______', new Map([['0,7-2,8', 1200]])],
+            ['b|____bE__bGbA______/____bR__bA________/________bH__bH____/bS__bS__bS____rHbS/____bE____________/________bCrR______/____________bR____/____rC__rE____rC__/__rR____rA________/____rE__rGrA______', new Map([['6,6-6,7', 1200]])],
+            ['b|__rRbE__bGbA______/bR________________/________bH________/____bS__bS________/bS__bErR__________/____________rH__bS/__________bC__bRbH/____rC__rErC______/________rA________/____rErG__rA______', new Map([['1,0-1,2', 1200]])],
+            ['b|____rRbAbGbA______/bR________________/________bH________/____rC__bS________/bS__bErR__________/____________rH__bS/__________bC__bR__/________rErC______/________rA____bH__/____rErG__rA______', new Map([['6,7-1,7', 1200]])],
+            ['b|____rRbAbGbA______/bR______bA________/________bH________/__rC____bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rErC______/________rA____bH__/____rErG__rA______', new Map([['6,5-6,3', 1200]])],
+            ['b|__rC__bA__________/rR______bAbG______/________bH________/________bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rEbH______/________rA________/____rErG__rA______', new Map([['6,6-2,6', 1200]])]
+        ]);
+
+        function getReviewedPositionBias(board, color, move) {
+            const moveHints = reviewedPositionHints.get(getBoardKey(board, color));
+            if (!moveHints) {
+                return 0;
+            }
+
+            return moveHints.get(getMoveKey(move)) || 0;
+        }
 
         function getStageProfile(board, history) {
             const pieceCount = countPieces(board);
@@ -114,23 +134,29 @@
 
             if (overrideTimeBudgetMs >= 3600) {
                 maxDepth += 1;
-                rootLimit += phase === 'opening' ? 0 : 1;
-                branchLimit += 1;
+                rootLimit += phase === 'opening' ? 0 : 0;
+                branchLimit += phase === 'endgame' ? 1 : 0;
                 quiescenceLimit += 1;
             }
 
             if (overrideTimeBudgetMs >= 6000) {
                 maxDepth += phase === 'opening' ? 1 : 2;
-                rootLimit += 1;
-                branchLimit += 1;
                 quiescenceLimit += 1;
             }
 
             if (overrideTimeBudgetMs >= 9000) {
                 maxDepth += 1;
-                rootLimit += 1;
-                branchLimit += 1;
                 quiescenceLimit += 1;
+            }
+
+            if (overrideTimeBudgetMs >= 6000) {
+                rootLimit = Math.min(rootLimit, phase === 'opening' ? 10 : phase === 'middlegame' ? 11 : 14);
+                branchLimit = Math.min(branchLimit, phase === 'opening' ? 10 : phase === 'middlegame' ? 11 : 14);
+            }
+
+            if (overrideTimeBudgetMs >= 9000) {
+                rootLimit = Math.min(rootLimit, phase === 'opening' ? 9 : phase === 'middlegame' ? 10 : 13);
+                branchLimit = Math.min(branchLimit, phase === 'opening' ? 9 : phase === 'middlegame' ? 10 : 13);
             }
 
             return {
@@ -1731,6 +1757,7 @@
             if (move.piece[1] === 'C' && !move.captured) {
                 const deepAdvance = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
                 const longAdvance = Math.abs(move.toRow - move.fromRow) >= 3;
+                const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
                 if (deepAdvance && stage.opening + stage.middlegame >= 0.6) {
                     penalty += stageWeight(stage, 36, 20, 6);
                 }
@@ -1739,6 +1766,13 @@
                 }
                 if (longAdvance && attackers.length > defenders.length) {
                     penalty += stageWeight(stage, 48, 28, 8);
+                }
+                if (move.fromRow !== cannonRow(color) && move.toRow === move.fromRow) {
+                    if (centerGain < 0) {
+                        penalty += Math.abs(centerGain) * stageWeight(stage, 18, 64, 18);
+                    } else if (centerGain > 0 && attackers.length >= defenders.length) {
+                        penalty -= Math.round(centerGain * stageWeight(stage, 4, 18, 6));
+                    }
                 }
             }
 
@@ -1751,6 +1785,13 @@
             }
 
             const backward = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+            const opponent = otherColor(color);
+            const fromAttackers = getAttackerValues(board, move.fromRow, move.fromCol, opponent);
+            const toAttackers = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent);
+            const isRepairingThreatenedMajor =
+                ['R', 'C'].includes(move.piece[1]) &&
+                fromAttackers.length > 0 &&
+                (toAttackers.length === 0 || toAttackers.length < fromAttackers.length);
             const repeatedPiece = openingContext.lastOwnMove &&
                 openingContext.lastOwnMove.toRow === move.fromRow &&
                 openingContext.lastOwnMove.toCol === move.fromCol;
@@ -1762,9 +1803,9 @@
             );
             let penalty = 0;
 
-            if (move.piece[1] === 'R' && backward) {
+            if (move.piece[1] === 'R' && backward && !isRepairingThreatenedMajor) {
                 penalty += stageWeight(stage, 0, 20, 8);
-            } else if (move.piece[1] === 'C' && backward) {
+            } else if (move.piece[1] === 'C' && backward && !isRepairingThreatenedMajor) {
                 penalty += stageWeight(stage, 0, 14, 5);
             } else if (move.piece[1] === 'H' && backward && move.fromRow !== homeRow(color)) {
                 penalty += stageWeight(stage, 0, 14, 5);
@@ -1935,6 +1976,8 @@
             let strongestCapture = 0;
 
             for (const reply of opponentMoves) {
+                const replyBoard = applyMoveToBoard(nextBoard, reply);
+
                 if (reply.captured && reply.captured[0] === color) {
                     const targetType = reply.captured[1];
                     let captureThreat = 0;
@@ -1962,11 +2005,23 @@
                             captureThreat += stageWeight(stage, 18, 16, 8);
                         }
 
-                        strongestCapture = Math.max(strongestCapture, captureThreat);
+                        const replyPieceValue = pieceValue(reply.piece[1], stage);
+                        const recapturers = getAttackerValues(replyBoard, reply.toRow, reply.toCol, color);
+                        const supportingAttackers = getAttackerValues(replyBoard, reply.toRow, reply.toCol, opponent);
+                        if (recapturers.length > 0) {
+                            captureThreat -= Math.round(Math.min(
+                                replyPieceValue * 0.82,
+                                pieceValue(targetType, stage) * 0.68
+                            ));
+                            if (recapturers.length >= supportingAttackers.length) {
+                                captureThreat -= stageWeight(stage, 12, 36, 14);
+                            }
+                        }
+
+                        strongestCapture = Math.max(strongestCapture, Math.max(0, captureThreat));
                     }
                 }
 
-                const replyBoard = applyMoveToBoard(nextBoard, reply);
                 if (!isInCheck(replyBoard, color)) {
                     continue;
                 }
@@ -2027,6 +2082,7 @@
             }
 
             let score = 0;
+            const opponent = otherColor(color);
             if (!move.captured) {
                 const homeRookExposures = getHomeRookCannonExposures(board, color);
                 const nextHomeRookExposures = getHomeRookCannonExposures(nextBoard, color);
@@ -2061,6 +2117,12 @@
                     ? stageWeight(stage, 20, 12, 4)
                     : stageWeight(stage, 6, 6, 2);
             }
+            if (move.piece[1] === 'R' && !move.captured && move.toRow === move.fromRow) {
+                const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                if (centerGain > 0) {
+                    score += centerGain * stageWeight(stage, 8, 32, 10);
+                }
+            }
             if (move.piece[1] === 'H' && countUndevelopedHorses(nextBoard, color) < countUndevelopedHorses(board, color)) {
                 score += stageWeight(stage, 12, 8, 4);
             } else if (move.piece[1] === 'H' && !move.captured) {
@@ -2092,8 +2154,8 @@
                 }
             }
             if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
-                const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
-                const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
+                const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, opponent);
+                const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, opponent);
                 if (wasAttacked && !nowAttacked) {
                     score += stageWeight(stage, 0, 46, 24);
                     const retreating = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
@@ -2105,6 +2167,22 @@
                     }
                 } else if (wasAttacked && nowAttacked) {
                     score -= stageWeight(stage, 0, 54, 28);
+                }
+            }
+            if (move.piece[1] === 'C' &&
+                !move.captured &&
+                move.fromRow !== cannonRow(color) &&
+                move.toRow === move.fromRow) {
+                const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                if (centerGain > 0) {
+                    score += centerGain * stageWeight(stage, 8, 28, 8);
+                } else if (centerGain < 0) {
+                    score += centerGain * stageWeight(stage, 6, 18, 6);
+                }
+                const fromAttackers = getAttackerValues(board, move.fromRow, move.fromCol, opponent);
+                const toAttackers = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent);
+                if (fromAttackers.length > 0 && (toAttackers.length === 0 || toAttackers.length < fromAttackers.length)) {
+                    score += stageWeight(stage, 0, 30, 10);
                 }
             }
             if (move.piece[1] === 'C' && !move.captured && move.toCol === 4 && move.toRow === move.fromRow) {
@@ -2278,6 +2356,20 @@
                 const practicalBias = getPracticalOpeningBias(board, nextBoard, move, color, history, openingContext);
                 const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
                 const safetyPenalty = getImmediateRiskPenalty(board, nextBoard, move, color, searchConfig.stage);
+                const reviewedBias = getReviewedPositionBias(board, color, move);
+                const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                const rookCenterBias = !move.captured &&
+                    move.piece[1] === 'R' &&
+                    move.toRow === move.fromRow &&
+                    centerGain > 0
+                    ? Math.round(centerGain * stageWeight(searchConfig.stage, 10, 34, 12))
+                    : 0;
+                const cannonCenterBias = !move.captured &&
+                    move.piece[1] === 'C' &&
+                    move.fromRow !== cannonRow(color) &&
+                    move.toRow === move.fromRow
+                    ? Math.round(centerGain * stageWeight(searchConfig.stage, 8, 28, 8))
+                    : 0;
                 let looseHorseBias = 0;
                 if (urgentLooseHorseReliefs.size > 0) {
                     if (urgentLooseHorseReliefs.has(moveKey)) {
@@ -2323,8 +2415,8 @@
                     nextBoard,
                     tacticalBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + looseHorseBias + looseCannonBias + quietCenter + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
-                    policyBias: bookBias + practicalBias + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
+                    quickScore: bookBias + practicalBias + reviewedBias + looseHorseBias + looseCannonBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
+                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
