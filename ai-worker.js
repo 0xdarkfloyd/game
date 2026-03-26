@@ -1,4 +1,94 @@
-importScripts('engine-core.js?v=20260327-multiponder1', 'game.js?v=20260327-multiponder1');
+importScripts('engine-core.js?v=20260327-multiponder2', 'game.js?v=20260327-multiponder2');
+
+function getPonderMoveKey(move) {
+    return move ? getMoveKey(move) : '';
+}
+
+function getPonderPieceType(move) {
+    return move && move.piece ? move.piece[1] : '';
+}
+
+function getPonderOriginKey(move) {
+    return move ? `${move.fromRow},${move.fromCol}` : '';
+}
+
+function pushUniquePonderMove(target, move, seenMoves, seenPieceTypes, seenOrigins) {
+    if (!move) {
+        return false;
+    }
+
+    const moveKey = getPonderMoveKey(move);
+    if (seenMoves.has(moveKey)) {
+        return false;
+    }
+
+    target.push(move);
+    seenMoves.add(moveKey);
+    seenPieceTypes.add(getPonderPieceType(move));
+    seenOrigins.add(getPonderOriginKey(move));
+    return true;
+}
+
+function selectPonderMoves(rootEntries, candidateCount) {
+    if (!Array.isArray(rootEntries) || rootEntries.length === 0) {
+        return [];
+    }
+
+    const windowSize = Math.max(candidateCount * 6, 12);
+    const candidates = rootEntries
+        .filter(entry => entry && entry.move)
+        .slice(0, windowSize);
+
+    if (candidates.length === 0) {
+        return [];
+    }
+
+    const selected = [];
+    const seenMoves = new Set();
+    const seenPieceTypes = new Set();
+    const seenOrigins = new Set();
+
+    pushUniquePonderMove(selected, candidates[0].move, seenMoves, seenPieceTypes, seenOrigins);
+
+    for (const entry of candidates) {
+        if (selected.length >= candidateCount) {
+            break;
+        }
+
+        const move = entry.move;
+        const pieceType = getPonderPieceType(move);
+        const originKey = getPonderOriginKey(move);
+        if (seenPieceTypes.has(pieceType) || seenOrigins.has(originKey)) {
+            continue;
+        }
+
+        pushUniquePonderMove(selected, move, seenMoves, seenPieceTypes, seenOrigins);
+    }
+
+    for (const entry of candidates) {
+        if (selected.length >= candidateCount) {
+            break;
+        }
+
+        const move = entry.move;
+        const originKey = getPonderOriginKey(move);
+        if (seenOrigins.has(originKey)) {
+            continue;
+        }
+
+        pushUniquePonderMove(selected, move, seenMoves, seenPieceTypes, seenOrigins);
+    }
+
+    for (const entry of candidates) {
+        if (selected.length >= candidateCount) {
+            break;
+        }
+
+        pushUniquePonderMove(selected, entry.move, seenMoves, seenPieceTypes, seenOrigins);
+    }
+
+    return selected;
+}
 
 self.onmessage = event => {
     const data = event.data || {};
@@ -28,25 +118,7 @@ self.onmessage = event => {
                 positionHistory,
                 timeBudgetMs: data.predictTimeBudgetMs
             });
-            const predictedMoves = [];
-            const seenMoveKeys = new Set();
-
-            for (const entry of rootEntries) {
-                if (!entry || !entry.move) {
-                    continue;
-                }
-
-                const moveKey = getMoveKey(entry.move);
-                if (seenMoveKeys.has(moveKey)) {
-                    continue;
-                }
-
-                predictedMoves.push(entry.move);
-                seenMoveKeys.add(moveKey);
-                if (predictedMoves.length >= candidateCount) {
-                    break;
-                }
-            }
+            const predictedMoves = selectPonderMoves(rootEntries, candidateCount);
 
             if (predictedMoves.length === 0) {
                 const predicted = engine.computeBestMove({
