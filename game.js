@@ -6,7 +6,7 @@ const MOVE_ANIMATION_MS = 220;
 const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260326-advancedfix2';
+const ASSET_VERSION = '20260326-advancedfix3';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',

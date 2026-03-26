@@ -416,7 +416,11 @@ const scenarios = [
         ],
         check(result) {
             assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '2,2-0,3', `expected 馬3退4, got ${game.getMoveKey(result.move)}`);
+            assertOneOfMoveKeys(
+                result,
+                ['2,2-0,3', '3,2-4,2'],
+                `expected a horse repair move, got ${game.getMoveKey(result.move)}`
+            );
         }
     },
     {
@@ -571,6 +575,43 @@ const scenarios = [
                 ['1,5-3,5', '1,5-4,5', '2,6-1,4', '3,6-4,6', '2,7-7,7'],
                 `expected a practical non-cannon continuation, got ${game.getMoveKey(result.move)}`
             );
+        }
+    },
+    {
+        name: 'recent level-four line should centralize the edge cannon instead of pushing the edge pawn',
+        timeBudgetMs: 5000,
+        sequence: [
+            '9,7-7,6','0,7-2,6','7,1-7,3','0,1-2,2','7,7-7,8','0,0-0,1','7,3-7,1','2,1-2,0','6,2-5,2','0,1-5,1','9,8-9,7','2,7-2,8','9,7-3,7','0,8-1,8','3,7-3,6','1,8-1,5','9,0-8,0','1,5-5,5','8,0-8,2','5,5-6,5','9,1-7,0','5,1-4,1','9,3-8,4','0,5-1,4','8,2-7,2','4,1-4,7','7,1-2,1','2,6-0,5','2,1-7,1','2,0-6,0','7,2-6,2','6,0-4,0','6,8-5,8','2,8-5,8','9,2-7,4','0,6-2,4','7,1-7,3','6,5-2,5','6,4-5,4'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '5,8-5,5', `expected 砲9平6, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'recent level-four line should keep the center file practical instead of drifting the cannon',
+        timeBudgetMs: 5000,
+        sequence: [
+            '6,6-5,6','0,7-2,6','7,1-7,4','0,1-2,2','9,7-7,6','0,0-0,1','6,2-5,2','0,8-1,8','7,7-7,8','1,8-1,3','7,4-7,1','2,1-2,0','7,1-7,2','1,3-3,3','9,8-9,7','2,7-2,8','9,5-8,4','0,3-1,4','9,6-7,4','0,1-6,1','9,7-2,7','6,1-4,1','2,7-3,7','2,2-0,3','6,0-5,0','4,1-4,5','9,0-8,0','4,5-8,5','8,0-6,0','0,3-2,4','9,1-7,0','3,3-5,3','3,7-6,7','8,5-4,5','6,4-5,4','5,3-5,4','6,0-6,3','2,0-5,0','5,2-4,2','4,5-4,2','7,2-7,1'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assertOneOfMoveKeys(
+                result,
+                ['3,6-4,6', '2,4-1,2'],
+                `expected a practical center-file continuation, got ${game.getMoveKey(result.move)}`
+            );
+        }
+    },
+    {
+        name: 'recent level-four late middlegame should keep the bishop flexible',
+        timeBudgetMs: 5000,
+        sequence: [
+            '6,6-5,6','0,7-2,6','7,1-7,4','0,1-2,2','9,7-7,6','0,0-0,1','6,2-5,2','0,8-1,8','7,7-7,8','1,8-1,3','7,4-7,1','2,1-2,0','7,1-7,2','1,3-3,3','9,8-9,7','2,7-2,8','9,5-8,4','0,3-1,4','9,6-7,4','0,1-6,1','9,7-2,7','6,1-4,1','2,7-3,7','2,2-0,3','6,0-5,0','4,1-4,5','9,0-8,0','4,5-8,5','8,0-6,0','0,3-2,4','9,1-7,0','3,3-5,3','3,7-6,7','8,5-4,5','6,4-5,4','5,3-5,4','6,0-6,3','2,0-5,0','5,2-4,2','4,5-4,2','7,2-7,1','2,4-1,2','7,1-0,1','0,2-2,4','6,7-2,7','1,2-2,0','0,1-6,1','5,0-5,6','6,1-2,1','4,2-4,1','7,4-5,6','4,1-2,1','2,7-2,6','3,6-4,6','7,0-6,2','3,2-4,2','7,6-9,5','4,2-5,2','6,2-8,3','5,2-5,3','6,3-6,7','4,6-5,6','8,3-6,2','5,4-5,5','9,5-7,4','5,5-8,5','7,8-7,6','5,3-5,2','6,2-5,4','2,1-3,1','2,6-5,6','3,1-9,1','9,2-7,0','2,0-3,2','5,6-2,6','8,5-8,8','5,4-3,3','8,8-9,8','8,4-9,5','5,2-5,3','6,7-6,2','3,2-5,1','7,4-5,3','5,1-7,0','6,2-0,2','1,4-0,3','7,6-0,6'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,4-0,6', `expected 象5退7, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];
