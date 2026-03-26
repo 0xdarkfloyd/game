@@ -108,15 +108,15 @@
                 if (phase === 'middlegame' || phase === 'endgame') {
                     maxDepth += 1;
                 }
-                rootLimit += phase === 'middlegame' ? 2 : 1;
-                branchLimit += phase === 'middlegame' ? 2 : 1;
-                quiescenceLimit += phase === 'middlegame' ? 2 : 1;
+                rootLimit += 1;
+                quiescenceLimit += 1;
             }
 
             if (overrideTimeBudgetMs >= 3600) {
-                rootLimit += 1;
-                branchLimit += phase === 'middlegame' ? 2 : 1;
-                quiescenceLimit += phase === 'middlegame' ? 2 : 1;
+                maxDepth += 1;
+                rootLimit += phase === 'opening' ? 0 : 1;
+                branchLimit += 1;
+                quiescenceLimit += 1;
             }
 
             return {
@@ -900,6 +900,34 @@
             return count;
         }
 
+        function countLooseCannons(board, color, stage) {
+            const opponent = otherColor(color);
+            let count = 0;
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (board[row][col] !== `${color}C`) {
+                        continue;
+                    }
+
+                    const attackers = getAttackerValues(board, row, col, opponent);
+                    if (attackers.length === 0) {
+                        continue;
+                    }
+
+                    const defenders = getAttackerValues(board, row, col, color);
+                    const cheapest = attackers[0];
+                    const outnumbered = defenders.length === 0 || attackers.length > defenders.length;
+                    const pressuredByCheapAttack = cheapest <= stageWeight(stage, 110, 160, 205);
+                    if (outnumbered || pressuredByCheapAttack) {
+                        count += 1;
+                    }
+                }
+            }
+
+            return count;
+        }
+
         function getLooseHorseReliefMoves(board, color, stage, legalMoves) {
             const looseHorsesBefore = countLooseHorses(board, color, stage);
             if (looseHorsesBefore === 0) {
@@ -914,6 +942,27 @@
 
                 const nextBoard = applyMoveToBoard(board, move);
                 if (countLooseHorses(nextBoard, color, stage) < looseHorsesBefore) {
+                    reliefs.add(getMoveKey(move));
+                }
+            }
+
+            return reliefs;
+        }
+
+        function getLooseCannonReliefMoves(board, color, stage, legalMoves) {
+            const looseCannonsBefore = countLooseCannons(board, color, stage);
+            if (looseCannonsBefore === 0) {
+                return new Set();
+            }
+
+            const reliefs = new Set();
+            for (const move of legalMoves) {
+                if (move.piece !== `${color}C`) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                if (countLooseCannons(nextBoard, color, stage) < looseCannonsBefore) {
                     reliefs.add(getMoveKey(move));
                 }
             }
@@ -1235,6 +1284,13 @@
                 if (move.fromRow !== cannonRow(color) && undevelopedMajors >= 1) {
                     score -= undevelopedMajors >= 3 ? 28 : undevelopedMajors === 2 ? 20 : 12;
                 }
+                if (move.fromRow !== cannonRow(color)) {
+                    const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+                    const edgeFile = move.fromCol === 0 || move.fromCol === 8;
+                    if (forward && edgeFile) {
+                        score -= 188;
+                    }
+                }
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
                     score -= move.toCol === 4 ? 44 : 26;
                 }
@@ -1496,7 +1552,7 @@
                 const beforeMajorPressure = countThreatenedEnemyMajors(board, color);
                 const afterMajorPressure = countThreatenedEnemyMajors(nextBoard, color);
                 if (afterMajorPressure > beforeMajorPressure) {
-                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(stage, 4, 26, 10);
+                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(stage, 2, 14, 6);
                 }
             }
 
@@ -1567,6 +1623,40 @@
                 }
                 if (countUndevelopedRooks(board, color) >= 1) {
                     penalty += stageWeight(stage, 42, 18, 0);
+                }
+            }
+
+            if (move.piece[1] === 'C' &&
+                move.captured &&
+                move.captured[1] === 'H' &&
+                stage.opening + stage.middlegame >= 0.55) {
+                const deepRaid = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
+                const edgeFile = move.toCol === 0 || move.toCol === 8;
+                if (deepRaid) {
+                    penalty += stageWeight(stage, 74, 166, 34);
+                }
+                if (edgeFile) {
+                    penalty += stageWeight(stage, 36, 84, 18);
+                }
+                if (attackers.length > 0) {
+                    penalty += stageWeight(stage, 42, 126, 24);
+                }
+                if (defenders.length === 0 || attackers.length >= defenders.length) {
+                    penalty += stageWeight(stage, 30, 92, 22);
+                }
+            }
+
+            if (move.piece[1] === 'C' && !move.captured) {
+                const deepAdvance = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
+                const longAdvance = Math.abs(move.toRow - move.fromRow) >= 3;
+                if (deepAdvance && stage.opening + stage.middlegame >= 0.6) {
+                    penalty += stageWeight(stage, 36, 20, 6);
+                }
+                if (deepAdvance && attackers.length > 0) {
+                    penalty += stageWeight(stage, 52, 34, 12);
+                }
+                if (longAdvance && attackers.length > defenders.length) {
+                    penalty += stageWeight(stage, 48, 28, 8);
                 }
             }
 
@@ -1652,6 +1742,15 @@
                 penalty += move.fromRow === cannonRow(color) && move.toCol === 4
                     ? stageWeight(stage, 54, 26, 8)
                     : stageWeight(stage, 36, 18, 6);
+            }
+
+            if (move.piece[1] === 'C' && !move.captured) {
+                const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+                const edgeFile = move.fromCol === 0 || move.fromCol === 8;
+                const alreadyAdvanced = move.fromRow !== cannonRow(color);
+                if (forward && edgeFile && alreadyAdvanced && stage.opening + stage.middlegame >= 0.55) {
+                    penalty += stageWeight(stage, 88, 246, 64);
+                }
             }
 
             if (move.piece[1] === 'A' || move.piece[1] === 'E') {
@@ -1854,6 +1953,17 @@
                     score -= looseHorsesBefore * stageWeight(stage, 0, 34, 16);
                 }
             }
+            const looseCannonsBefore = countLooseCannons(board, color, stage);
+            const looseCannonsAfter = countLooseCannons(nextBoard, color, stage);
+            if (looseCannonsAfter < looseCannonsBefore) {
+                score += (looseCannonsBefore - looseCannonsAfter) * stageWeight(stage, 0, 94, 38);
+            } else if (looseCannonsBefore > 0 && move.piece[1] !== 'C' && !move.captured) {
+                if (move.piece[1] === 'S') {
+                    score -= looseCannonsBefore * stageWeight(stage, 0, 42, 16);
+                } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                    score -= looseCannonsBefore * stageWeight(stage, 0, 28, 12);
+                }
+            }
             if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
                 const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
                 const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
@@ -1882,11 +1992,68 @@
             return Math.round(score);
         }
 
+        function getRootReplyProbePenalty(nextBoard, move, color, history, positionHistory, searchConfig) {
+            if (searchConfig.time < 2200) {
+                return 0;
+            }
+
+            const opponent = otherColor(color);
+            const nextHistory = history.concat(getMoveKey(move));
+            const nextPositionHistory = positionHistory.concat(getBoardKey(nextBoard, opponent));
+            const opponentMoves = filterPlayableMoves(
+                nextBoard,
+                opponent,
+                getAllLegalMoves(nextBoard, opponent),
+                nextPositionHistory,
+                nextHistory
+            );
+
+            if (opponentMoves.length === 0) {
+                return 0;
+            }
+
+            const ownStatic = evaluateBoardForColor(nextBoard, color, nextHistory);
+            const replyLimit = searchConfig.phase === 'opening'
+                ? (searchConfig.time >= 3600 ? 10 : 8)
+                : (searchConfig.time >= 3600 ? 12 : 9);
+            const orderedReplies = orderMoves(
+                nextBoard,
+                opponentMoves,
+                searchConfig.stage,
+                null,
+                replyLimit,
+                null,
+                1
+            );
+
+            let worstScore = ownStatic;
+            for (const reply of orderedReplies) {
+                const replyBoard = applyMoveToBoard(nextBoard, reply);
+                const replyScore = evaluateBoardForColor(replyBoard, color, nextHistory.concat(getMoveKey(reply)));
+                if (replyScore < worstScore) {
+                    worstScore = replyScore;
+                }
+            }
+
+            const delta = ownStatic - worstScore;
+            if (delta <= 0) {
+                return 0;
+            }
+
+            const weight = searchConfig.phase === 'opening'
+                ? (searchConfig.time >= 3600 ? 0.42 : 0.32)
+                : searchConfig.phase === 'middlegame'
+                    ? (searchConfig.time >= 3600 ? 0.3 : 0.24)
+                    : 0.18;
+            return Math.round(delta * weight);
+        }
+
         function buildRootEntries(board, color, history, positionHistory, searchConfig, legalMoves) {
             const suggestions = getOpeningSuggestionMap(board, color, history, legalMoves);
             const sameSideMoves = getSideHistoryMoves(history, color);
             const urgentHomeRookRepairs = getUrgentHomeRookScreenRepairMoves(board, color, legalMoves);
             const urgentLooseHorseReliefs = getLooseHorseReliefMoves(board, color, searchConfig.stage, legalMoves);
+            const urgentLooseCannonReliefs = getLooseCannonReliefMoves(board, color, searchConfig.stage, legalMoves);
             const openingContext = {
                 undevelopedMajors: countUndevelopedMajors(board, color),
                 undevelopedRooks: countUndevelopedRooks(board, color),
@@ -1928,14 +2095,36 @@
                         }
                     }
                 }
+                let looseCannonBias = 0;
+                if (urgentLooseCannonReliefs.size > 0) {
+                    if (urgentLooseCannonReliefs.has(moveKey)) {
+                        looseCannonBias += stageWeight(searchConfig.stage, 0, 156, 62);
+                    } else if (!move.captured) {
+                        if (move.piece[1] === 'S') {
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 84, 30);
+                        } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 62, 22);
+                        } else if (move.piece[1] === 'R') {
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 24, 10);
+                        } else if (move.piece[1] === 'C') {
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 28, 10);
+                            if (move.fromCol === move.toCol && Math.abs(move.toRow - move.fromRow) >= 2) {
+                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 168, 60);
+                            }
+                            if ((move.fromCol === 0 || move.fromCol === 8) && move.toCol === move.fromCol) {
+                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 96, 34);
+                            }
+                        }
+                    }
+                }
                 const quietCenter = move.captured ? 0 : Math.max(0, 4 - Math.abs(4 - move.toCol)) * 3;
                 return {
                     move,
                     nextBoard,
                     tacticalBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + looseHorseBias + quietCenter + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
-                    policyBias: bookBias + practicalBias + Math.round(looseHorseBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
+                    quickScore: bookBias + practicalBias + looseHorseBias + looseCannonBias + quietCenter + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
+                    policyBias: bookBias + practicalBias + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
@@ -1987,9 +2176,54 @@
                     move: entry.move,
                     nextBoard,
                     sortScore: entry.quickScore + continuationBias + homeRookReliefBias + defensiveRepairBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - deepRookRaidPenalty - checkThreatPenalty - captureThreatPenalty - passivityPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + Math.round(defensiveRepairBias * 0.8) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(deepRookRaidPenalty * 0.82) - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9)
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + Math.round(defensiveRepairBias * 0.8) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(deepRookRaidPenalty * 0.82) - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9),
+                    debug: {
+                        quickScore: entry.quickScore,
+                        continuationBias,
+                        homeRookReliefBias,
+                        defensiveRepairBias,
+                        captureBias,
+                        checkBias,
+                        safetyPenalty,
+                        tradePenalty,
+                        deepRookRaidPenalty,
+                        checkThreatPenalty,
+                        captureThreatPenalty,
+                        passivityPenalty,
+                        tacticalBias
+                    }
                 };
             }).sort((left, right) => right.sortScore - left.sortScore);
+
+            if (searchConfig.time >= 2200 && entries.length >= 2) {
+                const probeCount = Math.min(
+                    entries.length,
+                    searchConfig.phase === 'opening'
+                        ? (searchConfig.time >= 3600 ? 6 : 4)
+                        : (searchConfig.time >= 3600 ? 8 : 5)
+                );
+
+                for (let index = 0; index < probeCount; index++) {
+                    const entry = entries[index];
+                    const replyProbePenalty = getRootReplyProbePenalty(
+                        entry.nextBoard,
+                        entry.move,
+                        color,
+                        history,
+                        positionHistory,
+                        searchConfig
+                    );
+                    if (replyProbePenalty > 0) {
+                        entry.sortScore -= replyProbePenalty;
+                        entry.policyBias -= Math.round(replyProbePenalty * 0.72);
+                        if (entry.debug) {
+                            entry.debug.replyProbePenalty = replyProbePenalty;
+                        }
+                    }
+                }
+
+                entries.sort((left, right) => right.sortScore - left.sortScore);
+            }
 
             if (urgentHomeRookRepairs.size > 0) {
                 const repairEntries = entries.filter(entry => urgentHomeRookRepairs.has(getMoveKey(entry.move)));
@@ -2299,7 +2533,13 @@
             let bestScore = -Infinity;
             let bestPv = [bestMove];
             let completedDepth = 0;
-            const policyWeight = searchConfig.phase === 'opening' ? 1.9 : searchConfig.phase === 'middlegame' ? 1.15 : 1;
+            let policyWeight = searchConfig.phase === 'opening' ? 1.9 : searchConfig.phase === 'middlegame' ? 1.15 : 1;
+            if (searchConfig.time >= 2200) {
+                policyWeight *= searchConfig.phase === 'opening' ? 0.7 : 0.82;
+            }
+            if (searchConfig.time >= 3600) {
+                policyWeight *= searchConfig.phase === 'opening' ? 0.78 : 0.88;
+            }
             let orderedRootEntries = rootEntries.slice();
 
             for (let depth = 1; depth <= searchConfig.maxDepth; depth++) {
@@ -2351,11 +2591,17 @@
                 let verifyBestMove = bestMove;
                 let verifyBestScore = bestScore;
                 let verifyBestPv = bestPv;
-                const verifyPolicyWeight = searchConfig.phase === 'endgame'
+                let verifyPolicyWeight = searchConfig.phase === 'endgame'
                     ? 0.55
                     : searchConfig.phase === 'middlegame'
                         ? 0.25
                         : 0.35;
+                if (searchConfig.time >= 2200) {
+                    verifyPolicyWeight *= 0.8;
+                }
+                if (searchConfig.time >= 3600) {
+                    verifyPolicyWeight *= 0.85;
+                }
 
                 for (let index = 0; index < verifyCount; index++) {
                     const entry = orderedRootEntries[index];
@@ -2387,10 +2633,33 @@
             };
         }
 
+        function debugRootEntries(options) {
+            const board = cloneBoard(options.board);
+            const color = options.currentPlayer;
+            const history = cloneMoveSequence(options.history || []);
+            const positionHistory = clonePositionHistory(options.positionHistory || []);
+            const legalMoves = filterPlayableMoves(board, color, getAllLegalMoves(board, color), positionHistory, history);
+            const searchConfig = getPhaseConfig(board, history, options.timeBudgetMs);
+            return buildRootEntries(board, color, history, positionHistory, searchConfig, legalMoves).map(entry => ({
+                move: entry.move,
+                sortScore: entry.sortScore,
+                policyBias: entry.policyBias,
+                debug: entry.debug || null
+            }));
+        }
+
+        function debugPhaseConfig(options) {
+            const board = cloneBoard(options.board);
+            const history = cloneMoveSequence(options.history || []);
+            return getPhaseConfig(board, history, options.timeBudgetMs);
+        }
+
         return {
             computeBestMove,
             evaluateBoardForColor,
-            pickFallbackMove
+            pickFallbackMove,
+            debugRootEntries,
+            debugPhaseConfig
         };
     }
 

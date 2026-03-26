@@ -524,6 +524,30 @@ const scenarios = [
                 `expected a defensive reply, got ${game.getMoveKey(result.move)}`
             );
         }
+    },
+    {
+        name: 'high-budget middlegame should repair the edge cannon instead of raiding a horse',
+        timeBudgetMs: 5000,
+        sequence: [
+            '9,7-7,8', '0,7-2,6',
+            '7,7-7,5', '0,1-2,2',
+            '9,2-7,4', '0,8-0,7',
+            '9,1-7,2', '0,0-1,0',
+            '9,3-8,4', '2,6-1,4',
+            '6,2-5,2', '2,1-4,1',
+            '9,8-9,7', '4,1-4,0',
+            '9,0-9,3', '1,0-1,1',
+            '7,1-9,1', '4,0-4,8',
+            '6,8-5,8'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assertOneOfMoveKeys(
+                result,
+                ['4,8-4,4', '4,8-4,5', '4,8-4,6', '4,8-4,0'],
+                `expected lateral cannon repair, got ${game.getMoveKey(result.move)}`
+            );
+        }
     }
 ];
 
