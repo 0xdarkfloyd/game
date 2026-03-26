@@ -223,6 +223,17 @@
                 !move.captured;
         }
 
+        function isDelayedQuietCannonReverse(move, previousOwnMove, color) {
+            return Boolean(
+                previousOwnMove &&
+                move.piece === `${color}C` &&
+                !move.captured &&
+                move.fromRow === move.toRow &&
+                previousOwnMove.fromRow === previousOwnMove.toRow &&
+                isExactReverseMove(previousOwnMove, move)
+            );
+        }
+
         function isNaturalHorseDevelopment(move, color) {
             return move.piece === `${color}H` &&
                 move.fromRow === homeRow(color) &&
@@ -1395,6 +1406,27 @@
                 previousOwnMove.toCol === move.fromCol &&
                 !move.captured) {
                 score -= 12;
+
+                if (move.piece[1] === 'C' && move.toRow === move.fromRow) {
+                    score -= move.fromRow !== cannonRow(color)
+                        ? undevelopedMajors >= 2 ? 112 : 76
+                        : undevelopedMajors >= 2 ? 62 : 34;
+                }
+            }
+
+            if (isDelayedQuietCannonReverse(move, previousOwnMove, color)) {
+                score -= undevelopedMajors >= 2
+                    ? 148
+                    : undevelopedMajors === 1
+                        ? 104
+                        : 58;
+
+                if (undevelopedHorses >= 1) {
+                    score -= 22;
+                }
+                if (move.toCol === 0 || move.toCol === 8) {
+                    score -= 24;
+                }
             }
 
             if (!move.captured && move.piece[1] === 'R' && move.fromRow === homeRow(color)) {
@@ -1751,6 +1783,19 @@
                 if (forward && edgeFile && alreadyAdvanced && stage.opening + stage.middlegame >= 0.55) {
                     penalty += stageWeight(stage, 88, 246, 64);
                 }
+
+                if (openingContext.previousOwnMove &&
+                    openingContext.previousOwnMove.toRow === move.fromRow &&
+                    openingContext.previousOwnMove.toCol === move.fromCol &&
+                    move.toRow === move.fromRow) {
+                    penalty += move.fromRow !== cannonRow(color)
+                        ? stageWeight(stage, 28, 118, 32)
+                        : stageWeight(stage, 12, 44, 12);
+                }
+            }
+
+            if (isDelayedQuietCannonReverse(move, openingContext.previousOwnMove, color)) {
+                penalty += stageWeight(stage, 52, 136, 34);
             }
 
             if (move.piece[1] === 'A' || move.piece[1] === 'E') {
@@ -2046,6 +2091,39 @@
                     ? (searchConfig.time >= 3600 ? 0.3 : 0.24)
                     : 0.18;
             return Math.round(delta * weight);
+        }
+
+        function getTimedOutRootSanityScore(entry, board, color, history, positionHistory, searchConfig) {
+            const recentOwnMoves = getSideHistoryMoves(history, color);
+            const delayedReversePenalty = isDelayedQuietCannonReverse(
+                entry.move,
+                recentOwnMoves.length > 1 ? recentOwnMoves[recentOwnMoves.length - 2] : null,
+                color
+            )
+                ? stageWeight(searchConfig.stage, 96, 168, 42)
+                : 0;
+            const replyProbePenalty = getRootReplyProbePenalty(
+                entry.nextBoard,
+                entry.move,
+                color,
+                history,
+                positionHistory,
+                searchConfig
+            );
+            const replyThreats = getOpponentReplyThreats(
+                entry.nextBoard,
+                entry.move,
+                color,
+                searchConfig.stage,
+                history,
+                positionHistory
+            );
+
+            return entry.sortScore
+                - replyProbePenalty
+                - Math.round(replyThreats.checkPenalty * 0.9)
+                - Math.round(replyThreats.capturePenalty * 1.05)
+                - delayedReversePenalty;
         }
 
         function buildRootEntries(board, color, history, positionHistory, searchConfig, legalMoves) {
@@ -2617,10 +2695,43 @@
                     }
                 }
 
-                if (!context.timedOut) {
-                    bestMove = verifyBestMove;
-                    bestScore = verifyBestScore;
-                    bestPv = verifyBestPv;
+            if (!context.timedOut) {
+                bestMove = verifyBestMove;
+                bestScore = verifyBestScore;
+                bestPv = verifyBestPv;
+            }
+        }
+
+            if (context.timedOut && searchConfig.time >= 2200 && orderedRootEntries.length >= 2) {
+                const playoffCount = Math.min(searchConfig.time >= 3600 ? 5 : 4, orderedRootEntries.length);
+                let playoffBestMove = bestMove;
+                let playoffBestScore = -Infinity;
+
+                for (let index = 0; index < playoffCount; index++) {
+                    const entry = orderedRootEntries[index];
+                    const sanityScore = getTimedOutRootSanityScore(
+                        entry,
+                        board,
+                        color,
+                        history,
+                        positionHistory,
+                        searchConfig
+                    );
+
+                    if (sameMove(entry.move, bestMove)) {
+                        bestScore = Math.max(bestScore, sanityScore);
+                    }
+
+                    if (sanityScore > playoffBestScore) {
+                        playoffBestScore = sanityScore;
+                        playoffBestMove = entry.move;
+                    }
+                }
+
+                if (playoffBestScore > bestScore + 48) {
+                    bestMove = playoffBestMove;
+                    bestScore = playoffBestScore;
+                    bestPv = [playoffBestMove];
                 }
             }
 

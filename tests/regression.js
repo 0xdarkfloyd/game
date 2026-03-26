@@ -548,6 +548,30 @@ const scenarios = [
                 `expected lateral cannon repair, got ${game.getMoveKey(result.move)}`
             );
         }
+    },
+    {
+        name: 'high-budget middlegame should avoid reusing the same cannon again',
+        timeBudgetMs: 5000,
+        sequence: [
+            '6,6-5,6', '0,7-2,6',
+            '9,7-7,6', '0,1-2,2',
+            '7,7-7,8', '0,8-0,7',
+            '9,1-7,2', '0,0-1,0',
+            '9,8-9,7', '1,0-1,5',
+            '9,2-7,4', '2,1-4,1',
+            '6,2-5,2', '4,1-4,0',
+            '9,0-9,1', '4,0-4,1',
+            '9,1-9,0', '3,4-4,4',
+            '9,3-8,4'
+        ],
+        check(result) {
+            assert(result.move, 'expected a move');
+            assertOneOfMoveKeys(
+                result,
+                ['1,5-3,5', '1,5-4,5', '2,6-1,4', '3,6-4,6', '2,7-7,7'],
+                `expected a practical non-cannon continuation, got ${game.getMoveKey(result.move)}`
+            );
+        }
     }
 ];
 
