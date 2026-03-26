@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260326-timelevels1';
+const ASSET_VERSION = '20260327-multiponder1';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -322,7 +322,7 @@ let pendingAiJob = null;
 let ponderWorker = null;
 let ponderRequestId = 0;
 let pendingPonderJob = null;
-let ponderedReply = null;
+let ponderedReplies = [];
 let searchDeadline = 0;
 let searchNodeCounter = 0;
 let searchTimedOut = false;
@@ -1136,6 +1136,7 @@ function getPonderBudgets(activeBoard, legalMoves) {
 
     if (aiLevel === 'advanced') {
         return {
+            candidateCount: 3,
             predictTimeBudgetMs: Math.max(1400, Math.round(searchBudget * 0.4)),
             replyTimeBudgetMs: Math.max(2600, Math.round(searchBudget * 0.82))
         };
@@ -1143,12 +1144,14 @@ function getPonderBudgets(activeBoard, legalMoves) {
 
     if (aiLevel === 'intermediate') {
         return {
+            candidateCount: 2,
             predictTimeBudgetMs: Math.max(700, Math.round(searchBudget * 0.34)),
             replyTimeBudgetMs: Math.max(1300, Math.round(searchBudget * 0.62))
         };
     }
 
     return {
+        candidateCount: 1,
         predictTimeBudgetMs: Math.max(350, Math.round(searchBudget * 0.28)),
         replyTimeBudgetMs: Math.max(700, Math.round(searchBudget * 0.5))
     };
@@ -2310,7 +2313,7 @@ function cancelPendingAiJob() {
 }
 
 function clearPonderedReply() {
-    ponderedReply = null;
+    ponderedReplies = [];
 }
 
 function cancelPendingPonderJob(clearCache = true) {
@@ -2400,21 +2403,23 @@ function ensurePonderWorker() {
         if (
             data.kind === 'ponder' &&
             data.result &&
-            data.result.replyMove &&
-            data.result.targetBoardKey &&
+            Array.isArray(data.result.lines) &&
+            data.result.lines.length > 0 &&
             gameActive &&
             currentPlayer === humanColor &&
             moveSequence.length === job.sourceHistoryLength &&
             getBoardKey(board, currentPlayer) === job.sourceBoardKey
         ) {
-            ponderedReply = {
-                sourceBoardKey: job.sourceBoardKey,
-                sourceHistoryLength: job.sourceHistoryLength,
-                targetBoardKey: data.result.targetBoardKey,
-                targetHistoryLength: data.result.targetHistoryLength,
-                predictedMove: data.result.predictedMove,
-                replyMove: data.result.replyMove
-            };
+            ponderedReplies = data.result.lines
+                .filter(line => line && line.replyMove && line.targetBoardKey)
+                .map(line => ({
+                    sourceBoardKey: job.sourceBoardKey,
+                    sourceHistoryLength: job.sourceHistoryLength,
+                    targetBoardKey: line.targetBoardKey,
+                    targetHistoryLength: line.targetHistoryLength,
+                    predictedMove: line.predictedMove,
+                    replyMove: line.replyMove
+                }));
         }
     };
 
@@ -2434,18 +2439,11 @@ function ensurePonderWorker() {
 }
 
 function consumePonderedReply(activeBoard, color, historySequence = moveSequence, legalMoves = null) {
-    if (!ponderedReply) {
+    if (!ponderedReplies.length) {
         return null;
     }
 
     const activeBoardKey = getBoardKey(activeBoard, color);
-    if (ponderedReply.targetBoardKey !== activeBoardKey || ponderedReply.targetHistoryLength !== historySequence.length) {
-        if (ponderedReply.targetHistoryLength <= historySequence.length) {
-            clearPonderedReply();
-        }
-        return null;
-    }
-
     const availableMoves = legalMoves || filterPlayableMoves(
         activeBoard,
         color,
@@ -2453,7 +2451,19 @@ function consumePonderedReply(activeBoard, color, historySequence = moveSequence
         positionHistory,
         historySequence
     );
-    const matched = availableMoves.find(candidate => sameMove(candidate, ponderedReply.replyMove)) || null;
+
+    const matchedEntry = ponderedReplies.find(entry =>
+        entry.targetBoardKey === activeBoardKey &&
+        entry.targetHistoryLength === historySequence.length
+    ) || null;
+
+    ponderedReplies = ponderedReplies.filter(entry => entry.targetHistoryLength > historySequence.length);
+
+    if (!matchedEntry) {
+        return null;
+    }
+
+    const matched = availableMoves.find(candidate => sameMove(candidate, matchedEntry.replyMove)) || null;
     clearPonderedReply();
     return matched;
 }
@@ -2501,6 +2511,7 @@ function startPondering() {
         currentPlayer,
         history: cloneMoveSequence(moveSequence),
         positionHistory: clonePositionHistory(positionHistory),
+        candidateCount: budgets.candidateCount,
         predictTimeBudgetMs: budgets.predictTimeBudgetMs,
         replyTimeBudgetMs: budgets.replyTimeBudgetMs
     });
