@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260327-reviewed2';
+const ASSET_VERSION = '20260327-repetition3';
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -1994,7 +1994,7 @@ function orderMoves(activeBoard, moves, ttMove) {
 }
 
 function isPerpetualCheckViolation(activeBoard, move, color, history = positionHistory) {
-    if (!history || history.length < 5) {
+    if (!history || history.length < 13) {
         return false;
     }
 
@@ -2005,7 +2005,7 @@ function isPerpetualCheckViolation(activeBoard, move, color, history = positionH
     }
 
     const nextKey = getBoardKey(nextBoard, opponent);
-    return repeatsRecentCyclePosition(nextKey, history);
+    return countRecentCycleRepetitions(nextKey, history) >= 3;
 }
 
 function getThreatenedTargetKeys(activeBoard, row, col) {
@@ -2041,21 +2041,35 @@ function isExactReverseMove(previousMove, move) {
         previousMove.toCol === move.fromCol;
 }
 
+function countRecentCycleRepetitions(nextKey, history = positionHistory) {
+    if (!history || history.length < 5) {
+        return 0;
+    }
+
+    let count = 0;
+    for (let index = history.length - 4; index >= 0; index -= 4) {
+        if (history[index] !== nextKey) {
+            break;
+        }
+        count += 1;
+    }
+
+    return count;
+}
+
 function repeatsRecentCyclePosition(nextKey, history = positionHistory) {
-    return Boolean(history) &&
-        history.length >= 5 &&
-        nextKey === history[history.length - 4];
+    return countRecentCycleRepetitions(nextKey, history) >= 1;
 }
 
 function isPerpetualChaseViolation(activeBoard, move, color, history = positionHistory, historySequence = moveSequence) {
-    if (!history || history.length < 5 || !historySequence || historySequence.length < 2 || move.captured) {
+    if (!history || history.length < 13 || !historySequence || historySequence.length < 2 || move.captured) {
         return false;
     }
 
     const nextBoard = applyMoveToBoard(activeBoard, move);
     const opponent = otherColor(color);
     const nextKey = getBoardKey(nextBoard, opponent);
-    if (!repeatsRecentCyclePosition(nextKey, history)) {
+    if (countRecentCycleRepetitions(nextKey, history) < 3) {
         return false;
     }
 
@@ -3375,6 +3389,7 @@ if (typeof module !== 'undefined') {
         isPerpetualCheckViolation,
         isPerpetualChaseViolation,
         otherColor,
+        countRecentCycleRepetitions,
         repeatsRecentCyclePosition,
         openSetupPanel,
         startConfiguredGame,

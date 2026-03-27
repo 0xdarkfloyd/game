@@ -6,10 +6,11 @@ function createEmptyBoard() {
 }
 
 {
-    const history = ['p0', 'p1', 'p2', 'p3', 'p4'];
+    const history = ['h0', 'p1', 'h2', 'h3', 'h4', 'p1', 'h6', 'h7', 'h8', 'p1', 'h10', 'h11', 'current'];
+    assert.strictEqual(game.countRecentCycleRepetitions('p1', history), 3);
     assert.strictEqual(game.repeatsRecentCyclePosition('p1', history), true);
-    assert.strictEqual(game.repeatsRecentCyclePosition('p0', history), false);
-    assert.strictEqual(game.repeatsRecentCyclePosition('p4', history), false);
+    assert.strictEqual(game.repeatsRecentCyclePosition('h0', history), false);
+    assert.strictEqual(game.countRecentCycleRepetitions('h8', history), 0);
 }
 
 {
@@ -22,12 +23,22 @@ function createEmptyBoard() {
     const nextKey = game.getBoardKey(nextBoard, game.BLACK_COLOR);
 
     assert.strictEqual(
-        game.isPerpetualCheckViolation(board, move, game.RED_COLOR, ['old0', nextKey, 'old2', 'old3', 'current']),
-        true
+        game.isPerpetualCheckViolation(
+            board,
+            move,
+            game.RED_COLOR,
+            ['old0', nextKey, 'old2', 'old3', 'old4', nextKey, 'old6', 'old7', 'old8', 'old9', 'old10', 'old11', 'current']
+        ),
+        false
     );
     assert.strictEqual(
-        game.isPerpetualCheckViolation(board, move, game.RED_COLOR, [nextKey, 'old1', 'old2', 'old3', 'old4', 'current']),
-        false
+        game.isPerpetualCheckViolation(
+            board,
+            move,
+            game.RED_COLOR,
+            ['old0', nextKey, 'old2', 'old3', 'old4', nextKey, 'old6', 'old7', 'old8', nextKey, 'old10', 'old11', 'current']
+        ),
+        true
     );
 }
 
@@ -46,20 +57,20 @@ function createEmptyBoard() {
             board,
             move,
             game.RED_COLOR,
-            ['h0', nextKey, 'h2', 'h3', 'current'],
-            ['0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1']
+            ['h0', nextKey, 'h2', 'h3', 'h4', nextKey, 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'current'],
+            ['0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1', '0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1', '0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1']
         ),
-        true
+        false
     );
     assert.strictEqual(
         game.isPerpetualChaseViolation(
             board,
             move,
             game.RED_COLOR,
-            [nextKey, 'h1', 'h2', 'h3', 'h4', 'current'],
-            ['0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1']
+            ['h0', nextKey, 'h2', 'h3', 'h4', nextKey, 'h6', 'h7', 'h8', nextKey, 'h10', 'h11', 'current'],
+            ['0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1', '0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1', '0,0-0,1', '0,0-0,1', '5,4-5,3', '0,0-0,1']
         ),
-        false
+        true
     );
 }
 
