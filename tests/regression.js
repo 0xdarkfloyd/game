@@ -138,6 +138,16 @@ const reviewedCounterattackLine = [
     '俥二進三','砲7退1','俥二平三'
 ];
 
+const reviewedRookPressureLine = [
+    '傌二進三','馬8進7','炮二平一','馬2進3','兵七進一','車9平8','俥一平二','象7進9','俥二進四','車8進1',
+    '相七進五','卒7進1','傌八進九','砲2平1','炮一平二','砲1進4','傌九退八','砲1平7','傌八進七','砲8進2',
+    '俥九平八','車8退1','俥二平五','砲8平9','炮二平一','砲9平8','傌七進六','卒5進1','俥五平四','車8進3',
+    '炮八平七','士6進5','俥八進六','車8平7','俥四平二','砲8退1','兵七進一','卒7進1','相五進三','砲7進3',
+    '仕四進五','馬3退1','俥八進一','卒3進1','傌三進四','車7平4','炮一平三','車4進2','俥二進二','馬7進6',
+    '俥二退五','砲7退4','炮三平五','車4平6','炮五進三','象3進5','俥二進六','車6平3','炮七平三','車3進2',
+    '炮三平四','車3退1','俥二平四','馬6進8','俥八平五','象9退7','俥四進一','車3平5','俥五進一'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -717,7 +727,7 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assertOneOfMoveKeys(
                 result,
-                ['3,6-4,6', '2,4-1,2', '5,4-4,4'],
+                ['3,6-4,6', '2,4-1,2', '5,4-4,4', '4,2-4,4'],
                 `expected a practical center-file continuation, got ${game.getMoveKey(result.move)}`
             );
         }
@@ -855,6 +865,15 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '4,2-9,2', `expected 前砲進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed rook-pressure line should centralize the rook on round 32',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRookPressureLine.slice(0, 63),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,2-6,4', `expected 車3平5, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];

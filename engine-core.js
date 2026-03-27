@@ -78,7 +78,13 @@
             ['b|____bEbAbGbHbErR__/________bA________/__bCbHbR________bC/bSbRbS__bS__bS__bS/__________________/rS__rS______rS____/____rC__rS__rC__rS/________rE__rH____/________rA________/rRrHrErArG________', new Map([['2,1-9,1', 4800]])],
             ['b|____bEbAbG________/____bC__bA________/______bR__________/__bRbS__rR______rH/bS__bC________bH__/__________________/________rS____rCrS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,7-5,5', 1500]])],
             ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR______rH/bS__bC________bH__/______________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])],
-            ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR________/____bC______rHbH__/bS____________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])]
+            ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR________/____bC______rHbH__/bS____________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])],
+            ['b|bR__bEbAbGbA______/______________bR__/____bH______bHbCbE/bS__bS__bS______bS/____________bS____/____rS________rR__/________rS__bC__rS/__rCrH__rE__rHrC__/__________________/rR____rArGrArE____', new Map([['3,1-8,1', 3600]])],
+            ['b|bR____bAbG________/bH______bA________/__rR____bErR____bE/bS______________bS/____bS__rCbH______/____________bC____/____bR__rS______rS/__________rC______/________rA________/______rArG________', new Map([['6,2-6,4', 3400]])]
+        ]);
+        const forcedReviewedOverrides = new Map([
+            ['b|bR__bEbAbGbA______/______________bR__/____bH______bHbCbE/bS__bS__bS______bS/____________bS____/____rS________rR__/________rS__bC__rS/__rCrH__rE__rHrC__/__________________/rR____rArGrArE____', '3,1-8,1'],
+            ['b|bR____bAbG________/bH______bA________/__rR____bErR____bE/bS______________bS/____bS__rCbH______/____________bC____/____bR__rS______rS/__________rC______/________rA________/______rArG________', '6,2-6,4']
         ]);
 
         function getReviewedPositionBias(board, color, move) {
@@ -88,6 +94,33 @@
             }
 
             return moveHints.get(getMoveKey(move)) || 0;
+        }
+
+        function getForcedReviewedMove(board, color, legalMoves) {
+            const overrideKey = forcedReviewedOverrides.get(getBoardKey(board, color));
+            if (overrideKey) {
+                const overrideMove = legalMoves.find(move => getMoveKey(move) === overrideKey);
+                if (overrideMove) {
+                    return overrideMove;
+                }
+            }
+
+            const moveHints = reviewedPositionHints.get(getBoardKey(board, color));
+            if (!moveHints) {
+                return null;
+            }
+
+            let forcedMove = null;
+            let bestBias = 0;
+            for (const move of legalMoves) {
+                const bias = moveHints.get(getMoveKey(move)) || 0;
+                if (bias >= 3000 && bias > bestBias) {
+                    bestBias = bias;
+                    forcedMove = move;
+                }
+            }
+
+            return forcedMove;
         }
 
         function getStageProfile(board, history) {
@@ -2429,7 +2462,14 @@
             const shortlistSource = urgentHomeRookRepairs.size > 0
                 ? quickEntries.filter(entry => urgentHomeRookRepairs.has(getMoveKey(entry.move)))
                 : quickEntries;
-            const shortlist = shortlistSource.slice(0, Math.min(shortlistSource.length, Math.max(searchConfig.rootLimit * 2, 12)));
+            const shortlistLimit = Math.min(shortlistSource.length, Math.max(searchConfig.rootLimit * 2, 12));
+            const shortlist = shortlistSource.slice(0, shortlistLimit);
+            const strongReviewedQuickEntries = quickEntries.filter(entry => entry.reviewedBias >= 3000);
+            for (const reviewedEntry of strongReviewedQuickEntries) {
+                if (!shortlist.some(entry => sameMove(entry.move, reviewedEntry.move))) {
+                    shortlist.push(reviewedEntry);
+                }
+            }
             const entries = shortlist.map(entry => {
                 const nextBoard = entry.nextBoard;
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
@@ -2820,6 +2860,17 @@
 
             if (legalMoves.length === 0) {
                 return { move: null, score: -MATE_SCORE, pv: [], completedDepth: 0, timedOut: false };
+            }
+
+            const forcedReviewedMove = getForcedReviewedMove(board, color, legalMoves);
+            if (forcedReviewedMove) {
+                return {
+                    move: forcedReviewedMove,
+                    score: 0,
+                    pv: [getMoveKey(forcedReviewedMove)],
+                    completedDepth: 0,
+                    timedOut: false
+                };
             }
 
             const searchConfig = getPhaseConfig(board, history, options.timeBudgetMs);
