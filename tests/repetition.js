@@ -84,4 +84,28 @@ function createEmptyBoard() {
     );
 }
 
+{
+    const board = createEmptyBoard();
+    board[0][4] = 'bG';
+    board[9][4] = 'rG';
+    board[5][3] = 'rR';
+    board[5][7] = 'bH';
+    board[5][8] = 'bR';
+    const move = game.createMove(board, 5, 3, 5, 4);
+    const nextBoard = game.applyMoveToBoard(board, move);
+    const nextKey = game.getBoardKey(nextBoard, game.BLACK_COLOR);
+
+    assert.deepStrictEqual(game.getThreatenedUnguardedTargetKeys(nextBoard, 5, 4), []);
+    assert.strictEqual(
+        game.isPerpetualChaseViolation(
+            board,
+            move,
+            game.RED_COLOR,
+            ['h0', nextKey, 'h2', 'h3', 'h4', nextKey, 'h6', 'h7', 'h8', nextKey, 'h10', 'h11', 'current'],
+            ['5,4-5,3', '5,7-5,6', '5,4-5,3', '5,6-5,7', '5,4-5,3', '5,7-5,6', '5,4-5,3', '5,6-5,7', '5,4-5,3', '5,7-5,6', '5,4-5,3', '5,6-5,7']
+        ),
+        false
+    );
+}
+
 console.log('repetition rules passed');

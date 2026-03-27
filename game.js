@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260327-chase2';
+const ASSET_VERSION = '20260327-chase3';
 const GAME_MODES = {
     ai: 'ai',
     local: 'local'
@@ -2095,6 +2095,36 @@ function getThreatenedTargetKeys(activeBoard, row, col) {
     return targets;
 }
 
+function getThreatenedUnguardedTargetKeys(activeBoard, row, col) {
+    const piece = activeBoard[row][col];
+    if (!piece) {
+        return [];
+    }
+
+    const color = piece[0];
+    const targets = [];
+
+    for (let targetRow = 0; targetRow < 10; targetRow++) {
+        for (let targetCol = 0; targetCol < 9; targetCol++) {
+            const target = activeBoard[targetRow][targetCol];
+            if (!target || target[0] === color || target[1] === 'G') {
+                continue;
+            }
+
+            if (!pieceThreatensSquare(activeBoard, row, col, targetRow, targetCol)) {
+                continue;
+            }
+
+            const defenders = getAttackerValues(activeBoard, targetRow, targetCol, target[0]);
+            if (defenders.length === 0) {
+                targets.push(`${targetRow},${targetCol}`);
+            }
+        }
+    }
+
+    return targets;
+}
+
 function isExactReverseMove(previousMove, move) {
     return previousMove &&
         previousMove.fromRow === move.toRow &&
@@ -2156,7 +2186,7 @@ function isPerpetualChaseViolation(activeBoard, move, color, history = positionH
         return false;
     }
 
-    const currentTargets = getThreatenedTargetKeys(nextBoard, move.toRow, move.toCol);
+    const currentTargets = getThreatenedUnguardedTargetKeys(nextBoard, move.toRow, move.toCol);
     const chasedTargetKey = `${opponentLastMove.toRow},${opponentLastMove.toCol}`;
     return currentTargets.includes(chasedTargetKey);
 }
@@ -3489,6 +3519,7 @@ if (typeof module !== 'undefined') {
         isInCheck,
         isPerpetualCheckViolation,
         isPerpetualChaseViolation,
+        getThreatenedUnguardedTargetKeys,
         otherColor,
         countRecentCycleRepetitions,
         repeatsRecentCyclePosition,
