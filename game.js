@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260327-marker3';
+const ASSET_VERSION = '20260327-marker4';
 const GAME_MODES = {
     ai: 'ai',
     local: 'local'
@@ -2947,7 +2947,7 @@ function buildBoardSvg() {
 function drawMarker({ row, col, left, right }) {
     const x = col + 0.5;
     const y = row + 0.5;
-    const short = 0.12;
+    const short = 0.09;
     const long = 0.08;
     const gap = 0.1;
     const segments = [];
