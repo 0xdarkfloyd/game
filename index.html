@@ -4,22 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>&#20013;&#22283;&#35937;&#26827;</title>
-    <link rel="stylesheet" href="styles.css?v=20260327-repetition3">
+    <link rel="stylesheet" href="styles.css?v=20260327-localtest1">
 </head>
 <body>
     <div class="game-container">
         <h1>&#20013;&#22283;&#35937;&#26827;</h1>
         <section id="setup-panel" class="setup-panel" aria-label="Game setup">
             <h2 class="setup-title">&#20808;&#36984;&#25799;&#23565;&#23616;&#35373;&#23450;</h2>
-            <p class="setup-copy">&#36984;&#23450;&#22519;&#33394;&#21644;&#38627;&#24230;&#24460;&#20877;&#38283;&#22987;&#65292;&#23565;&#23616;&#36914;&#34892;&#20013;&#19981;&#21487;&#26356;&#25563;&#38627;&#24230;&#12290;</p>
+            <p class="setup-copy">&#20808;&#36984;&#27169;&#24335;&#12289;&#22519;&#33394;&#33287;&#38627;&#24230;&#65292;&#20877;&#38283;&#22987;&#23565;&#23616;&#12290;&#38617;&#20154;&#27169;&#24335;&#21487;&#29992;&#26044;&#28204;&#35430;&#38263;&#23559;&#12289;&#38263;&#25417;&#35215;&#21063;&#12290;</p>
             <div class="setup-group">
-                <div class="setup-label">&#22519;&#33394;</div>
+                <div class="setup-label">&#27169;&#24335;</div>
+                <div class="side-picker" role="group" aria-label="Choose mode">
+                    <button id="mode-ai" type="button" class="side-button active" onclick="setGameMode('ai')">&#20154;&#27231;&#23565;&#23616;</button>
+                    <button id="mode-local" type="button" class="side-button" onclick="setGameMode('local')">&#38617;&#20154;&#28204;&#35430;</button>
+                </div>
+            </div>
+            <div class="setup-group">
+                <div id="side-label" class="setup-label">&#22519;&#33394;</div>
                 <div class="side-picker" role="group" aria-label="Choose side">
                     <button id="side-red" type="button" class="side-button active" onclick="setHumanSide('r')">&#x57f7;&#32005;&#20808;&#25163;</button>
                     <button id="side-black" type="button" class="side-button" onclick="setHumanSide('b')">&#x57f7;&#40657;&#24460;&#25163;</button>
                 </div>
             </div>
-            <div class="setup-group">
+            <div id="difficulty-group" class="setup-group">
                 <div class="setup-label">&#38627;&#24230;</div>
                 <div class="difficulty-picker setup-difficulty-picker" role="group" aria-label="Choose difficulty">
                     <button id="level-beginner" type="button" class="difficulty-button" onclick="setAiLevel('beginner')">
@@ -32,7 +39,7 @@
                     </button>
                     <button id="level-advanced" type="button" class="difficulty-button" onclick="setAiLevel('advanced')">
                         <span class="difficulty-name">&#x9ad8;&#32026;</span>
-                        <span class="difficulty-time">6500-10000ms + &#38928;&#24605;&#32771;</span>
+                        <span class="difficulty-time">6500-10000ms</span>
                     </button>
                 </div>
             </div>
@@ -59,7 +66,7 @@
             </aside>
         </div>
     </div>
-    <script src="engine-core.js?v=20260327-repetition3"></script>
-    <script src="game.js?v=20260327-repetition3"></script>
+    <script src="engine-core.js?v=20260327-localtest1"></script>
+    <script src="game.js?v=20260327-localtest1"></script>
 </body>
 </html>

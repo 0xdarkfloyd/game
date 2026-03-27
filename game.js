@@ -7,7 +7,11 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260327-repetition3';
+const ASSET_VERSION = '20260327-localtest1';
+const GAME_MODES = {
+    ai: 'ai',
+    local: 'local'
+};
 const AI_LEVELS = {
     beginner: {
         label: '\u521d\u7d1a',
@@ -303,6 +307,7 @@ const BOARD_SVG = buildBoardSvg();
 let board = cloneBoard(initialBoard);
 let humanColor = RED_COLOR;
 let computerColor = BLACK_COLOR;
+let gameMode = GAME_MODES.ai;
 let aiLevel = null;
 let currentPlayer = RED_COLOR;
 let selectedCell = null;
@@ -355,6 +360,18 @@ function colorName(color) {
 
 function getAiLevelLabel(level = aiLevel) {
     return AI_LEVELS[level] ? AI_LEVELS[level].label : '\u672a\u9078\u64c7';
+}
+
+function hasComputerOpponent(mode = gameMode) {
+    return mode === GAME_MODES.ai;
+}
+
+function isHumanControlled(color) {
+    return !hasComputerOpponent() || color === humanColor;
+}
+
+function isComputerTurn(color = currentPlayer) {
+    return hasComputerOpponent() && color === computerColor;
 }
 
 function isInsideBoard(row, col) {
@@ -438,10 +455,16 @@ function mirrorMoveKey(moveKey) {
 }
 
 function getStartStatusMessage() {
+    if (!hasComputerOpponent()) {
+        return `${humanColor === RED_COLOR ? '\u7d05\u65b9\u5728\u4e0b' : '\u9ed1\u65b9\u5728\u4e0b'}\uff0c\u96d9\u4eba\u6e2c\u8a66\u5c0d\u5c40\u3002`;
+    }
     return `${humanColor === RED_COLOR ? '\u4f60\u57f7\u7d05\u65b9\uff08\u5148\u624b\uff09' : '\u4f60\u57f7\u9ed1\u65b9\uff08\u5f8c\u624b\uff09'}\uff0c${computerColor === RED_COLOR ? '\u96fb\u8166\u57f7\u7d05\u65b9' : '\u96fb\u8166\u57f7\u9ed1\u65b9'}\u3002\u96e3\u5ea6\uff1a${getAiLevelLabel()}\u3002`;
 }
 
 function getSetupStatusMessage() {
+    if (!hasComputerOpponent()) {
+        return `${humanColor === RED_COLOR ? '\u7d05\u65b9\u5728\u4e0b' : '\u9ed1\u65b9\u5728\u4e0b'}\uff0c\u96d9\u4eba\u6e2c\u8a66\u6a21\u5f0f\uff0c\u6094\u68cb\u4e0d\u9650\u3002`;
+    }
     if (!AI_LEVELS[aiLevel]) {
         return '\u8acb\u5148\u9078\u64c7\u96e3\u5ea6\uff0c\u518d\u958b\u59cb\u5c0d\u5c40\u3002';
     }
@@ -450,6 +473,9 @@ function getSetupStatusMessage() {
 }
 
 function getAiLevelTimeRange(level = aiLevel) {
+    if (!hasComputerOpponent()) {
+        return '\u96d9\u4eba\u6e2c\u8a66';
+    }
     const config = AI_LEVELS[level];
     if (!config) {
         return '\u672a\u9078\u64c7';
@@ -459,6 +485,9 @@ function getAiLevelTimeRange(level = aiLevel) {
 }
 
 function getUndoLimit(level = aiLevel) {
+    if (!hasComputerOpponent()) {
+        return Infinity;
+    }
     const config = AI_LEVELS[level];
     return config ? config.undoLimit : 0;
 }
@@ -498,12 +527,33 @@ function updateSideButtons() {
 
     const redButton = document.getElementById('side-red');
     const blackButton = document.getElementById('side-black');
+    const sideLabel = document.getElementById('side-label');
     if (!redButton || !blackButton) {
         return;
     }
 
+    if (sideLabel) {
+        sideLabel.textContent = hasComputerOpponent() ? '\u57f7\u8272' : '\u8996\u89d2';
+    }
+    redButton.textContent = hasComputerOpponent() ? '\u57f7\u7d05\u5148\u624b' : '\u7d05\u65b9\u5728\u4e0b';
+    blackButton.textContent = hasComputerOpponent() ? '\u57f7\u9ed1\u5f8c\u624b' : '\u9ed1\u65b9\u5728\u4e0b';
     redButton.classList.toggle('active', humanColor === RED_COLOR);
     blackButton.classList.toggle('active', humanColor === BLACK_COLOR);
+}
+
+function updateModeButtons() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const aiButton = document.getElementById('mode-ai');
+    const localButton = document.getElementById('mode-local');
+    if (!aiButton || !localButton) {
+        return;
+    }
+
+    aiButton.classList.toggle('active', gameMode === GAME_MODES.ai);
+    localButton.classList.toggle('active', gameMode === GAME_MODES.local);
 }
 
 function updateDifficultyButtons() {
@@ -511,7 +561,7 @@ function updateDifficultyButtons() {
         return;
     }
 
-    const locked = setupOpen ? false : isDifficultyLocked();
+    const locked = !hasComputerOpponent() || (setupOpen ? false : isDifficultyLocked());
     for (const [levelKey] of Object.entries(AI_LEVELS)) {
         const button = document.getElementById(`level-${levelKey}`);
         if (!button) {
@@ -533,6 +583,7 @@ function updateSetupPanel() {
     const layout = document.getElementById('game-layout');
     const startButton = document.getElementById('start-game-button');
     const setupStatus = document.getElementById('setup-status');
+    const difficultyGroup = document.getElementById('difficulty-group');
 
     if (panel) {
         panel.classList.toggle('hidden', !setupOpen);
@@ -540,8 +591,11 @@ function updateSetupPanel() {
     if (layout) {
         layout.classList.toggle('hidden', setupOpen);
     }
+    if (difficultyGroup) {
+        difficultyGroup.classList.toggle('hidden', !hasComputerOpponent());
+    }
     if (startButton) {
-        const ready = Boolean(AI_LEVELS[aiLevel]);
+        const ready = hasComputerOpponent() ? Boolean(AI_LEVELS[aiLevel]) : true;
         startButton.disabled = !ready;
         startButton.setAttribute('aria-disabled', ready ? 'false' : 'true');
     }
@@ -560,8 +614,13 @@ function updateGameSettings() {
         return;
     }
 
-    if (setupOpen || !AI_LEVELS[aiLevel]) {
+    if (setupOpen || (hasComputerOpponent() && !AI_LEVELS[aiLevel])) {
         summary.textContent = '';
+        return;
+    }
+
+    if (!hasComputerOpponent()) {
+        summary.textContent = `${humanColor === RED_COLOR ? '\u7d05\u65b9\u5728\u4e0b' : '\u9ed1\u65b9\u5728\u4e0b'} \u00b7 \u96d9\u4eba\u6e2c\u8a66 \u00b7 ${getUndoSummaryText()}`;
         return;
     }
 
@@ -610,6 +669,9 @@ function shouldLockDifficulty(moveCount, thinking, active = true) {
 }
 
 function isDifficultyLocked() {
+    if (!hasComputerOpponent()) {
+        return false;
+    }
     if (setupOpen) {
         return false;
     }
@@ -3069,7 +3131,7 @@ function updateStatus() {
     }
 
     if (gameActive) {
-        const suffix = aiThinking ? ' \u96fb\u8166\u601d\u8003\u4e2d...' : '';
+        const suffix = hasComputerOpponent() && aiThinking ? ' \u96fb\u8166\u601d\u8003\u4e2d...' : '';
         turnElement.textContent = `${colorName(currentPlayer)}\u56de\u5408`;
         statusElement.textContent = `${statusMessage}${suffix}`.trim();
     } else {
@@ -3097,9 +3159,11 @@ function finalizeMove() {
 
     statusMessage = isInCheck(board, currentPlayer)
         ? `${colorName(currentPlayer)}\u88ab\u5c07\u8ecd\u3002`
-        : currentPlayer === humanColor
-            ? getStartStatusMessage()
-            : `${colorName(computerColor)}\u6b63\u5728\u627e\u6b65\u3002`;
+        : !hasComputerOpponent()
+            ? '\u96d9\u4eba\u6e2c\u8a66\u5c0d\u5c40\u3002'
+            : currentPlayer === humanColor
+                ? getStartStatusMessage()
+                : `${colorName(computerColor)}\u6b63\u5728\u627e\u6b65\u3002`;
 
     createBoard();
     renderMoveLog();
@@ -3109,20 +3173,20 @@ function finalizeMove() {
         playCheckSound();
     }
 
-    if (gameActive && currentPlayer === computerColor) {
+    if (gameActive && isComputerTurn()) {
         cancelPendingPonderJob(false);
         aiThinking = true;
         updateStatus();
         if (typeof window !== 'undefined') {
             window.setTimeout(computerMove, AI_THINK_DELAY_MS);
         }
-    } else if (gameActive && currentPlayer === humanColor) {
+    } else if (gameActive && hasComputerOpponent() && currentPlayer === humanColor) {
         startPondering();
     }
 }
 
 function performMove(move) {
-    if (currentPlayer === humanColor) {
+    if (hasComputerOpponent() && currentPlayer === humanColor) {
         cancelPendingPonderJob(false);
     }
 
@@ -3139,7 +3203,7 @@ function performMove(move) {
 }
 
 function handleCellClick(row, col) {
-    if (!gameActive || aiThinking || currentPlayer !== humanColor) {
+    if (!gameActive || aiThinking || !isHumanControlled(currentPlayer)) {
         return;
     }
 
@@ -3167,7 +3231,7 @@ function handleCellClick(row, col) {
 }
 
 async function computerMove() {
-    if (!gameActive || currentPlayer !== computerColor) {
+    if (!gameActive || !isComputerTurn()) {
         aiThinking = false;
         updateStatus();
         return;
@@ -3217,11 +3281,12 @@ function openSetupPanel() {
     createBoard();
     renderMoveLog();
     updateSideButtons();
+    updateModeButtons();
     updateStatus();
 }
 
 function startConfiguredGame() {
-    if (!AI_LEVELS[aiLevel]) {
+    if (hasComputerOpponent() && !AI_LEVELS[aiLevel]) {
         updateStatus();
         return;
     }
@@ -3236,6 +3301,9 @@ function undoMove() {
     }
 
     let steps = currentPlayer === humanColor ? 2 : 1;
+    if (!hasComputerOpponent()) {
+        steps = 1;
+    }
     steps = Math.min(steps, moveHistory.length);
 
     let snapshot = null;
@@ -3270,8 +3338,28 @@ function setHumanSide(color) {
     resetGame();
 }
 
+function setGameMode(mode) {
+    if (!GAME_MODES[mode] || gameMode === mode) {
+        return;
+    }
+
+    gameMode = mode;
+    cancelPendingAiJob();
+    cancelPendingPonderJob();
+    aiThinking = false;
+    statusMessage = setupOpen ? getSetupStatusMessage() : getStartStatusMessage();
+    updateModeButtons();
+    updateSideButtons();
+    updateDifficultyButtons();
+    updateStatus();
+
+    if (!setupOpen) {
+        resetGame();
+    }
+}
+
 function setAiLevel(level) {
-    if (!AI_LEVELS[level] || aiLevel === level || isDifficultyLocked()) {
+    if (!AI_LEVELS[level] || aiLevel === level || isDifficultyLocked() || !hasComputerOpponent()) {
         return;
     }
 
@@ -3286,17 +3374,17 @@ function setAiLevel(level) {
         return;
     }
 
-    if (gameActive && currentPlayer === computerColor && typeof window !== 'undefined') {
+    if (gameActive && isComputerTurn() && typeof window !== 'undefined') {
         aiThinking = true;
         updateStatus();
         window.setTimeout(computerMove, AI_THINK_DELAY_MS);
-    } else if (gameActive && currentPlayer === humanColor) {
+    } else if (gameActive && hasComputerOpponent() && currentPlayer === humanColor) {
         startPondering();
     }
 }
 
 function resetGame() {
-    if (!AI_LEVELS[aiLevel]) {
+    if (hasComputerOpponent() && !AI_LEVELS[aiLevel]) {
         setupOpen = true;
         gameActive = false;
         aiThinking = false;
@@ -3329,14 +3417,15 @@ function resetGame() {
     createBoard();
     renderMoveLog();
     updateSideButtons();
+    updateModeButtons();
     updateDifficultyButtons();
     updateStatus();
 
-    if (currentPlayer === computerColor && typeof window !== 'undefined') {
+    if (isComputerTurn() && typeof window !== 'undefined') {
         aiThinking = true;
         updateStatus();
         window.setTimeout(computerMove, AI_THINK_DELAY_MS);
-    } else if (currentPlayer === humanColor) {
+    } else if (hasComputerOpponent() && currentPlayer === humanColor) {
         startPondering();
     }
 }
@@ -3346,11 +3435,13 @@ if (typeof window !== 'undefined') {
     window.startConfiguredGame = startConfiguredGame;
     window.resetGame = resetGame;
     window.undoMove = undoMove;
+    window.setGameMode = setGameMode;
     window.setHumanSide = setHumanSide;
     window.setAiLevel = setAiLevel;
     createBoard();
     renderMoveLog();
     updateSideButtons();
+    updateModeButtons();
     updateStatus();
 }
 
@@ -3359,6 +3450,7 @@ if (typeof module !== 'undefined') {
         AI_LEVELS,
         BLACK_COLOR,
         DEFAULT_AI_LEVEL,
+        GAME_MODES,
         PIECE_LABELS,
         RED_COLOR,
         initialBoard,
@@ -3393,6 +3485,7 @@ if (typeof module !== 'undefined') {
         repeatsRecentCyclePosition,
         openSetupPanel,
         startConfiguredGame,
+        setGameMode,
         setAiLevel,
         setHumanSide,
         shouldLockDifficulty,

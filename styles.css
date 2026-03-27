@@ -81,6 +81,10 @@ h1 {
     margin-top: 18px;
 }
 
+.setup-group.hidden {
+    display: none;
+}
+
 .setup-label {
     margin-bottom: 8px;
     text-align: center;

@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260327-repetition3', 'game.js?v=20260327-repetition3');
+importScripts('engine-core.js?v=20260327-localtest1', 'game.js?v=20260327-localtest1');
 
 function getPonderMoveKey(move) {
     return move ? getMoveKey(move) : '';
