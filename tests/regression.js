@@ -763,12 +763,39 @@ const scenarios = [
         }
     },
     {
+        name: 'reviewed advanced line should stabilize the rook file on round 29',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 57),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,6-6,7', `expected 車7平8, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed advanced line should find the rook sidestep on round 40',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 79),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '1,0-1,2', `expected 車1平3, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
         name: 'reviewed advanced line should retreat the rook on round 42',
         timeBudgetMs: 10000,
         notationSequence: reviewedAdvancedLine.slice(0, 83),
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '6,7-1,7', `expected 車8退5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed advanced line should repair the left rook on round 44',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedAdvancedLine.slice(0, 87),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '1,0-1,1', `expected 車1平2, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
