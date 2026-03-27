@@ -3209,7 +3209,7 @@ function handleCellClick(row, col) {
 
     const piece = board[row][col];
     if (!selectedCell) {
-        if (piece && piece[0] === humanColor) {
+        if (piece && piece[0] === currentPlayer) {
             selectPiece(row, col);
         }
         return;
@@ -3221,7 +3221,7 @@ function handleCellClick(row, col) {
         return;
     }
 
-    if (piece && piece[0] === humanColor) {
+    if (piece && piece[0] === currentPlayer) {
         selectPiece(row, col);
         return;
     }
