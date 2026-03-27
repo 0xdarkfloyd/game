@@ -69,8 +69,8 @@ assert.strictEqual(game.PIECE_LABELS.rR, '俥');
 assert.strictEqual(game.shouldLockDifficulty(0, false, true), false);
 assert.strictEqual(game.shouldLockDifficulty(1, false, true), true);
 assert.strictEqual(game.shouldLockDifficulty(0, true, true), true);
-assert.ok(game.drawMarker({ row: 3, col: 2, left: true, right: true }).includes('l -0.16 0'));
-assert.ok(game.drawMarker({ row: 3, col: 2, left: true, right: true }).includes('l 0.16 0'));
+assert.ok(game.drawMarker({ row: 3, col: 2, left: true, right: true }).includes('l -0.08 0'));
+assert.ok(game.drawMarker({ row: 3, col: 2, left: true, right: true }).includes('l 0.08 0'));
 
 game.setHumanSide('b');
 assert.strictEqual(
