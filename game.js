@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260327-localtest1';
+const ASSET_VERSION = '20260327-chase2';
 const GAME_MODES = {
     ai: 'ai',
     local: 'local'
@@ -2145,11 +2145,20 @@ function isPerpetualChaseViolation(activeBoard, move, color, history = positionH
         return false;
     }
 
-    const currentTargets = getThreatenedTargetKeys(nextBoard, move.toRow, move.toCol);
-    if (currentTargets.length > 0) {
-        return true;
+    const opponentMoves = historySequence.filter((_, index) => (index % 2 === 0) !== (color === RED_COLOR));
+    if (opponentMoves.length < 2) {
+        return false;
     }
-    return false;
+
+    const opponentLastMove = parseMoveKey(opponentMoves[opponentMoves.length - 1]);
+    const opponentPreviousMove = parseMoveKey(opponentMoves[opponentMoves.length - 2]);
+    if (!isExactReverseMove(opponentPreviousMove, opponentLastMove)) {
+        return false;
+    }
+
+    const currentTargets = getThreatenedTargetKeys(nextBoard, move.toRow, move.toCol);
+    const chasedTargetKey = `${opponentLastMove.toRow},${opponentLastMove.toCol}`;
+    return currentTargets.includes(chasedTargetKey);
 }
 
 function filterPlayableMoves(activeBoard, color, moves, history = positionHistory, historySequence = moveSequence) {
