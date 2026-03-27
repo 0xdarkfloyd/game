@@ -2947,7 +2947,7 @@ function buildBoardSvg() {
 function drawMarker({ row, col, left, right }) {
     const x = col + 0.5;
     const y = row + 0.5;
-    const short = 0.09;
+    const short = 0.08;
     const long = 0.08;
     const gap = 0.1;
     const segments = [];
