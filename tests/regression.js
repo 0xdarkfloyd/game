@@ -124,6 +124,20 @@ const reviewedAdvancedLine = [
     '炮八進二','士5進6','傌四進六','馬7退5','俥五進三','砲6退1','俥五退一','將6退1','俥五進三'
 ];
 
+const reviewedCounterattackLine = [
+    '兵三進一','馬2進3','相三進五','馬8進7','傌二進三','車9進1','炮八平六','車1平2','兵七進一','車9平4',
+    '炮六平八','砲2平1','炮八平七','車4進5','仕四進五','車2進3','炮二進一','車4退1','炮二平三','士6進5',
+    '炮七進一','砲1平2','俥一平二','砲8平9','俥二進七','車4退3','兵九進一','馬7退6','俥二進二','車4平7',
+    '傌八進九','砲9退1','兵九進一','卒1進1','兵三進一','車7平4','俥二平三','車4進2','俥三退一','砲9退1',
+    '俥三退二','砲2平1','炮三平二','車4平5','兵七進一','馬6進8','俥三進三','士5退6','兵七平六','車5平4',
+    '俥九進一','砲9進1','俥三平二','馬8進6','兵三進一','馬3退5','俥二平一','砲9平7','兵三平四','馬6退8',
+    '兵四進一','車4平6','傌三進二','車6退2','俥一平二','砲7進7','炮七退二','砲7平3','俥二退一','砲3退4',
+    '俥二平三','車6平4','俥三平四','砲1退1','俥四退五','馬5進7','俥九平七','士6進5','俥四進三','砲1平3',
+    '傌二進一','馬7進8','俥四平五','車4平2','炮二進一','卒1進1','傌一退三','後車平1','炮二平五','馬8進7',
+    '炮五進一','前砲平7','俥五平七','車1平5','前俥平八','砲7退3','俥七進四','卒1進1','俥八平二','卒1進1',
+    '俥二進三','砲7退1','俥二平三'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -805,6 +819,42 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '6,6-2,6', `expected 車7退4, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterattack line should find the cannon raid on round 15',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterattackLine.slice(0, 29),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,1-9,1', `expected 砲2進7, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterattack line should jump the horse on round 42',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterattackLine.slice(0, 83),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,7-5,5', `expected 馬8進6, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterattack line should press with the front cannon on round 43',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterattackLine.slice(0, 85),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,2-9,2', `expected 前砲進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterattack line should keep the front cannon pressure on round 44',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterattackLine.slice(0, 87),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,2-9,2', `expected 前砲進5, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];

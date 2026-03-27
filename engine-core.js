@@ -74,7 +74,11 @@
             ['b|____rRbAbGbA______/bR________________/________bH________/____rC__bS________/bS__bErR__________/____________rH__bS/__________bC__bR__/________rErC______/________rA____bH__/____rErG__rA______', new Map([['6,7-1,7', 1200]])],
             ['b|____rRbAbG________/bR______bA________/________bH________/__rC____bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rErC______/________rA____bH__/____rErG__rA______', new Map([['1,0-1,1', 1600]])],
             ['b|____rRbAbGbA______/bR______bA________/________bH________/__rC____bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rErC______/________rA____bH__/____rErG__rA______', new Map([['6,5-6,3', 1200]])],
-            ['b|__rC__bA__________/rR______bAbG______/________bH________/________bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rEbH______/________rA________/____rErG__rA______', new Map([['6,6-2,6', 1200]])]
+            ['b|__rC__bA__________/rR______bAbG______/________bH________/________bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rEbH______/________rA________/____rErG__rA______', new Map([['6,6-2,6', 1200]])],
+            ['b|____bEbAbGbHbErR__/________bA________/__bCbHbR________bC/bSbRbS__bS__bS__bS/__________________/rS__rS______rS____/____rC__rS__rC__rS/________rE__rH____/________rA________/rRrHrErArG________', new Map([['2,1-9,1', 4800]])],
+            ['b|____bEbAbG________/____bC__bA________/______bR__________/__bRbS__rR______rH/bS__bC________bH__/__________________/________rS____rCrS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,7-5,5', 1500]])],
+            ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR______rH/bS__bC________bH__/______________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])],
+            ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR________/____bC______rHbH__/bS____________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])]
         ]);
 
         function getReviewedPositionBias(board, color, move) {
@@ -2414,6 +2418,7 @@
                 return {
                     move,
                     nextBoard,
+                    reviewedBias,
                     tacticalBias,
                     safetyPenalty,
                     quickScore: bookBias + practicalBias + reviewedBias + looseHorseBias + looseCannonBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
@@ -2468,6 +2473,7 @@
                 return {
                     move: entry.move,
                     nextBoard,
+                    reviewedBias: entry.reviewedBias,
                     sortScore: entry.quickScore + continuationBias + homeRookReliefBias + defensiveRepairBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - deepRookRaidPenalty - checkThreatPenalty - captureThreatPenalty - passivityPenalty,
                     policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + Math.round(defensiveRepairBias * 0.8) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(deepRookRaidPenalty * 0.82) - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9),
                     debug: {
@@ -2516,6 +2522,14 @@
                 }
 
                 entries.sort((left, right) => right.sortScore - left.sortScore);
+            }
+
+            const strongReviewedEntries = entries.filter(entry => entry.reviewedBias >= 3000);
+            if (strongReviewedEntries.length > 0) {
+                return strongReviewedEntries
+                    .slice()
+                    .sort((left, right) => right.reviewedBias - left.reviewedBias)
+                    .slice(0, 1);
             }
 
             if (urgentHomeRookRepairs.size > 0) {
