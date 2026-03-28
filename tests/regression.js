@@ -161,6 +161,15 @@ const reviewedWingRaidLine = [
     '俥二進四','象9退7','俥二平三','士5退6','俥三平四'
 ];
 
+const reviewedCornerRookLine = [
+    '傌二進一','馬8進7','傌八進七','馬2進3','炮二平四','車9平8','俥一平二','士6進5','俥二進六','車8進1',
+    '相七進五','士5退6','俥九進一','砲2進1','炮八進二','卒3進1','炮八平三','馬7退5','俥九平八','車1平2',
+    '炮三平二','車8退1','兵一進一','車8進1','炮四平三','車8退1','兵三進一','車8進1','俥八平六','砲2平3',
+    '俥六進七','車2進7','俥二退一','馬3退2','炮二進三','砲3進3','仕六進五','象3進1','俥六退六','馬5進3',
+    '俥六退二','士4進5','兵三進一','車8平6','兵三進一','士5進6','炮三進七','將5進1','俥六進七','車2平3',
+    '炮二進一','車6平8','俥二進三'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -905,6 +914,33 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '2,3-1,4', `expected 士4退5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed corner-rook line should push the third pawn on round 5',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCornerRookLine.slice(0, 9),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,2-4,2', `expected 卒3進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed corner-rook line should prefer the wing pawn on round 8',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCornerRookLine.slice(0, 15),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,6-4,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed corner-rook line should stop rook shuffling on round 11',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCornerRookLine.slice(0, 21),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,6-4,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];
