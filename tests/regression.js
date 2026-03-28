@@ -148,6 +148,19 @@ const reviewedRookPressureLine = [
     '炮三平四','車3退1','俥二平四','馬6進8','俥八平五','象9退7','俥四進一','車3平5','俥五進一'
 ];
 
+const reviewedWingRaidLine = [
+    '傌二進三','馬8進7','兵三進一','馬2進3','相三進五','車9進1','傌八進七','車9平5','傌三進四','車1進1',
+    '炮二平四','卒3進1','炮八進四','馬3進2','俥一平二','車1平4','俥二進五','車4平3','炮八平三','象7進9',
+    '仕六進五','馬2進3','俥九平八','卒3進1','俥八進三','卒3平4','兵一進一','卒5進1','俥二進一','卒5進1',
+    '炮三平七','馬3退4','傌四退三','卒5進1','傌七進五','車5進4','兵三進一','士4進5','傌五進三','砲2平5',
+    '帥五平六','卒4平3','炮四進六','士5進4','炮四退三','馬7進6','兵三平四','砲8平7','炮七平五','車5退2',
+    '俥二平五','砲7進5','傌三進二','卒3進1','俥八進四','士6進5','傌二進三','將5平6','傌三退五','馬4退5',
+    '俥八進二','士5退4','俥八退二','砲7退5','俥八退二','馬5退7','帥六平五','砲7進4','俥五平六','車3平4',
+    '兵四進一','將6平5','俥八平七','砲7平1','俥六平九','卒3平2','兵四進一','車4平5','俥七平四','車5進4',
+    '仕五退六','後士進5','兵四進一','馬7退9','俥九平一','車5退3','俥四平七','象3進1','俥七平二','象1退3',
+    '俥二進四','象9退7','俥二平三','士5退6','俥三平四'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -874,6 +887,24 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '6,2-6,4', `expected 車3平5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed wing-raid line should find the rook shot on round 22',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedWingRaidLine.slice(0, 43),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '1,2-2,2', `expected 車3進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed wing-raid line should keep the guard flexible on round 25',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedWingRaidLine.slice(0, 49),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,3-1,4', `expected 士4退5, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];
