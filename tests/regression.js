@@ -193,6 +193,19 @@ const reviewedGuardedCenterLine = [
     '俥二進三','砲7退1','俥二平三'
 ];
 
+const reviewedCounterswingLine = [
+    '傌二進三','馬2進3','相七進五','馬8進7','俥一進一','車1進1','傌八進七','車1平5','兵七進一','卒5進1',
+    '俥一平四','砲2進2','仕六進五','砲8進2','俥四進六','馬3進5','傌七進六','砲2平4','兵三進一','砲8退2',
+    '俥四退六','車9進2','俥九平七','砲8進4','傌三進四','砲4退1','俥四進二','砲8退1','傌四進五','砲8平4',
+    '兵七進一','車5進2','兵七平六','後砲退2','炮二進四','車5退1','炮二平七','前砲進1','俥四進三','車5平1',
+    '炮七退三','車1平2','炮八進四','前砲平1','俥四平七','象3進1','炮七進二','車2平4','前俥進二','砲1平9',
+    '炮八進三','將5進1','兵六進一','車4進1','炮七平八','車4平2','帥五平六','車2退3','炮八進三','馬7進5',
+    '前俥平六','將5退1','俥六退三','車2進1','俥六進四','將5進1','兵五進一','卒5進1','俥七進九','車2進8',
+    '俥七退九','車2平3','相五退七','車9平6','俥六退三','砲9平5','兵三進一','卒7進1','俥六平五','砲5退3',
+    '相三進五','車6進4','相五退三','將5退1','帥六平五','士6進5','相七進五','卒5平6','帥五平六','車6平4',
+    '帥六平五','車4進2','相三進一','卒6進1','相一進三','將5平6','相三退一','將6平5','相一進三','卒7進1'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -1022,6 +1035,33 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '1,6-1,5', `expected 砲7平6, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterswing line should push the center pawn on round 13',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterswingLine.slice(0, 25),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,4-5,4', `expected 卒5進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterswing line should push the center pawn again on round 20',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterswingLine.slice(0, 39),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,4-5,4', `expected 卒5進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed counterswing line should thrust the rook on round 25',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedCounterswingLine.slice(0, 49),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,3-4,3', `expected 車4進2, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];
