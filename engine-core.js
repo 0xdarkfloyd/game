@@ -878,6 +878,23 @@
             return Math.round(score);
         }
 
+        function countSafeGeneralMoves(board, color) {
+            const general = findGeneral(board, color);
+            if (!general) {
+                return 0;
+            }
+
+            const pseudoMoves = getPseudoMoves(board, general.row, general.col);
+            let count = 0;
+            for (const move of pseudoMoves) {
+                const nextBoard = applyMoveToBoard(board, move);
+                if (!isInCheck(nextBoard, color)) {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+
         function evaluateRookPressure(board, color, stage) {
             const enemyGeneral = findGeneral(board, otherColor(color));
             if (!enemyGeneral) {
@@ -1187,6 +1204,37 @@
             return count;
         }
 
+        function countOverextendedCannons(board, color, stage) {
+            const opponent = otherColor(color);
+            let count = 0;
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (board[row][col] !== `${color}C`) {
+                        continue;
+                    }
+
+                    if (row === cannonRow(color)) {
+                        continue;
+                    }
+
+                    const homeDistance = Math.abs(homeRow(color) - row);
+                    const edgeDistance = Math.abs(4 - col);
+                    const attackers = getAttackerValues(board, row, col, opponent);
+                    const defenders = getAttackerValues(board, row, col, color);
+                    const risky = attackers.length > 0 && (defenders.length === 0 || attackers.length >= defenders.length);
+                    const deepEdge = homeDistance >= 3 && edgeDistance >= 2;
+                    const veryWide = edgeDistance >= 3;
+
+                    if (risky || deepEdge || veryWide) {
+                        count += 1;
+                    }
+                }
+            }
+
+            return count;
+        }
+
         function countBackRankHorses(board, color) {
             const row = homeRow(color);
             let count = 0;
@@ -1242,6 +1290,73 @@
             return reliefs;
         }
 
+        function getAttackedRookReliefMoves(board, color, legalMoves) {
+            const opponent = otherColor(color);
+            const reliefs = new Set();
+
+            for (const move of legalMoves) {
+                if (move.piece !== `${color}R`) {
+                    continue;
+                }
+
+                const attackersBefore = getAttackerValues(board, move.fromRow, move.fromCol, opponent).length;
+                if (attackersBefore === 0) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                const attackersAfter = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent).length;
+                const defendersAfter = getAttackerValues(nextBoard, move.toRow, move.toCol, color).length;
+                const retreating = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+                const sideways = move.toRow === move.fromRow;
+
+                if (attackersAfter < attackersBefore ||
+                    (attackersAfter === 0 && defendersAfter > 0) ||
+                    ((retreating || sideways) && attackersAfter === 0)) {
+                    reliefs.add(getMoveKey(move));
+                }
+            }
+
+            return reliefs;
+        }
+
+        function getOverextendedCannonRepairMoves(board, color, stage, legalMoves) {
+            const overextendedBefore = countOverextendedCannons(board, color, stage);
+            if (overextendedBefore === 0) {
+                return new Set();
+            }
+
+            const opponent = otherColor(color);
+            const repairs = new Set();
+            for (const move of legalMoves) {
+                if (move.piece !== `${color}C`) {
+                    continue;
+                }
+
+                const attackersBefore = getAttackerValues(board, move.fromRow, move.fromCol, opponent).length;
+                const defendersBefore = getAttackerValues(board, move.fromRow, move.fromCol, color).length;
+                const homeDistanceBefore = Math.abs(homeRow(color) - move.fromRow);
+                const centerDistanceBefore = Math.abs(4 - move.fromCol);
+                const nextBoard = applyMoveToBoard(board, move);
+                const overextendedAfter = countOverextendedCannons(nextBoard, color, stage);
+                const attackersAfter = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent).length;
+                const defendersAfter = getAttackerValues(nextBoard, move.toRow, move.toCol, color).length;
+                const homeDistanceAfter = Math.abs(homeRow(color) - move.toRow);
+                const centerDistanceAfter = Math.abs(4 - move.toCol);
+                const saferSquare = attackersAfter < attackersBefore ||
+                    (attackersAfter === attackersBefore && defendersAfter > defendersBefore);
+                const closerHome = homeDistanceAfter < homeDistanceBefore;
+                const moreCentral = centerDistanceAfter < centerDistanceBefore;
+                if (overextendedAfter < overextendedBefore ||
+                    (saferSquare && (closerHome || moreCentral)) ||
+                    (closerHome && centerDistanceAfter <= centerDistanceBefore)) {
+                    repairs.add(getMoveKey(move));
+                }
+            }
+
+            return repairs;
+        }
+
         function getBackRankHorseReliefMoves(board, color, legalMoves) {
             const backRankHorsesBefore = countBackRankHorses(board, color);
             if (backRankHorsesBefore === 0) {
@@ -1261,6 +1376,40 @@
             }
 
             return reliefs;
+        }
+
+        function getPracticalSoldierPushMoves(board, color, stage, legalMoves) {
+            if (stage.opening < 0.18 && stage.middlegame < 0.22) {
+                return new Set();
+            }
+
+            const pushes = new Set();
+            const centerFiles = new Set([2, 4, 6]);
+            for (const move of legalMoves) {
+                if (move.piece !== `${color}S` || move.captured || move.toCol !== move.fromCol) {
+                    continue;
+                }
+
+                if (!centerFiles.has(move.fromCol)) {
+                    continue;
+                }
+
+                const forward = color === RED_COLOR
+                    ? move.toRow < move.fromRow
+                    : move.toRow > move.fromRow;
+                if (!forward) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                const beforePressure = countThreatenedEnemyMajors(board, color);
+                const afterPressure = countThreatenedEnemyMajors(nextBoard, color);
+                if (afterPressure >= beforePressure || hasCrossedRiver(color, move.toRow)) {
+                    pushes.add(getMoveKey(move));
+                }
+            }
+
+            return pushes;
         }
 
         function hasAttackerType(board, row, col, attackerColor, targetTypes) {
@@ -1850,10 +1999,19 @@
             }
 
             const safetyDelta = evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage);
+            const escapeBefore = countSafeGeneralMoves(board, color);
+            const escapeAfter = countSafeGeneralMoves(nextBoard, color);
             let score = 0;
 
             if (safetyDelta > 0) {
                 score += Math.round(safetyDelta * stageWeight(stage, 0.16, 0.52, 0.72));
+            }
+
+            if (escapeAfter > escapeBefore) {
+                score += (escapeAfter - escapeBefore) * stageWeight(stage, 0, 48, 30);
+                if (escapeBefore <= 1) {
+                    score += stageWeight(stage, 0, 86, 56);
+                }
             }
 
             if (!move.captured && move.piece[1] === 'A') {
@@ -1865,6 +2023,9 @@
                 if (safetyDelta > 0) {
                     score += stageWeight(stage, 0, 28, 44);
                 }
+                if (move.toCol === 4 && escapeBefore <= 2) {
+                    score += stageWeight(stage, 0, 42, 26);
+                }
             } else if (!move.captured && move.piece[1] === 'E' && safetyDelta > 0) {
                 score += stageWeight(stage, 0, 14, 24);
             } else if (!move.captured &&
@@ -1873,6 +2034,8 @@
                 score += safetyDelta > 0
                     ? stageWeight(stage, 0, 18, 28)
                     : stageWeight(stage, 0, 8, 14);
+            } else if (!move.captured && move.piece[1] === 'G' && safetyDelta <= 0 && escapeAfter <= escapeBefore) {
+                score -= stageWeight(stage, 0, 52, 24);
             }
 
             return Math.round(score);
@@ -1916,6 +2079,10 @@
                         repeatedQuietCannonShuffle ? 4 : 14,
                         repeatedQuietCannonShuffle ? 2 : 6
                     );
+                }
+
+                if (move.fromCol === move.toCol && move.fromRow !== cannonRow(color) && afterMajorPressure > beforeMajorPressure) {
+                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(stage, 8, 38, 14);
                 }
 
                 if (repeatedQuietCannonShuffle) {
@@ -2393,6 +2560,16 @@
                     score += centerGain * stageWeight(stage, 8, 32, 10);
                 }
             }
+            if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
+                const deeperAdvance = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+                const sideways = move.toRow === move.fromRow;
+                const rookPressureDelta = evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage);
+                if (sideways && rookPressureDelta > 0) {
+                    score += Math.round(rookPressureDelta * stageWeight(stage, 0.2, 1.0, 0.35));
+                } else if (deeperAdvance && rookPressureDelta <= 0 && !isInCheck(nextBoard, otherColor(color))) {
+                    score -= stageWeight(stage, 0, 54, 18);
+                }
+            }
             if (move.piece[1] === 'H' && countUndevelopedHorses(nextBoard, color) < countUndevelopedHorses(board, color)) {
                 score += stageWeight(stage, 12, 8, 4);
             } else if (move.piece[1] === 'H' && !move.captured) {
@@ -2428,6 +2605,27 @@
                     score -= looseCannonsBefore * stageWeight(stage, 0, 42, 16);
                 } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
                     score -= looseCannonsBefore * stageWeight(stage, 0, 28, 12);
+                }
+            }
+            const overextendedCannonsBefore = countOverextendedCannons(board, color, stage);
+            const overextendedCannonsAfter = countOverextendedCannons(nextBoard, color, stage);
+            if (overextendedCannonsAfter < overextendedCannonsBefore) {
+                score += (overextendedCannonsBefore - overextendedCannonsAfter) * stageWeight(stage, 0, 118, 42);
+            } else if (overextendedCannonsBefore > 0 && !move.captured) {
+                if (move.piece[1] === 'R' && move.fromRow !== homeRow(color)) {
+                    const deeperAdvance = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+                    if (deeperAdvance) {
+                        score -= overextendedCannonsBefore * stageWeight(stage, 0, 44, 16);
+                    }
+                } else if (move.piece[1] === 'R') {
+                    score -= overextendedCannonsBefore * stageWeight(stage, 0, 52, 18);
+                } else if (move.piece[1] === 'S') {
+                    score -= overextendedCannonsBefore * stageWeight(stage, 0, 36, 14);
+                } else if (move.piece[1] === 'H') {
+                    const backward = color === RED_COLOR ? move.toRow > move.fromRow : move.toRow < move.fromRow;
+                    if (backward || move.toRow === move.fromRow) {
+                        score -= overextendedCannonsBefore * stageWeight(stage, 0, 34, 12);
+                    }
                 }
             }
             if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
@@ -2596,10 +2794,22 @@
                 }
             }
 
+            if (!entry.move.captured && entry.move.piece[1] === 'G') {
+                const escapeBefore = countSafeGeneralMoves(board, color);
+                const escapeAfter = countSafeGeneralMoves(entry.nextBoard, color);
+                if (escapeAfter > escapeBefore) {
+                    practicalAdjustment += (escapeAfter - escapeBefore) * stageWeight(searchConfig.stage, 0, 88, 34);
+                } else {
+                    practicalAdjustment -= stageWeight(searchConfig.stage, 0, 42, 16);
+                }
+            }
+
             if (!entry.move.captured && entry.move.piece[1] === 'C') {
                 const alreadyAdvanced = entry.move.fromRow !== cannonRow(color);
                 const sideways = entry.move.toRow === entry.move.fromRow;
                 const forward = color === RED_COLOR ? entry.move.toRow < entry.move.fromRow : entry.move.toRow > entry.move.fromRow;
+                const homeDistanceBefore = Math.abs(homeRow(color) - entry.move.fromRow);
+                const homeDistanceAfter = Math.abs(homeRow(color) - entry.move.toRow);
                 if (alreadyAdvanced && sideways && !isInCheck(entry.nextBoard, otherColor(color))) {
                     practicalAdjustment -= stageWeight(searchConfig.stage, 0, 152, 36);
                     if (Math.abs(entry.move.toCol - 4) >= Math.abs(entry.move.fromCol - 4)) {
@@ -2607,6 +2817,20 @@
                     }
                 } else if (alreadyAdvanced && forward) {
                     practicalAdjustment -= stageWeight(searchConfig.stage, 0, 72, 18);
+                }
+                if (alreadyAdvanced && homeDistanceAfter < homeDistanceBefore) {
+                    practicalAdjustment += stageWeight(searchConfig.stage, 0, 76, 26);
+                }
+            }
+
+            if (!entry.move.captured && entry.move.piece[1] === 'R' && entry.move.fromRow !== homeRow(color)) {
+                const deeperAdvance = color === RED_COLOR ? entry.move.toRow < entry.move.fromRow : entry.move.toRow > entry.move.fromRow;
+                const sideways = entry.move.toRow === entry.move.fromRow;
+                const pressureDelta = evaluateRookPressure(entry.nextBoard, color, searchConfig.stage) - evaluateRookPressure(board, color, searchConfig.stage);
+                if (sideways && pressureDelta > 0) {
+                    practicalAdjustment += Math.round(pressureDelta * 0.8);
+                } else if (deeperAdvance && pressureDelta <= 0) {
+                    practicalAdjustment -= stageWeight(searchConfig.stage, 0, 68, 24);
                 }
             }
 
@@ -2625,7 +2849,10 @@
             const urgentHomeRookRepairs = getUrgentHomeRookScreenRepairMoves(board, color, legalMoves);
             const urgentLooseHorseReliefs = getLooseHorseReliefMoves(board, color, searchConfig.stage, legalMoves);
             const urgentLooseCannonReliefs = getLooseCannonReliefMoves(board, color, searchConfig.stage, legalMoves);
+            const urgentAttackedRookReliefs = getAttackedRookReliefMoves(board, color, legalMoves);
+            const urgentOverextendedCannonRepairs = getOverextendedCannonRepairMoves(board, color, searchConfig.stage, legalMoves);
             const urgentBackRankHorseReliefs = getBackRankHorseReliefMoves(board, color, legalMoves);
+            const practicalSoldierPushes = getPracticalSoldierPushMoves(board, color, searchConfig.stage, legalMoves);
             const openingContext = {
                 undevelopedMajors: countUndevelopedMajors(board, color),
                 undevelopedRooks: countUndevelopedRooks(board, color),
@@ -2638,6 +2865,7 @@
                 horizontalRookMovesAvailable: hasHomeHorizontalRookDevelopment(board, color),
                 ownCenteredCannon: hasCenteredCannon(board, color),
                 opponentCenteredCannon: hasCenteredCannon(board, otherColor(color)),
+                safeGeneralMoves: countSafeGeneralMoves(board, color),
                 homeRookCannonExposures: getHomeRookCannonExposures(board, color),
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
                 previousOwnMove: sameSideMoves.length > 1 ? sameSideMoves[sameSideMoves.length - 2] : null
@@ -2667,6 +2895,28 @@
                     move.toRow === move.fromRow
                     ? Math.round(centerGain * stageWeight(searchConfig.stage, 8, 28, 8))
                     : 0;
+                let soldierPressureBias = 0;
+                if (practicalSoldierPushes.size > 0) {
+                    if (practicalSoldierPushes.has(moveKey)) {
+                        soldierPressureBias += stageWeight(searchConfig.stage, 60, 96, 36);
+                    } else if (!move.captured && move.piece[1] === 'C') {
+                        soldierPressureBias -= stageWeight(searchConfig.stage, 0, 52, 18);
+                    }
+                }
+                let attackedRookReliefBias = 0;
+                if (urgentAttackedRookReliefs.size > 0) {
+                    if (urgentAttackedRookReliefs.has(moveKey)) {
+                        attackedRookReliefBias += stageWeight(searchConfig.stage, 0, 214, 78);
+                        if (move.piece[1] === 'R' && move.toRow === move.fromRow) {
+                            attackedRookReliefBias += stageWeight(searchConfig.stage, 0, 36, 16);
+                        }
+                    } else if (!move.captured && move.piece[1] !== 'R') {
+                        attackedRookReliefBias -= stageWeight(searchConfig.stage, 0, 96, 36);
+                        if (move.piece[1] === 'C') {
+                            attackedRookReliefBias -= stageWeight(searchConfig.stage, 0, 42, 14);
+                        }
+                    }
+                }
                 let looseHorseBias = 0;
                 if (urgentLooseHorseReliefs.size > 0) {
                     if (urgentLooseHorseReliefs.has(moveKey)) {
@@ -2715,6 +2965,65 @@
                         }
                     }
                 }
+                let overextendedCannonBias = 0;
+                if (urgentOverextendedCannonRepairs.size > 0) {
+                    if (urgentOverextendedCannonRepairs.has(moveKey)) {
+                        overextendedCannonBias += stageWeight(searchConfig.stage, 0, 112, 42);
+                        if (move.piece[1] === 'C') {
+                            const homeDistanceBefore = Math.abs(homeRow(color) - move.fromRow);
+                            const homeDistanceAfter = Math.abs(homeRow(color) - move.toRow);
+                            const centerGainForRepair = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                            const attackersBefore = getAttackerValues(board, move.fromRow, move.fromCol, otherColor(color)).length;
+                            const attackersAfter = getAttackerValues(nextBoard, move.toRow, move.toCol, otherColor(color)).length;
+                            if (homeDistanceAfter < homeDistanceBefore) {
+                                overextendedCannonBias += stageWeight(searchConfig.stage, 0, 138, 46);
+                            }
+                            if (centerGainForRepair > 0) {
+                                overextendedCannonBias += Math.round(centerGainForRepair * stageWeight(searchConfig.stage, 0, 34, 10));
+                            }
+                            if (attackersAfter < attackersBefore) {
+                                overextendedCannonBias += (attackersBefore - attackersAfter) * stageWeight(searchConfig.stage, 0, 44, 16);
+                            }
+                            if (homeDistanceAfter >= homeDistanceBefore && centerGainForRepair <= 0 && attackersAfter >= attackersBefore) {
+                                overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 96, 34);
+                            }
+                            if (openingContext.safeGeneralMoves <= 1) {
+                                overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 86, 34);
+                            }
+                        }
+                    } else if (!move.captured) {
+                        if (move.piece[1] === 'S') {
+                            overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 108, 36);
+                        } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                            overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 56, 20);
+                        } else if (move.piece[1] === 'R') {
+                            const deeperAdvance = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+                            if (move.fromRow !== homeRow(color) && deeperAdvance) {
+                                overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 96, 34);
+                            } else {
+                                overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 42, 16);
+                            }
+                        } else if (move.piece[1] === 'C') {
+                            overextendedCannonBias -= stageWeight(searchConfig.stage, 0, 54, 20);
+                        }
+                    }
+                }
+                let kingEscapeBias = 0;
+                const urgentKingRepair = openingContext.safeGeneralMoves === 0 ||
+                    (openingContext.safeGeneralMoves === 1 &&
+                        openingContext.homeRookCannonExposures.length > 0 &&
+                        urgentOverextendedCannonRepairs.size === 0);
+                if (urgentKingRepair && !move.captured) {
+                    if (move.piece[1] === 'A' && move.toCol === 4) {
+                        kingEscapeBias += stageWeight(searchConfig.stage, 0, 146, 64);
+                    } else if (move.piece[1] === 'G') {
+                        kingEscapeBias += stageWeight(searchConfig.stage, 0, 164, 72);
+                    } else if (move.piece[1] === 'C') {
+                        kingEscapeBias -= stageWeight(searchConfig.stage, 0, 56, 20);
+                    } else if (move.piece[1] === 'R' && move.fromRow !== homeRow(color)) {
+                        kingEscapeBias -= stageWeight(searchConfig.stage, 0, 34, 12);
+                    }
+                }
                 let backRankHorseBias = 0;
                 if (urgentBackRankHorseReliefs.size > 0) {
                     if (urgentBackRankHorseReliefs.has(moveKey)) {
@@ -2752,8 +3061,8 @@
                     reviewedBias,
                     tacticalBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + looseHorseBias + looseCannonBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
-                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(backRankHorseBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
+                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
+                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
@@ -2761,7 +3070,30 @@
                 ? quickEntries.filter(entry => urgentHomeRookRepairs.has(getMoveKey(entry.move)))
                 : quickEntries;
             const shortlistLimit = Math.min(shortlistSource.length, Math.max(searchConfig.rootLimit * 2, 12));
-            const shortlist = shortlistSource.slice(0, shortlistLimit);
+            const mustIncludeKeys = new Set([
+                ...urgentHomeRookRepairs,
+                ...urgentAttackedRookReliefs,
+                ...urgentLooseHorseReliefs,
+                ...urgentLooseCannonReliefs,
+                ...urgentOverextendedCannonRepairs,
+                ...urgentBackRankHorseReliefs,
+                ...practicalSoldierPushes
+            ]);
+            if (openingContext.safeGeneralMoves <= 1) {
+                for (const entry of quickEntries) {
+                    if (!entry.move.captured && (entry.move.piece[1] === 'A' || entry.move.piece[1] === 'G')) {
+                        mustIncludeKeys.add(getMoveKey(entry.move));
+                    }
+                }
+            }
+            const shortlist = shortlistSource
+                .slice(0, shortlistLimit)
+                .concat(
+                    quickEntries.filter(entry => mustIncludeKeys.has(getMoveKey(entry.move)))
+                )
+                .filter((entry, index, array) =>
+                    index === array.findIndex(candidate => sameMove(candidate.move, entry.move))
+                );
             const entries = shortlist.map(entry => {
                 const nextBoard = entry.nextBoard;
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);

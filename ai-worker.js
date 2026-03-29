@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260330-twinrook1', 'game.js?v=20260330-twinrook1');
+importScripts('engine-core.js?v=20260330-heuristics1', 'game.js?v=20260330-heuristics1');
 
 function getPonderMoveKey(move) {
     return move ? getMoveKey(move) : '';

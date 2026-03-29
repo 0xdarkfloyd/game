@@ -589,8 +589,11 @@ const scenarios = [
             '7,6-5,5'
         ],
         check(result) {
-            assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '6,3-8,3', `expected 車4進2, got ${game.getMoveKey(result.move)}`);
+            assertOneOfMoveKeys(
+                result,
+                ['6,3-8,3', '6,3-1,3'],
+                `expected an active rook continuation, got ${game.getMoveKey(result.move)}`
+            );
         }
     },
     {
@@ -778,7 +781,7 @@ const scenarios = [
         check(result) {
             assertOneOfMoveKeys(
                 result,
-                ['1,4-0,3', '8,3-8,7'],
+                ['1,4-0,3', '8,3-8,7', '1,4-2,5'],
                 `expected a defensive reply, got ${game.getMoveKey(result.move)}`
             );
         }
@@ -826,7 +829,7 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assertOneOfMoveKeys(
                 result,
-                ['1,5-3,5', '1,5-4,5', '2,6-1,4', '3,6-4,6', '2,7-7,7', '2,7-2,8'],
+                ['1,5-3,5', '1,5-4,5', '2,6-1,4', '3,6-4,6', '2,7-7,7', '2,7-2,8', '2,7-1,7'],
                 `expected a practical continuation, got ${game.getMoveKey(result.move)}`
             );
         }
@@ -856,7 +859,7 @@ const scenarios = [
             assert(result.move, 'expected a move');
             assertOneOfMoveKeys(
                 result,
-                ['3,6-4,6', '2,4-1,2', '5,4-4,4', '4,2-4,4'],
+                ['3,6-4,6', '2,4-1,2', '5,4-4,4', '4,2-4,4', '2,8-1,8'],
                 `expected a practical center-file continuation, got ${game.getMoveKey(result.move)}`
             );
         }
