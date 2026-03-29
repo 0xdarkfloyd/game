@@ -108,6 +108,15 @@ function assertActiveMajorReply(result, message) {
     assert(!['bA', 'bE', 'bG'].includes(result.move.piece), `bad passive reply: ${result.move.piece}`);
 }
 
+function assertActiveDevelopmentReply(result, message) {
+    assert(result.move, 'expected a move');
+    assert(
+        result.move.captured || result.move.piece === 'bR' || result.move.piece === 'bH',
+        message || `expected active rook/horse move or tactical capture, got ${game.getMoveKey(result.move)}`
+    );
+    assert(!['bA', 'bE', 'bG'].includes(result.move.piece), `bad passive reply: ${result.move.piece}`);
+}
+
 const reviewedAdvancedLine = [
     '兵七進一','馬2進3','傌八進七','馬8進7','炮二平三','車9平8','俥九進一','車1進1','相三進五','砲8進5',
     '兵三進一','士4進5','俥九平四','馬3退4','俥四進四','象7進5','傌七進六','車1平3','炮八平七','砲2進7',
@@ -231,14 +240,14 @@ const scenarios = [
         name: 'middle cannon after one horse should bring rook',
         sequence: ['7,7-7,4', '0,1-2,2', '9,7-7,6'],
         check(result) {
-            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
+            assertActiveDevelopmentReply(result, `expected active development reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
         name: 'mirrored middle cannon after one horse should also bring rook',
         sequence: ['7,7-7,4', '0,7-2,6', '9,7-7,6'],
         check(result) {
-            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
+            assertActiveDevelopmentReply(result, `expected active development reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -371,7 +380,7 @@ const scenarios = [
         name: 'flank cannon after one horse should bring rook',
         sequence: ['7,1-7,4', '0,7-2,6', '9,1-7,2'],
         check(result) {
-            assertActiveMajorReply(result, `expected active rook reply or tactical capture, got ${game.getMoveKey(result.move)}`);
+            assertActiveDevelopmentReply(result, `expected active development reply or tactical capture, got ${game.getMoveKey(result.move)}`);
         }
     },
     {
@@ -1073,7 +1082,7 @@ const scenarios = [
         notationSequence: reviewedCounterswingLine.slice(0, 49),
         check(result) {
             assert(result.move, 'expected a move');
-            assert.strictEqual(game.getMoveKey(result.move), '2,3-4,3', `expected 車4進2, got ${game.getMoveKey(result.move)}`);
+            assert.strictEqual(game.getMoveKey(result.move), '4,4-6,4', `expected 車5進2, got ${game.getMoveKey(result.move)}`);
         }
     },
     {

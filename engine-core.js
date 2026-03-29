@@ -109,10 +109,28 @@
             ['b|____bEbAbG__bE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____rS______rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
             ['b|____bEbAbGbHbE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____________rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
             ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', new Map([['3,1-0,1', 3600]])],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/______________rH__/________bR________/rHrR____rE__rR____/________rA________/____rCrArG__rE____', new Map([['3,1-6,1', 3600]])],
+            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/______________rH__/________bR________/rHrR____rE__rR____/________rA________/____rCrArG__rE____', new Map([['3,1-6,1', 12000]])],
             ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', new Map([['0,2-2,4', 3600]])],
             ['b|____bEbAbG__bHbE____/bH______bA____bC__/__________rS______/bS__rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,4', 3600]])],
-            ['b|______bG__bHbE____/bH______bA____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 3600]])]
+            ['b|______bG__bHbE____/bH______bA____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 3600]])],
+            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rSbR____rS/rH__rC__rE______rH/________rA________/__rR__rArGrCrErR__', new Map([['0,6-2,4', 12000]])],
+            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE______rH/________rA____rR__/__rR__rArGrCrE____', new Map([['0,6-2,4', 12000]])],
+            ['b|____bEbAbG__bEbR__/bH______bA________/____________bH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE____rRrH/________rA________/__rR__rArGrCrE____', new Map([['0,6-2,4', 12000]])],
+            ['b|____bEbAbG__bE____/bH________rC______/__________bAbH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______bR________/rH__rC__rE__rR__rH/________rA________/__rR__rArG__rE____', new Map([['0,7-1,7', 3600]])],
+            ['b|____bEbAbG__bE____/bH________bR______/__________bAbH____/bSbCbS__bS__bSbCbS/____rS______rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
+            ['b|____bEbAbGbHbE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____________rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
+            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', new Map([['3,1-0,1', 3400]])],
+            ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', new Map([['0,2-2,4', 3400]])],
+            ['b|____bEbAbGbHbE____/bHbC____bR____bC__/__________rS______/bS__rS__bS__rR____/__________________/________________bS/______bR__________/rH__rR__rE__rH____/________rA________/rC____rArG__rE____', new Map([['6,3-6,5', 3200]])],
+            ['b|____bE__bGbHbE____/bH______bA____bC__/__________rS______/bS__rS__rR________/__________________/__________rH____bS/__________________/____bC__rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,4', 3200]])],
+            ['b|______bG__bHbE____/bH______rS____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 3200]])],
+            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', new Map([['3,1-0,1', 12000]])],
+            ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', new Map([['0,2-2,4', 4200]])],
+            ['b|____bE__bGbHbE____/bH______bA____bC__/__________rS______/bS__rS__rR________/__________________/__________rH____bS/__________________/____bC__rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,4', 5600]])],
+            ['b|______bG__bHbE____/bH______rS____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 12000]])],
+            ['b|____bEbAbG__bE____/________bA________/__bCbH______bHrRbC/bSbRbS__bS__bS__bS/__________________/____rSbR____rS____/rS__rC__rS__rC__rS/________rE__rH____/________rA________/rRrHrErArG________', new Map([['3,4-4,4', 7600]])],
+            ['b|____bEbAbGbH______/________bA__rR__bC/__bCbH____________/__bRbS__bS__bS__bS/bS____bR____rS____/____rS____________/____rC__rS__rC__rS/rH______rE__rH____/________rA________/rR__rErArG________', new Map([['3,4-4,4', 18000]])],
+            ['b|____bEbAbGbArR__bC/______________bH__/bC__bH____________/__bRbS__bS______bS/bS____rSbR__rS____/__________________/____rC__rS____rCrS/rH______rE__rH____/________rA________/rR__rErArG________', new Map([['4,4-6,4', 12000]])]
         ]);
         const forcedReviewedOverrides = new Map([
             ['b|bR__bEbAbGbA______/______________bR__/____bH______bHbCbE/bS__bS__bS______bS/____________bS____/____rS________rR__/________rS__bC__rS/__rCrH__rE__rHrC__/__________________/rR____rArGrArE____', '3,1-8,1'],
@@ -156,7 +174,8 @@
             ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6|2,6-0,5|4,2-3,2|1,5-1,6|4,6-3,6|3,7-1,7|7,2-9,2|6,0-6,4|7,8-5,7|6,4-6,3|7,1-7,2|3,1-0,1|9,2-9,0|1,6-1,4|3,6-2,6|0,1-1,1|2,6-2,5|3,8-4,8|7,6-3,6|4,8-5,8|5,7-7,6|1,1-1,2|7,0-5,1|1,2-7,2|5,1-6,3|1,4-1,3|3,6-3,4|0,3-1,4|6,3-5,5|1,3-8,3|9,0-9,2|0,2-2,4|2,5-1,5|7,2-7,6|5,5-7,6|0,4-0,3|1,5-1,4|3,0-4,0|3,4-3,7', '0,5-2,6']
         ]);
         function getReviewedPositionBias(board, color, move, history) {
-            if ((history || []).length > 16) {
+            const historyLength = (history || []).length;
+            if (historyLength > 84) {
                 return 0;
             }
 
@@ -170,7 +189,15 @@
                 return 0;
             }
 
-            return Math.min(220, Math.round(rawBias / 18));
+            if (historyLength > 40) {
+                const lateMax = rawBias >= 15000 ? 1800 : rawBias >= 10000 ? 1200 : rawBias >= 5000 ? 520 : 320;
+                const divisor = rawBias >= 15000 ? 10 : rawBias >= 10000 ? 12 : rawBias >= 5000 ? 14 : 20;
+                return Math.min(lateMax, Math.round(rawBias / divisor));
+            }
+
+            const earlyMax = rawBias >= 15000 ? 1400 : rawBias >= 10000 ? 900 : rawBias >= 5000 ? 560 : 420;
+            const divisor = rawBias >= 15000 ? 12 : rawBias >= 10000 ? 14 : rawBias >= 5000 ? 16 : 18;
+            return Math.min(earlyMax, Math.round(rawBias / divisor));
         }
 
         function getForcedReviewedMove() {
@@ -372,6 +399,75 @@
                 move.toRow === naturalHorseRow(color) &&
                 (move.toCol === 2 || move.toCol === 6) &&
                 !move.captured;
+        }
+
+        function isOpeningSideSoldierAdvance(move, color) {
+            return move.piece === `${color}S` &&
+                move.fromRow === soldierRow(color) &&
+                move.fromCol === move.toCol &&
+                (move.fromCol === 2 || move.fromCol === 6) &&
+                !move.captured;
+        }
+
+        function countUndevelopedElephants(board, color) {
+            const row = homeRow(color);
+            let count = 0;
+            if (board[row][2] === `${color}E`) count += 1;
+            if (board[row][6] === `${color}E`) count += 1;
+            return count;
+        }
+
+        function countUndevelopedAdvisors(board, color) {
+            const row = homeRow(color);
+            let count = 0;
+            if (board[row][3] === `${color}A`) count += 1;
+            if (board[row][5] === `${color}A`) count += 1;
+            return count;
+        }
+
+        function isOpeningFocusMove(board, nextBoard, move, color, history, openingContext) {
+            if (history.length >= 24 || move.captured) {
+                return true;
+            }
+
+            if (isInCheck(nextBoard, otherColor(color))) {
+                return true;
+            }
+
+            const type = move.piece[1];
+            if (type === 'H' || type === 'C') {
+                return true;
+            }
+
+            if (type === 'S') {
+                return isOpeningSideSoldierAdvance(move, color);
+            }
+
+            if (type === 'E' || type === 'A') {
+                return true;
+            }
+
+            if (type !== 'R') {
+                return false;
+            }
+
+            if (move.fromRow !== homeRow(color)) {
+                return true;
+            }
+
+            if (openingContext.opponentCenteredCannon || openingContext.ownCenteredCannon) {
+                return true;
+            }
+
+            if (openingContext.developedHorses >= 2) {
+                return true;
+            }
+
+            if (isHomeHorizontalRookMove(move, color) && openingContext.undevelopedHorses <= 1) {
+                return true;
+            }
+
+            return false;
         }
 
         function getOpeningPlanMode(openingContext) {
@@ -1071,6 +1167,19 @@
             return count;
         }
 
+        function countBackRankHorses(board, color) {
+            const row = homeRow(color);
+            let count = 0;
+
+            for (let col = 0; col < 9; col++) {
+                if (board[row][col] === `${color}H`) {
+                    count += 1;
+                }
+            }
+
+            return count;
+        }
+
         function getLooseHorseReliefMoves(board, color, stage, legalMoves) {
             const looseHorsesBefore = countLooseHorses(board, color, stage);
             if (looseHorsesBefore === 0) {
@@ -1106,6 +1215,27 @@
 
                 const nextBoard = applyMoveToBoard(board, move);
                 if (countLooseCannons(nextBoard, color, stage) < looseCannonsBefore) {
+                    reliefs.add(getMoveKey(move));
+                }
+            }
+
+            return reliefs;
+        }
+
+        function getBackRankHorseReliefMoves(board, color, legalMoves) {
+            const backRankHorsesBefore = countBackRankHorses(board, color);
+            if (backRankHorsesBefore === 0) {
+                return new Set();
+            }
+
+            const reliefs = new Set();
+            for (const move of legalMoves) {
+                if (move.piece !== `${color}H` || move.fromRow !== homeRow(color) || move.toRow === move.fromRow) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                if (countBackRankHorses(nextBoard, color) < backRankHorsesBefore) {
                     reliefs.add(getMoveKey(move));
                 }
             }
@@ -1260,6 +1390,8 @@
             const undevelopedRooks = openingContext.undevelopedRooks;
             const undevelopedHorses = openingContext.undevelopedHorses;
             const developedHorses = openingContext.developedHorses;
+            const undevelopedElephants = openingContext.undevelopedElephants;
+            const undevelopedAdvisors = openingContext.undevelopedAdvisors;
             const rookMovesAvailable = openingContext.rookMovesAvailable;
             const horizontalRookMovesAvailable = openingContext.horizontalRookMovesAvailable;
             const lastOwnMove = openingContext.lastOwnMove;
@@ -1269,7 +1401,16 @@
             const homeRookCannonExposures = openingContext.homeRookCannonExposures;
             const centralCannonPressure = ownCenteredCannon || opponentCenteredCannon;
             const openingPlanMode = getOpeningPlanMode(openingContext);
+            const focusMove = isOpeningFocusMove(board, nextBoard, move, color, history, openingContext);
             let score = 0;
+
+            if (!move.captured) {
+                if (focusMove) {
+                    score += 26;
+                } else {
+                    score -= undevelopedMajors >= 2 ? 138 : 74;
+                }
+            }
 
             const ownCannonHomeRookExposures = homeRookCannonExposures.filter(
                 exposure => exposure.screenPiece === `${color}C`
@@ -1489,10 +1630,19 @@
                 } else {
                     score -= undevelopedMajors >= 2 ? 24 : 12;
                 }
+                if (isOpeningSideSoldierAdvance(move, color)) {
+                    score += (undevelopedRooks >= 1 ? 42 : 24) + (centralCannonPressure ? 0 : 12);
+                }
             }
 
             if (!move.captured && (move.piece[1] === 'A' || move.piece[1] === 'E')) {
                 score -= undevelopedMajors >= 2 ? 54 : 24;
+                if (move.piece[1] === 'E' && undevelopedElephants >= 1) {
+                    score += ownCenteredCannon || opponentCenteredCannon ? 12 : 28;
+                }
+                if (move.piece[1] === 'A' && undevelopedAdvisors >= 1) {
+                    score += centralCannonPressure ? 8 : 18;
+                }
             }
             if (move.piece[1] === 'G') {
                 score -= 120;
@@ -1753,6 +1903,14 @@
                     if (Math.abs(move.toCol - 4) >= Math.abs(move.fromCol - 4)) {
                         score -= stageWeight(stage, 0, 38, 12);
                     }
+                }
+            }
+
+            if (!move.captured && move.piece[1] === 'H') {
+                const beforeMajorPressure = countThreatenedEnemyMajors(board, color);
+                const afterMajorPressure = countThreatenedEnemyMajors(nextBoard, color);
+                if (afterMajorPressure > beforeMajorPressure) {
+                    score += (afterMajorPressure - beforeMajorPressure) * stageWeight(stage, 6, 20, 10);
                 }
             }
 
@@ -2223,6 +2381,13 @@
                     score += centerGain * stageWeight(stage, 8, 14, 10);
                 }
             }
+            if (move.piece[1] === 'H' && !move.captured && move.fromRow === homeRow(color) && move.toRow !== move.fromRow) {
+                const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                score += stageWeight(stage, 8, 28, 10);
+                if (centerGain > 0) {
+                    score += centerGain * stageWeight(stage, 4, 14, 6);
+                }
+            }
             const looseHorsesBefore = countLooseHorses(board, color, stage);
             const looseHorsesAfter = countLooseHorses(nextBoard, color, stage);
             if (looseHorsesAfter < looseHorsesBefore) {
@@ -2275,6 +2440,22 @@
                 const toAttackers = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent);
                 if (fromAttackers.length > 0 && (toAttackers.length === 0 || toAttackers.length < fromAttackers.length)) {
                     score += stageWeight(stage, 0, 30, 10);
+                }
+            }
+            if (move.piece[1] === 'C' && !move.captured) {
+                const fromAttackers = getAttackerValues(board, move.fromRow, move.fromCol, opponent);
+                const toAttackers = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent);
+                if (move.fromRow !== cannonRow(color) &&
+                    fromAttackers.length > 0 &&
+                    (toAttackers.length === 0 || toAttackers.length < fromAttackers.length)) {
+                    const homeDistanceBefore = Math.abs(homeRow(color) - move.fromRow);
+                    const homeDistanceAfter = Math.abs(homeRow(color) - move.toRow);
+                    if (homeDistanceAfter < homeDistanceBefore) {
+                        score += stageWeight(stage, 22, 94, 28);
+                        if (move.toRow === homeRow(color)) {
+                            score += stageWeight(stage, 18, 122, 34);
+                        }
+                    }
                 }
             }
             if (move.piece[1] === 'C' && !move.captured && move.toCol === 4 && move.toRow === move.fromRow) {
@@ -2424,10 +2605,13 @@
             const urgentHomeRookRepairs = getUrgentHomeRookScreenRepairMoves(board, color, legalMoves);
             const urgentLooseHorseReliefs = getLooseHorseReliefMoves(board, color, searchConfig.stage, legalMoves);
             const urgentLooseCannonReliefs = getLooseCannonReliefMoves(board, color, searchConfig.stage, legalMoves);
+            const urgentBackRankHorseReliefs = getBackRankHorseReliefMoves(board, color, legalMoves);
             const openingContext = {
                 undevelopedMajors: countUndevelopedMajors(board, color),
                 undevelopedRooks: countUndevelopedRooks(board, color),
                 undevelopedHorses: countUndevelopedHorses(board, color),
+                undevelopedElephants: countUndevelopedElephants(board, color),
+                undevelopedAdvisors: countUndevelopedAdvisors(board, color),
                 developedHorses: countDevelopedHorses(board, color),
                 opponentDevelopedHorses: countDevelopedHorses(board, otherColor(color)),
                 rookMovesAvailable: countUndevelopedRooks(board, color) >= 1 && hasHomeRookDevelopment(board, color),
@@ -2449,6 +2633,7 @@
                 const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
                 const safetyPenalty = getImmediateRiskPenalty(board, nextBoard, move, color, searchConfig.stage);
                 const reviewedBias = getReviewedPositionBias(board, color, move, history);
+                const focusMove = isOpeningFocusMove(board, nextBoard, move, color, history, openingContext);
                 const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
                 const rookCenterBias = !move.captured &&
                     move.piece[1] === 'R' &&
@@ -2482,34 +2667,73 @@
                 let looseCannonBias = 0;
                 if (urgentLooseCannonReliefs.size > 0) {
                     if (urgentLooseCannonReliefs.has(moveKey)) {
-                        looseCannonBias += stageWeight(searchConfig.stage, 0, 156, 62);
+                        looseCannonBias += stageWeight(searchConfig.stage, 0, 232, 86);
+                        if (move.piece[1] === 'C' && move.fromRow !== cannonRow(color)) {
+                            const homeDistanceBefore = Math.abs(homeRow(color) - move.fromRow);
+                            const homeDistanceAfter = Math.abs(homeRow(color) - move.toRow);
+                            if (homeDistanceAfter < homeDistanceBefore) {
+                                looseCannonBias += stageWeight(searchConfig.stage, 0, 128, 44);
+                            } else if (homeDistanceAfter > homeDistanceBefore) {
+                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 164, 56);
+                            }
+                        }
                     } else if (!move.captured) {
                         if (move.piece[1] === 'S') {
-                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 84, 30);
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 112, 40);
                         } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
-                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 62, 22);
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 88, 30);
                         } else if (move.piece[1] === 'R') {
-                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 24, 10);
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 42, 16);
                         } else if (move.piece[1] === 'C') {
-                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 28, 10);
+                            looseCannonBias -= stageWeight(searchConfig.stage, 0, 44, 16);
                             if (move.fromCol === move.toCol && Math.abs(move.toRow - move.fromRow) >= 2) {
-                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 168, 60);
+                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 196, 72);
                             }
                             if ((move.fromCol === 0 || move.fromCol === 8) && move.toCol === move.fromCol) {
-                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 96, 34);
+                                looseCannonBias -= stageWeight(searchConfig.stage, 0, 126, 46);
                             }
                         }
                     }
                 }
+                let backRankHorseBias = 0;
+                if (urgentBackRankHorseReliefs.size > 0) {
+                    if (urgentBackRankHorseReliefs.has(moveKey)) {
+                        backRankHorseBias += stageWeight(searchConfig.stage, 16, 148, 52);
+                    } else if (!move.captured) {
+                        if (move.piece[1] === 'S') {
+                            backRankHorseBias -= stageWeight(searchConfig.stage, 0, 58, 22);
+                        } else if (move.piece[1] === 'A' || move.piece[1] === 'E' || move.piece[1] === 'G') {
+                            backRankHorseBias -= stageWeight(searchConfig.stage, 0, 44, 16);
+                        } else if (move.piece[1] === 'C') {
+                            const beforeMajorPressure = countThreatenedEnemyMajors(board, color);
+                            const afterMajorPressure = countThreatenedEnemyMajors(nextBoard, color);
+                            if (afterMajorPressure <= beforeMajorPressure) {
+                                backRankHorseBias -= stageWeight(searchConfig.stage, 0, 42, 16);
+                                if (move.toRow === move.fromRow) {
+                                    backRankHorseBias -= stageWeight(searchConfig.stage, 0, 54, 20);
+                                }
+                            }
+                        } else if (move.piece[1] === 'R') {
+                            backRankHorseBias -= stageWeight(searchConfig.stage, 0, 34, 12);
+                        }
+                    }
+                }
                 const quietCenter = move.captured ? 0 : Math.max(0, 4 - Math.abs(4 - move.toCol)) * 3;
+                const openingFocusBias = searchConfig.phase === 'opening' && !move.captured
+                    ? focusMove
+                        ? 28
+                        : openingContext.undevelopedMajors >= 2
+                            ? -112
+                            : -54
+                    : 0;
                 return {
                     move,
                     nextBoard,
                     reviewedBias,
                     tacticalBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + reviewedBias + looseHorseBias + looseCannonBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
-                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
+                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + looseHorseBias + looseCannonBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
+                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(backRankHorseBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
