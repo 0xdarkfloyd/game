@@ -215,6 +215,30 @@ const reviewedCounterswingLine = [
     '帥六平五','車4進2','相三進一','卒6進1','相一進三','將5平6','相三退一','將6平5','相一進三','卒7進1'
 ];
 
+const reviewedHorseCannonLine = [
+    '傌二進一','馬8進7','炮二平四','馬2進3','兵七進一','車9平8','兵三進一','車1進1','相七進五','車1平5',
+    '炮八平七','車5平6','仕四進五','砲2進1','傌八進九','士6進5','炮四退二','車6進5','俥九平八','馬3退1',
+    '俥一平二','車6平9','俥二進一','砲8進1','俥二進一','車9平5','炮四進八','士5進6','俥二平三','車5平1',
+    '俥八進二','車8進1','兵七進一','車8平6','兵三進一','馬7退6','兵七進一','車6平7','兵三進一','砲8退2',
+    '炮七退二','車1平5','傌一進二','車5平4','俥八平七','砲2退3','炮七平九','車7平5','兵三進一','砲2進1',
+    '兵三平四','卒9進1','俥三進四','卒9進1','傌二退三','砲2平3','傌九進八','砲3進6','傌八退六','車5平4',
+    '俥三平五','士4進5','傌六進四','車4進7','炮九平七','象3進5','兵四進一','砲3平7','傌四退三','將5平4',
+    '兵四平五','卒1進1','俥五平二','砲8平7','俥二平四','車4進1','仕五退六','砲7平6','兵七平六','馬1進3',
+    '兵六進一','馬3退2','俥四平八','馬2進1','炮七進一','砲6進1','炮七平六','馬6進4','兵六進一'
+];
+
+const reviewedEarlyRookPivotLine = [
+    '傌二進一','馬8進7','炮二平四','馬2進3','兵七進一','車9平8','兵三進一','車1進1','相七進五','車1平5',
+    '炮八平七','車5平6','仕四進五','砲2進1','傌八進九','士6進5','炮四退二','車6進5','俥九平八','馬3退1',
+    '俥一平二','車6平9','俥二進一','砲8進1','俥二進一','車9平5','炮四進八','士5進6','俥二平三','車5平1',
+    '俥八進二','車8進1','兵七進一','車8平6','兵三進一','馬7退6','兵七進一','車6平7','兵三進一','砲8退2',
+    '炮七退二','車1平5','傌一進二','車5平4','俥八平七','砲2退3','炮七平九','車7平5','兵三進一','砲2進1',
+    '兵三平四','卒9進1','俥三進四','卒9進1','傌二退三','砲2平3','傌九進八','砲3進6','傌八退六','車5平4',
+    '俥三平五','士4進5','傌六進四','車4進7','炮九平七','象3進5','兵四進一','砲3平7','傌四退三','將5平4',
+    '兵四平五','卒1進1','俥五平二','砲8平7','俥二平四','車4進1','仕五退六','砲7平6','兵七平六','馬1進3',
+    '兵六進一','馬3退2','俥四平八','馬2進1','炮七進一','砲6進1','炮七平六','馬6進4','兵六進一'
+];
+
 const reviewedRightFlankLine = [
     '傌二進一','馬8進7','炮二平四','馬2進3','兵七進一','車9平8','兵三進一','車1進1','相七進五','車1平5',
     '炮八平七','車5平6','仕四進五','砲2進1','傌八進九','士6進5','炮四退二','車6進5','俥九平八','馬3退1',
@@ -1083,6 +1107,42 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '4,4-6,4', `expected 車5進2, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed horse-cannon line should push the right soldier on round 9',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedHorseCannonLine.slice(0, 17),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,6-4,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed horse-cannon line should push the center soldier on round 11',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedHorseCannonLine.slice(0, 21),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,4-4,4', `expected 卒5進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed early-rook-pivot line should push the right soldier on round 9',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedEarlyRookPivotLine.slice(0, 17),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,6-4,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed early-rook-pivot line should push the center soldier on round 11',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedEarlyRookPivotLine.slice(0, 21),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,4-4,4', `expected 卒5進1, got ${game.getMoveKey(result.move)}`);
         }
     },
     {

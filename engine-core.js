@@ -131,6 +131,9 @@
             ['b|____bEbAbG__bE____/________bA________/__bCbH______bHrRbC/bSbRbS__bS__bS__bS/__________________/____rSbR____rS____/rS__rC__rS__rC__rS/________rE__rH____/________rA________/rRrHrErArG________', new Map([['3,4-4,4', 7600]])],
             ['b|____bEbAbGbH______/________bA__rR__bC/__bCbH____________/__bRbS__bS__bS__bS/bS____bR____rS____/____rS____________/____rC__rS__rC__rS/rH______rE__rH____/________rA________/rR__rErArG________', new Map([['3,4-4,4', 18000]])],
             ['b|____bEbAbGbArR__bC/______________bH__/bC__bH____________/__bRbS__bS______bS/bS____rSbR__rS____/__________________/____rC__rS____rCrS/rH______rE__rH____/________rA________/rR__rErArG________', new Map([['4,4-6,4', 12000]])]
+            ,
+            ['b|____bEbAbG__bEbR__/________bAbR______/____bH______bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______rS/rH__rC__rE______rH/________rA________/rR____rArGrCrE__rR', new Map([['3,6-4,6', 9000]])],
+            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rSbR____rS/rH__rC__rE______rH/________rA________/__rR__rArGrCrErR__', new Map([['3,4-4,4', 9000]])]
         ]);
         const forcedReviewedOverrides = new Map([
             ['b|bR__bEbAbGbA______/______________bR__/____bH______bHbCbE/bS__bS__bS______bS/____________bS____/____rS________rR__/________rS__bC__rS/__rCrH__rE__rHrC__/__________________/rR____rArGrArE____', '3,1-8,1'],
