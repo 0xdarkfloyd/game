@@ -264,6 +264,15 @@ const reviewedLooseCannonLine = [
     '兵七平六','馬6退8','俥七進七','士5退4','俥七平六'
 ];
 
+const reviewedTwinRookLine = [
+    '兵三進一','馬2進3','傌八進七','馬8進7','炮八平九','車1平2','相三進五','車9進1','炮二平三','馬3退5',
+    '傌二進四','車9平6','炮九平八','砲2平5','兵三進一','車2進7','傌七退五','車6進6','傌四退二','卒7進1',
+    '傌五退三','砲5進4','仕四進五','車6平7','傌二進三','砲5退2','前傌進四','車2退2','傌四退二','砲8進3',
+    '傌三進一','車2平4','俥九平八','車4進1','俥一平三','車4平5','俥八進七','車5平3','俥八平四','車3平1',
+    '俥三平四','車1平5','後俥進四','砲8退3','前俥進一','砲8進2','後俥退三','象3進5','帥五平四','馬5進3',
+    '後俥進六','馬7進6','傌二進三','車5平2','前俥進一','將5進1','後俥進一'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -1336,6 +1345,96 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '2,4-4,2', `expected 象5進3, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should push the center soldier on round 5',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 9),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,4-4,4', `expected 卒5進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should press with the right soldier on round 17',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 33),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,6-5,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should jump the center horse on round 18',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 35),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '1,4-3,5', `expected 馬5進6, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should develop the elephant on round 19',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 37),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,2-2,4', `expected 象3進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should keep the wing soldier pressure on round 21',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 41),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,6-5,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should pull the rear cannon back on round 22',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 43),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '5,7-0,7', `expected 砲8退5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should restore the far elephant on round 23',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 45),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,6-2,8', `expected 象7進9, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should centralize the cannon on round 25',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 49),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '4,4-4,5', `expected 砲5平6, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should push the left soldier on round 26',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 51),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,2-4,2', `expected 卒3進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed twin-rook line should bring the advisor up on round 27',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedTwinRookLine.slice(0, 53),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,3-1,4', `expected 士4進5, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];

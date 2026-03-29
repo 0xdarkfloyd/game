@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260330-loosecannon1', 'game.js?v=20260330-loosecannon1');
+importScripts('engine-core.js?v=20260330-twinrook1', 'game.js?v=20260330-twinrook1');
 
 function getPonderMoveKey(move) {
     return move ? getMoveKey(move) : '';
