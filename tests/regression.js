@@ -251,6 +251,19 @@ const reviewedRightFlankLine = [
     '兵六進一','馬3退2','俥四平八','馬2進1','炮七進一','砲6進1','炮七平六','馬6進4','兵六進一'
 ];
 
+const reviewedLooseCannonLine = [
+    '兵三進一','馬2進3','傌二進三','馬8進7','傌三進四','車9進1','傌八進七','車9平5','炮二平四','砲8進5',
+    '兵三進一','卒7進1','相三進五','卒5進1','兵七進一','卒5進1','俥一平二','卒5平6','炮八進二','砲8平7',
+    '俥二平三','砲7退2','炮八平九','車1平2','炮九平八','砲2平1','相五進三','卒7進1','炮四平五','卒7平8',
+    '炮八平四','馬3進5','炮四平五','卒3進1','前炮進四','士4進5','兵七進一','砲1平3','仕六進五','砲3進5',
+    '俥九進二','砲3退1','俥九平六','車2進9','俥六平七','砲3進3','兵七進一','馬5進4','俥七平九','馬7退9',
+    '俥三進八','馬9進8','俥三退三','馬8退6','俥三平六','砲3退3','仕五退六','砲3進3','仕六進五','馬4進5',
+    '俥九平五','砲3退3','仕五退六','砲3進3','仕六進五','砲3退3','仕五退六','砲3進3','仕六進五','砲3平6',
+    '仕五退六','砲6退3','兵七進一','車2平3','兵七平八','車3平1','俥五平七','象3進5','俥六平四','砲6平1',
+    '兵八平七','砲1平9','俥四進一','卒8進1','兵七進一','車1退3','兵五進一','車1平5','帥五平四','車5退1',
+    '兵七平六','馬6退8','俥七進七','士5退4','俥七平六'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -1260,6 +1273,69 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '0,5-2,6', `expected 馬6進7, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should push the chased soldier on round 11',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 21),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '5,5-6,5', `expected 卒6進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should jump the horse on round 15',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 29),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,2-3,4', `expected 馬3進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should keep the wider horse line on round 16',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 31),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,6-3,4', `expected 馬7進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should develop the elephant on round 17',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 33),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,6-2,4', `expected 象7進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should retreat the cannon deeper on round 27',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 53),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '9,2-4,2', `expected 砲3退5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should keep the cannon back on round 38',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 75),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,5-3,5', `expected 砲6退3, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed loose-cannon line should restore the elephant on round 46',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedLooseCannonLine.slice(0, 91),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,4-4,2', `expected 象5進3, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];
