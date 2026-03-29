@@ -155,50 +155,26 @@
             ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6|2,6-0,5|4,2-3,2|1,5-1,6|4,6-3,6|3,7-1,7|7,2-9,2|6,0-6,4|7,8-5,7|6,4-6,3|7,1-7,2|3,1-0,1|9,2-9,0|1,6-1,4|3,6-2,6|0,1-1,1|2,6-2,5|3,8-4,8|7,6-3,6|4,8-5,8|5,7-7,6|1,1-1,2|7,0-5,1|1,2-7,2|5,1-6,3|1,4-1,3|3,6-3,4|0,3-1,4|6,3-5,5|1,3-8,3|9,0-9,2', '0,5-2,4'],
             ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6|2,6-0,5|4,2-3,2|1,5-1,6|4,6-3,6|3,7-1,7|7,2-9,2|6,0-6,4|7,8-5,7|6,4-6,3|7,1-7,2|3,1-0,1|9,2-9,0|1,6-1,4|3,6-2,6|0,1-1,1|2,6-2,5|3,8-4,8|7,6-3,6|4,8-5,8|5,7-7,6|1,1-1,2|7,0-5,1|1,2-7,2|5,1-6,3|1,4-1,3|3,6-3,4|0,3-1,4|6,3-5,5|1,3-8,3|9,0-9,2|0,2-2,4|2,5-1,5|7,2-7,6|5,5-7,6|0,4-0,3|1,5-1,4|3,0-4,0|3,4-3,7', '0,5-2,6']
         ]);
-        let currentHistoryKey = '';
+        function getReviewedPositionBias(board, color, move, history) {
+            if ((history || []).length > 16) {
+                return 0;
+            }
 
-        function getReviewedPositionBias(board, color, move) {
             const moveHints = reviewedPositionHints.get(getBoardKey(board, color));
             if (!moveHints) {
                 return 0;
             }
 
-            return moveHints.get(getMoveKey(move)) || 0;
+            const rawBias = moveHints.get(getMoveKey(move)) || 0;
+            if (!rawBias) {
+                return 0;
+            }
+
+            return Math.min(220, Math.round(rawBias / 18));
         }
 
-        function getForcedReviewedMove(board, color, legalMoves) {
-            const historyOverrideKey = forcedReviewedHistoryOverrides.get(currentHistoryKey);
-            if (historyOverrideKey) {
-                const historyOverrideMove = legalMoves.find(move => getMoveKey(move) === historyOverrideKey);
-                if (historyOverrideMove) {
-                    return historyOverrideMove;
-                }
-            }
-
-            const overrideKey = forcedReviewedOverrides.get(getBoardKey(board, color));
-            if (overrideKey) {
-                const overrideMove = legalMoves.find(move => getMoveKey(move) === overrideKey);
-                if (overrideMove) {
-                    return overrideMove;
-                }
-            }
-
-            const moveHints = reviewedPositionHints.get(getBoardKey(board, color));
-            if (!moveHints) {
-                return null;
-            }
-
-            let forcedMove = null;
-            let bestBias = 0;
-            for (const move of legalMoves) {
-                const bias = moveHints.get(getMoveKey(move)) || 0;
-                if (bias >= 3000 && bias > bestBias) {
-                    bestBias = bias;
-                    forcedMove = move;
-                }
-            }
-
-            return forcedMove;
+        function getForcedReviewedMove() {
+            return null;
         }
 
         function getStageProfile(board, history) {
@@ -2472,7 +2448,7 @@
                 const practicalBias = getPracticalOpeningBias(board, nextBoard, move, color, history, openingContext);
                 const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
                 const safetyPenalty = getImmediateRiskPenalty(board, nextBoard, move, color, searchConfig.stage);
-                const reviewedBias = getReviewedPositionBias(board, color, move);
+                const reviewedBias = getReviewedPositionBias(board, color, move, history);
                 const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
                 const rookCenterBias = !move.captured &&
                     move.piece[1] === 'R' &&
@@ -2542,12 +2518,6 @@
                 : quickEntries;
             const shortlistLimit = Math.min(shortlistSource.length, Math.max(searchConfig.rootLimit * 2, 12));
             const shortlist = shortlistSource.slice(0, shortlistLimit);
-            const strongReviewedQuickEntries = quickEntries.filter(entry => entry.reviewedBias >= 3000);
-            for (const reviewedEntry of strongReviewedQuickEntries) {
-                if (!shortlist.some(entry => sameMove(entry.move, reviewedEntry.move))) {
-                    shortlist.push(reviewedEntry);
-                }
-            }
             const entries = shortlist.map(entry => {
                 const nextBoard = entry.nextBoard;
                 const continuationBias = getRootContinuationBias(board, nextBoard, entry.move, color, history, searchConfig.stage);
@@ -2640,14 +2610,6 @@
                 }
 
                 entries.sort((left, right) => right.sortScore - left.sortScore);
-            }
-
-            const strongReviewedEntries = entries.filter(entry => entry.reviewedBias >= 3000);
-            if (strongReviewedEntries.length > 0) {
-                return strongReviewedEntries
-                    .slice()
-                    .sort((left, right) => right.reviewedBias - left.reviewedBias)
-                    .slice(0, 1);
             }
 
             if (urgentHomeRookRepairs.size > 0) {
@@ -2935,21 +2897,9 @@
             const history = cloneMoveSequence(options.history || []);
             const positionHistory = clonePositionHistory(options.positionHistory || []);
             const legalMoves = filterPlayableMoves(board, color, getAllLegalMoves(board, color), positionHistory, history);
-            currentHistoryKey = history.join('|');
 
             if (legalMoves.length === 0) {
                 return { move: null, score: -MATE_SCORE, pv: [], completedDepth: 0, timedOut: false };
-            }
-
-            const forcedReviewedMove = getForcedReviewedMove(board, color, legalMoves);
-            if (forcedReviewedMove) {
-                return {
-                    move: forcedReviewedMove,
-                    score: 0,
-                    pv: [getMoveKey(forcedReviewedMove)],
-                    completedDepth: 0,
-                    timedOut: false
-                };
             }
 
             const searchConfig = getPhaseConfig(board, history, options.timeBudgetMs);

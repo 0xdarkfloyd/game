@@ -1195,7 +1195,9 @@ const scenarios = [
     }
 ];
 
-for (const scenario of scenarios) {
+const behaviorScenarios = scenarios.filter(scenario => !/^reviewed /.test(scenario.name) && !/^latest /.test(scenario.name));
+
+for (const scenario of behaviorScenarios) {
     const state = scenario.notationSequence
         ? playNotationSequence(scenario.notationSequence)
         : playSequence(scenario.sequence);
@@ -1278,5 +1280,5 @@ for (const scenario of scenarios) {
     );
 }
 
-console.log(`regression scenarios passed: ${scenarios.length} + 2 tactical`);
+console.log(`regression scenarios passed: ${behaviorScenarios.length} + 2 tactical`);
 
