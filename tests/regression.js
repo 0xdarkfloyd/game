@@ -206,6 +206,18 @@ const reviewedCounterswingLine = [
     '帥六平五','車4進2','相三進一','卒6進1','相一進三','將5平6','相三退一','將6平5','相一進三','卒7進1'
 ];
 
+const reviewedRightFlankLine = [
+    '傌二進一','馬8進7','炮二平四','馬2進3','兵七進一','車9平8','兵三進一','車1進1','相七進五','車1平5',
+    '炮八平七','車5平6','仕四進五','砲2進1','傌八進九','士6進5','炮四退二','車6進5','俥九平八','馬3退1',
+    '俥一平二','車6平9','俥二進一','砲8進1','俥二進一','車9平5','炮四進八','士5進6','俥二平三','車5平1',
+    '俥八進二','車8進1','兵七進一','車8平6','兵三進一','馬7退6','兵七進一','車6平7','兵三進一','砲8退2',
+    '炮七退二','車1平5','傌一進二','車5平4','俥八平七','砲2退3','炮七平九','車7平5','兵三進一','砲2進1',
+    '兵三平四','卒9進1','俥三進四','卒9進1','傌二退三','砲2平3','傌九進八','砲3進6','傌八退六','車5平4',
+    '俥三平五','士4進5','傌六進四','車4進7','炮九平七','象3進5','兵四進一','砲3平7','傌四退三','將5平4',
+    '兵四平五','卒1進1','俥五平二','砲8平7','俥二平四','車4進1','仕五退六','砲7平6','兵七平六','馬1進3',
+    '兵六進一','馬3退2','俥四平八','馬2進1','炮七進一','砲6進1','炮七平六','馬6進4','兵六進一'
+];
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -1062,6 +1074,123 @@ const scenarios = [
         check(result) {
             assert(result.move, 'expected a move');
             assert.strictEqual(game.getMoveKey(result.move), '2,3-4,3', `expected 車4進2, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should sidestep with the cannon on round 8',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 15),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '2,7-2,8', `expected 砲8平9, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should develop the elephant on round 11',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 21),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,6-2,4', `expected 象7進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should keep the elephant development on round 12',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 23),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,6-2,4', `expected 象7進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should still prefer the elephant on round 13',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 25),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,6-2,4', `expected 象7進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should bring the rook up on round 15',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 29),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,7-1,7', `expected 車8進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should push the wing pawn on round 18',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 35),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,6-4,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should keep pressing with the wing pawn on round 19',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 37),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,6-4,6', `expected 卒7進1, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should retreat the cannon on round 21',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 41),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,1-0,1', `expected 砲2退3, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should strike with the cannon on round 22',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 43),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '3,1-6,1', `expected 砲2進3, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should develop the elephant on round 24',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 47),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,2-2,4', `expected 象3進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should reroute the rook on round 28',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 55),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '6,3-6,5', `expected 車4平6, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should jump the horse on round 33',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 65),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,5-2,4', `expected 馬6進5, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'reviewed right-flank line should jump the horse wider on round 37',
+        timeBudgetMs: 10000,
+        notationSequence: reviewedRightFlankLine.slice(0, 73),
+        check(result) {
+            assert(result.move, 'expected a move');
+            assert.strictEqual(game.getMoveKey(result.move), '0,5-2,6', `expected 馬6進7, got ${game.getMoveKey(result.move)}`);
         }
     }
 ];

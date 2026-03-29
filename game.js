@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260329-reviewed4';
+const ASSET_VERSION = '20260329-reviewed5';
 const GAME_MODES = {
     ai: 'ai',
     local: 'local'
