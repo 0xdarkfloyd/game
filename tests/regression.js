@@ -118,6 +118,15 @@ function assertMoveNotationIn(state, result, expectedNotations, message) {
     );
 }
 
+function assertMoveNotationNotIn(state, result, forbiddenNotations, message) {
+    assert(result.move, 'expected a move');
+    const notation = getMoveNotation(state, result.move);
+    assert(
+        !forbiddenNotations.includes(notation),
+        message || `unexpected move ${notation}`
+    );
+}
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -260,6 +269,86 @@ const scenarios = [
         timeBudgetMs: 2200,
         check(state, result) {
             assertActiveMajorReply(result, `expected forcing defensive continuation, got ${game.getMoveKey(result.move)}`);
+        }
+    },
+    {
+        name: 'pressure ladder prefers active reply over palace drift',
+        notationSequence: [
+            '兵七進一', '馬2進3',
+            '傌二進三', '馬8進7',
+            '傌八進七', '車1進1',
+            '傌七進六', '車1平5',
+            '俥一進一', '車9進1',
+            '兵三進一', '卒5進1',
+            '炮八平五', '車5平3',
+            '兵七進一', '卒3進1',
+            '俥一平四', '車9平4',
+            '俥九平八', '砲2平1',
+            '炮二進二', '卒3進1',
+            '傌六進四', '馬7進5',
+            '炮五進三', '士4進5',
+            '炮二平七'
+        ],
+        timeBudgetMs: 2000,
+        check(state, result) {
+            assertActiveMajorReply(result, `expected active reply under repeated pressure, got ${getMoveNotation(state, result.move)}`);
+            assertMoveNotationNotIn(state, result, ['士5進4', '象3進5'], 'should not drift into quiet palace move');
+        }
+    },
+    {
+        name: 'counterpressure should continue after opponent retreats',
+        notationSequence: [
+            '兵七進一', '馬2進3',
+            '傌二進三', '馬8進7',
+            '傌八進七', '車1進1',
+            '傌七進六', '車1平5',
+            '俥一進一', '車9進1',
+            '兵三進一', '卒5進1',
+            '炮八平五', '車5平3',
+            '兵七進一', '卒3進1',
+            '俥一平四', '車9平4',
+            '俥九平八', '砲2平1',
+            '炮二進二', '卒3進1',
+            '傌六進四', '馬7進5',
+            '炮五進三', '士4進5',
+            '炮二平七', '馬3進4',
+            '相七進九', '砲1進4',
+            '俥四平六', '砲1退1',
+            '兵三進一'
+        ],
+        timeBudgetMs: 2200,
+        check(state, result) {
+            assertActiveMajorReply(result, `expected counterpressure continuation, got ${getMoveNotation(state, result.move)}`);
+            assertMoveNotationNotIn(state, result, ['士5進4', '士6進5'], 'should not switch to passive palace move');
+        }
+    },
+    {
+        name: 'opened attack lane prefers pressure maintenance over quiet reroute',
+        notationSequence: [
+            '兵七進一', '馬2進3',
+            '傌二進三', '馬8進7',
+            '傌八進七', '車1進1',
+            '傌七進六', '車1平5',
+            '俥一進一', '車9進1',
+            '兵三進一', '卒5進1',
+            '炮八平五', '車5平3',
+            '兵七進一', '卒3進1',
+            '俥一平四', '車9平4',
+            '俥九平八', '砲2平1',
+            '炮二進二', '卒3進1',
+            '傌六進四', '馬7進5',
+            '炮五進三', '士4進5',
+            '炮二平七', '馬3進4',
+            '相七進九', '砲1進4',
+            '俥四平六', '砲1退1',
+            '兵三進一', '卒7進1',
+            '相三進五', '砲8退1',
+            '俥八進七'
+        ],
+        timeBudgetMs: 2200,
+        check(state, result) {
+            assertActiveMajorReply(result, `expected pressure-maintaining reply, got ${getMoveNotation(state, result.move)}`);
+            assertMoveNotationNotIn(state, result, ['士5退6', '象3進1'], 'should keep the opened lane active');
         }
     }
 ];
