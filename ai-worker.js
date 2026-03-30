@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260330-search4', 'game.js?v=20260330-search4');
+importScripts('engine-core.js?v=20260330-search5', 'game.js?v=20260330-search5');
 
 function getPonderMoveKey(move) {
     return move ? getMoveKey(move) : '';

@@ -1283,8 +1283,13 @@
                 return new Set();
             }
 
+            const opponent = otherColor(color);
             const pushes = new Set();
             const centerFiles = new Set([2, 4, 6]);
+            const threatBefore = countThreatenedEnemyMajors(board, color);
+            const pressureBefore = getCompositePressureScore(board, color, stage);
+            const coordinationBefore = evaluateAttackCoordination(board, color, stage);
+            const enemyDefenseBefore = getCompositeDefenseScore(board, opponent, stage);
             for (const move of legalMoves) {
                 if (move.piece !== `${color}S` || move.captured || move.toCol !== move.fromCol) {
                     continue;
@@ -1302,14 +1307,92 @@
                 }
 
                 const nextBoard = applyMoveToBoard(board, move);
-                const beforePressure = countThreatenedEnemyMajors(board, color);
-                const afterPressure = countThreatenedEnemyMajors(nextBoard, color);
-                if (afterPressure >= beforePressure || hasCrossedRiver(color, move.toRow)) {
+                const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+                const pressureAfter = getCompositePressureScore(nextBoard, color, stage);
+                const coordinationAfter = evaluateAttackCoordination(nextBoard, color, stage);
+                const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, opponent, stage);
+                const centralPush = move.fromCol === 4;
+                const practicalGain =
+                    threatAfter > threatBefore ||
+                    pressureAfter > pressureBefore ||
+                    coordinationAfter > coordinationBefore ||
+                    enemyDefenseAfter < enemyDefenseBefore;
+
+                if (
+                    threatAfter >= threatBefore ||
+                    hasCrossedRiver(color, move.toRow) ||
+                    practicalGain ||
+                    (centralPush && pressureAfter >= pressureBefore - stageWeight(stage, 4, 18, 8))
+                ) {
                     pushes.add(getMoveKey(move));
                 }
             }
 
             return pushes;
+        }
+
+        function getStrategicCannonRedeployMoves(board, color, stage, legalMoves) {
+            const moves = new Set();
+            if (stage.middlegame < 0.18 && stage.endgame < 0.18) {
+                return moves;
+            }
+
+            const opponent = otherColor(color);
+            const enemyGeneral = findGeneral(board, opponent);
+            const threatBefore = countThreatenedEnemyMajors(board, color);
+            const pressureBefore = getCompositePressureScore(board, color, stage);
+            const enemyDefenseBefore = getCompositeDefenseScore(board, opponent, stage);
+            const enemyExposedBefore = countExposedMajors(board, opponent, stage);
+            for (const move of legalMoves) {
+                if (
+                    move.piece !== `${color}C` ||
+                    move.captured ||
+                    move.toRow !== move.fromRow ||
+                    move.fromRow === cannonRow(color)
+                ) {
+                    continue;
+                }
+
+                const nextBoard = applyMoveToBoard(board, move);
+                const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+                const pressureAfter = getCompositePressureScore(nextBoard, color, stage);
+                const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, opponent, stage);
+                const enemyExposedAfter = countExposedMajors(nextBoard, opponent, stage);
+                const fromAttackers = getAttackerValues(board, move.fromRow, move.fromCol, opponent);
+                const toAttackers = getAttackerValues(nextBoard, move.toRow, move.toCol, opponent);
+                const saferSquare =
+                    toAttackers.length < fromAttackers.length ||
+                    (toAttackers.length === fromAttackers.length &&
+                        getAttackerValues(nextBoard, move.toRow, move.toCol, color).length >
+                        getAttackerValues(board, move.fromRow, move.fromCol, color).length);
+                const moveToWing = Math.abs(4 - move.toCol) > Math.abs(4 - move.fromCol);
+                const fileGain = enemyGeneral
+                    ? Math.abs(enemyGeneral.col - move.fromCol) - Math.abs(enemyGeneral.col - move.toCol)
+                    : 0;
+                const tacticalGain =
+                    threatAfter > threatBefore ||
+                    enemyExposedAfter > enemyExposedBefore ||
+                    enemyDefenseAfter < enemyDefenseBefore - stageWeight(stage, 2, 16, 8);
+
+                if (
+                    tacticalGain &&
+                    pressureAfter >= pressureBefore - stageWeight(stage, 8, 26, 12)
+                ) {
+                    moves.add(getMoveKey(move));
+                    continue;
+                }
+
+                if (
+                    moveToWing &&
+                    saferSquare &&
+                    pressureAfter >= pressureBefore - stageWeight(stage, 6, 22, 10) &&
+                    (fileGain > 0 || enemyDefenseAfter < enemyDefenseBefore || threatAfter >= threatBefore)
+                ) {
+                    moves.add(getMoveKey(move));
+                }
+            }
+
+            return moves;
         }
 
         function hasAttackerType(board, row, col, attackerColor, targetTypes) {
@@ -1374,6 +1457,7 @@
             const enemyGeneral = findGeneral(board, opponent);
             const pressureBefore = getCompositePressureScore(board, color, stage);
             const threatBefore = countThreatenedEnemyMajors(board, color);
+            const enemyDefenseBefore = getCompositeDefenseScore(board, opponent, stage);
             const exposedBefore = countExposedMajors(board, color, stage);
             const minimumPressure = stageWeight(stage, 18, 54, 24);
 
@@ -1381,6 +1465,7 @@
                 const nextBoard = applyMoveToBoard(board, move);
                 const pressureAfter = getCompositePressureScore(nextBoard, color, stage);
                 const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+                const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, opponent, stage);
                 const exposedAfter = countExposedMajors(nextBoard, color, stage);
                 const activeMove = move.captured ||
                     isInCheck(nextBoard, opponent) ||
@@ -1404,6 +1489,21 @@
                     ['R', 'C'].includes(move.piece[1]) &&
                     fileGain > 0 &&
                     pressureAfter >= pressureBefore - stageWeight(stage, 10, 30, 12)
+                ) {
+                    moves.add(getMoveKey(move));
+                } else if (
+                    !move.captured &&
+                    move.piece[1] === 'S' &&
+                    move.fromCol === 4 &&
+                    move.toCol === move.fromCol &&
+                    (color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow) &&
+                    pressureAfter >= pressureBefore - stageWeight(stage, 8, 22, 10) &&
+                    (
+                        threatAfter > threatBefore ||
+                        enemyDefenseAfter < enemyDefenseBefore ||
+                        exposedAfter < exposedBefore ||
+                        hasCrossedRiver(color, move.toRow)
+                    )
                 ) {
                     moves.add(getMoveKey(move));
                 }
@@ -2353,6 +2453,20 @@
                 const deepAdvance = color === RED_COLOR ? move.toRow <= 4 : move.toRow >= 5;
                 const longAdvance = Math.abs(move.toRow - move.fromRow) >= 3;
                 const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
+                const pressureBefore = getCompositePressureScore(board, color, stage);
+                const pressureAfter = getCompositePressureScore(nextBoard, color, stage);
+                const threatBefore = countThreatenedEnemyMajors(board, color);
+                const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+                const enemyDefenseBefore = getCompositeDefenseScore(board, otherColor(color), stage);
+                const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, otherColor(color), stage);
+                const strategicSidewaysRedeploy =
+                    move.fromRow !== cannonRow(color) &&
+                    move.toRow === move.fromRow &&
+                    (
+                        threatAfter > threatBefore ||
+                        enemyDefenseAfter < enemyDefenseBefore - stageWeight(stage, 2, 14, 6) ||
+                        pressureAfter >= pressureBefore - stageWeight(stage, 8, 24, 10)
+                    );
                 if (deepAdvance && stage.opening + stage.middlegame >= 0.6) {
                     penalty += stageWeight(stage, 36, 20, 6);
                 }
@@ -2363,8 +2477,10 @@
                     penalty += stageWeight(stage, 48, 28, 8);
                 }
                 if (move.fromRow !== cannonRow(color) && move.toRow === move.fromRow) {
-                    if (centerGain < 0) {
+                    if (centerGain < 0 && !strategicSidewaysRedeploy) {
                         penalty += Math.abs(centerGain) * stageWeight(stage, 18, 64, 18);
+                    } else if (centerGain < 0 && strategicSidewaysRedeploy) {
+                        penalty -= Math.abs(centerGain) * stageWeight(stage, 4, 14, 6);
                     } else if (centerGain > 0 && attackers.length >= defenders.length) {
                         penalty -= Math.round(centerGain * stageWeight(stage, 4, 18, 6));
                     }
@@ -2472,6 +2588,27 @@
                 const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
                 const edgeFile = move.fromCol === 0 || move.fromCol === 8;
                 const alreadyAdvanced = move.fromRow !== cannonRow(color);
+                const pressureBefore = getCompositePressureScore(board, color, stage);
+                const pressureAfter = getCompositePressureScore(nextBoard, color, stage);
+                const threatBefore = countThreatenedEnemyMajors(board, color);
+                const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+                const enemyDefenseBefore = getCompositeDefenseScore(board, opponent, stage);
+                const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, opponent, stage);
+                const enemyGeneral = findGeneral(board, opponent);
+                const fileGain = enemyGeneral
+                    ? Math.abs(enemyGeneral.col - move.fromCol) - Math.abs(enemyGeneral.col - move.toCol)
+                    : 0;
+                const strategicSidewaysRedeploy =
+                    alreadyAdvanced &&
+                    move.toRow === move.fromRow &&
+                    (
+                        threatAfter > threatBefore ||
+                        enemyDefenseAfter < enemyDefenseBefore - stageWeight(stage, 2, 14, 6) ||
+                        (
+                            pressureAfter >= pressureBefore - stageWeight(stage, 8, 24, 10) &&
+                            (fileGain > 0 || (Math.abs(move.toCol - 4) > Math.abs(move.fromCol - 4) && enemyDefenseAfter < enemyDefenseBefore))
+                        )
+                    );
                 if (forward && edgeFile && alreadyAdvanced && stage.opening + stage.middlegame >= 0.55) {
                     penalty += stageWeight(stage, 88, 246, 64);
                 }
@@ -2487,11 +2624,15 @@
 
                 if (stage.middlegame >= 0.55 && alreadyAdvanced) {
                     if (move.toRow === move.fromRow && !isInCheck(nextBoard, otherColor(color))) {
-                        penalty += move.toCol === 4
-                            ? stageWeight(stage, 0, 34, 10)
-                            : stageWeight(stage, 0, 128, 36);
-                        if (Math.abs(move.toCol - 4) >= Math.abs(move.fromCol - 4)) {
-                            penalty += stageWeight(stage, 0, 72, 22);
+                        if (!strategicSidewaysRedeploy) {
+                            penalty += move.toCol === 4
+                                ? stageWeight(stage, 0, 34, 10)
+                                : stageWeight(stage, 0, 128, 36);
+                            if (Math.abs(move.toCol - 4) >= Math.abs(move.fromCol - 4)) {
+                                penalty += stageWeight(stage, 0, 72, 22);
+                            }
+                        } else {
+                            penalty -= stageWeight(stage, 0, 36, 14);
                         }
                     } else if (forward && !move.captured) {
                         penalty += stageWeight(stage, 0, 58, 18);
@@ -2908,6 +3049,7 @@
                 return 0;
             }
 
+            const opponent = otherColor(color);
             const pressureBefore = evaluateRookPressure(board, color, stage);
             const pressureAfter = evaluateRookPressure(nextBoard, color, stage);
             const coordinationBefore = evaluateAttackCoordination(board, color, stage);
@@ -2918,7 +3060,9 @@
             const exposedAfter = countExposedMajors(nextBoard, color, stage);
             const compositeBefore = getCompositePressureScore(board, color, stage);
             const compositeAfter = getCompositePressureScore(nextBoard, color, stage);
-            const enemyGeneral = findGeneral(board, otherColor(color));
+            const enemyDefenseBefore = getCompositeDefenseScore(board, opponent, stage);
+            const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, opponent, stage);
+            const enemyGeneral = findGeneral(board, opponent);
             let score = 0;
 
             score += (pressureAfter - pressureBefore) * stageWeight(stage, 0.35, 1.25, 0.45);
@@ -2983,8 +3127,36 @@
                 pressureBefore + coordinationBefore >= stageWeight(stage, 16, 46, 18) &&
                 pressureAfter <= pressureBefore &&
                 coordinationAfter <= coordinationBefore &&
-                threatAfter <= threatBefore) {
+                threatAfter <= threatBefore &&
+                !(
+                    move.fromCol === 4 &&
+                    move.toCol === move.fromCol &&
+                    (hasCrossedRiver(color, move.toRow) ||
+                        enemyDefenseAfter < enemyDefenseBefore ||
+                        compositeAfter >= compositeBefore - stageWeight(stage, 6, 24, 12))
+                )) {
                 score -= stageWeight(stage, 0, 118, 42);
+            }
+
+            if (!move.captured &&
+                move.piece[1] === 'S' &&
+                move.fromCol === 4 &&
+                move.toCol === move.fromCol) {
+                const forward = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+                if (
+                    forward &&
+                    (
+                        hasCrossedRiver(color, move.toRow) ||
+                        enemyDefenseAfter < enemyDefenseBefore ||
+                        threatAfter > threatBefore ||
+                        compositeAfter >= compositeBefore - stageWeight(stage, 6, 24, 12)
+                    )
+                ) {
+                    score += stageWeight(stage, 0, 82, 36);
+                    if (enemyDefenseAfter < enemyDefenseBefore) {
+                        score += stageWeight(stage, 0, 42, 18);
+                    }
+                }
             }
 
             return Math.round(score);
@@ -3131,6 +3303,13 @@
             const recentOwnMoves = getSideHistoryMoves(history, color);
             const lastOwnMove = recentOwnMoves[recentOwnMoves.length - 1] || null;
             const previousOwnMove = recentOwnMoves.length > 1 ? recentOwnMoves[recentOwnMoves.length - 2] : null;
+            const strategicCannonRedeployMoves = getStrategicCannonRedeployMoves(
+                board,
+                color,
+                searchConfig.stage,
+                [entry.move]
+            );
+            const strategicCannonRedeploy = strategicCannonRedeployMoves.has(getMoveKey(entry.move));
             const delayedReversePenalty = isDelayedQuietCannonReverse(
                 entry.move,
                 previousOwnMove,
@@ -3194,9 +3373,13 @@
                 const homeDistanceBefore = Math.abs(homeRow(color) - entry.move.fromRow);
                 const homeDistanceAfter = Math.abs(homeRow(color) - entry.move.toRow);
                 if (alreadyAdvanced && sideways && !isInCheck(entry.nextBoard, otherColor(color))) {
-                    practicalAdjustment -= stageWeight(searchConfig.stage, 0, 152, 36);
-                    if (Math.abs(entry.move.toCol - 4) >= Math.abs(entry.move.fromCol - 4)) {
-                        practicalAdjustment -= stageWeight(searchConfig.stage, 0, 86, 22);
+                    if (!strategicCannonRedeploy) {
+                        practicalAdjustment -= stageWeight(searchConfig.stage, 0, 152, 36);
+                        if (Math.abs(entry.move.toCol - 4) >= Math.abs(entry.move.fromCol - 4)) {
+                            practicalAdjustment -= stageWeight(searchConfig.stage, 0, 86, 22);
+                        }
+                    } else {
+                        practicalAdjustment += stageWeight(searchConfig.stage, 0, 84, 26);
                     }
                 } else if (alreadyAdvanced && forward) {
                     practicalAdjustment -= stageWeight(searchConfig.stage, 0, 72, 18);
@@ -3236,6 +3419,7 @@
             const urgentOverextendedCannonRepairs = getOverextendedCannonRepairMoves(board, color, searchConfig.stage, legalMoves);
             const urgentBackRankHorseReliefs = getBackRankHorseReliefMoves(board, color, legalMoves);
             const practicalSoldierPushes = getPracticalSoldierPushMoves(board, color, searchConfig.stage, legalMoves);
+            const strategicCannonRedeployMoves = getStrategicCannonRedeployMoves(board, color, searchConfig.stage, legalMoves);
             const pressureContinuationMoves = getPressureContinuationMoveKeys(board, color, searchConfig.stage, legalMoves);
             const practicalDefenseMoves = getPracticalDefenseMoveKeys(board, color, searchConfig.stage, legalMoves);
             const advancedRootSearch = searchConfig.time >= 6000;
@@ -3275,6 +3459,9 @@
                 let practicalDefenseBias = practicalDefenseMoves.has(moveKey)
                     ? stageWeight(searchConfig.stage, 0, 126, 54)
                     : 0;
+                let strategicCannonRedeployBias = strategicCannonRedeployMoves.has(moveKey)
+                    ? stageWeight(searchConfig.stage, 0, 108, 42)
+                    : 0;
                 const forcefulMove = move.captured ||
                     isInCheck(nextBoard, otherColor(color)) ||
                     urgentHomeRookRepairs.has(moveKey) ||
@@ -3283,6 +3470,7 @@
                     urgentLooseCannonReliefs.has(moveKey) ||
                     urgentOverextendedCannonRepairs.has(moveKey) ||
                     urgentBackRankHorseReliefs.has(moveKey) ||
+                    strategicCannonRedeployMoves.has(moveKey) ||
                     pressureContinuationMoves.has(moveKey) ||
                     practicalDefenseMoves.has(moveKey) ||
                     tacticalBias >= 42 ||
@@ -3315,7 +3503,18 @@
                 let soldierPressureBias = 0;
                 if (practicalSoldierPushes.size > 0) {
                     if (practicalSoldierPushes.has(moveKey)) {
-                        soldierPressureBias += stageWeight(searchConfig.stage, 60, 96, 36);
+                        soldierPressureBias += stageWeight(searchConfig.stage, 72, 124, 48);
+                        if (move.piece[1] === 'S' && move.fromCol === 4) {
+                            soldierPressureBias += stageWeight(searchConfig.stage, 0, 94, 34);
+                            if (pressureContinuationMoves.has(moveKey)) {
+                                soldierPressureBias += stageWeight(searchConfig.stage, 0, 58, 24);
+                            }
+                            const enemyDefenseBefore = getCompositeDefenseScore(board, otherColor(color), searchConfig.stage);
+                            const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, otherColor(color), searchConfig.stage);
+                            if (enemyDefenseAfter < enemyDefenseBefore) {
+                                soldierPressureBias += stageWeight(searchConfig.stage, 0, 48, 22);
+                            }
+                        }
                     } else if (!move.captured && move.piece[1] === 'C') {
                         soldierPressureBias -= stageWeight(searchConfig.stage, 0, 52, 18);
                     }
@@ -3464,6 +3663,11 @@
                         }
                     }
                 }
+                if (strategicCannonRedeployMoves.has(moveKey)) {
+                    strategicCannonRedeployBias += stageWeight(searchConfig.stage, 0, 28, 12);
+                } else if (!move.captured && move.piece[1] === 'C' && move.toRow === move.fromRow) {
+                    strategicCannonRedeployBias -= stageWeight(searchConfig.stage, 0, 22, 8);
+                }
                 if (pressureContinuationMoves.size > 0 && !pressureContinuationMoves.has(moveKey) && !move.captured) {
                     if (['A', 'E', 'G', 'S'].includes(move.piece[1])) {
                         pressureRouteBias -= stageWeight(searchConfig.stage, 0, 64, 24);
@@ -3495,10 +3699,11 @@
                     counterstrikeBias,
                     pressureRouteBias,
                     practicalDefenseBias,
+                    strategicCannonRedeployBias,
                     openingSoftBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + pressureRouteBias + practicalDefenseBias + openingSoftBias + Math.round(pressureMaintenanceBias * 0.82) + Math.round(counterstrikeBias * 0.86) + Math.round(tacticalBias * 0.92) - Math.round(safetyPenalty * 0.52),
-                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(pressureRouteBias * 0.88) + Math.round(practicalDefenseBias * 0.88) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(openingSoftBias * 0.82) + Math.round(pressureMaintenanceBias * 0.76) + Math.round(counterstrikeBias * 0.78) + Math.round(tacticalBias * 0.6) - Math.round(safetyPenalty * 0.34)
+                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + pressureRouteBias + practicalDefenseBias + strategicCannonRedeployBias + openingSoftBias + Math.round(pressureMaintenanceBias * 0.82) + Math.round(counterstrikeBias * 0.86) + Math.round(tacticalBias * 0.92) - Math.round(safetyPenalty * 0.52),
+                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(pressureRouteBias * 0.88) + Math.round(practicalDefenseBias * 0.88) + Math.round(strategicCannonRedeployBias * 0.86) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(openingSoftBias * 0.82) + Math.round(pressureMaintenanceBias * 0.76) + Math.round(counterstrikeBias * 0.78) + Math.round(tacticalBias * 0.6) - Math.round(safetyPenalty * 0.34)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
@@ -3516,6 +3721,7 @@
                 ...urgentOverextendedCannonRepairs,
                 ...urgentBackRankHorseReliefs,
                 ...practicalSoldierPushes,
+                ...strategicCannonRedeployMoves,
                 ...pressureContinuationMoves,
                 ...practicalDefenseMoves
             ]);

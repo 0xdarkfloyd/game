@@ -147,6 +147,27 @@ function assertTopEntriesContain(entries, predicate, topN, message) {
     assert(window.some(entry => predicate(entry.move)), message || `expected matching move in top ${topN}`);
 }
 
+const pressureLineKeys = `
+6,6-5,6 0,7-2,6 7,1-7,4 0,1-2,2 7,4-7,2 0,0-0,1 9,1-7,0 2,1-2,0
+6,2-5,2 2,0-6,0 9,0-9,1 0,1-9,1 7,0-9,1 6,0-5,0 9,7-7,6 0,8-1,8
+7,7-7,8 1,8-1,1 9,8-9,7 2,7-2,8 9,7-2,7 2,2-1,4 9,1-7,0 2,8-1,8
+7,2-3,2 1,1-1,2 7,0-5,1 1,2-1,1 5,1-7,2 1,1-1,2 5,2-4,2 1,8-1,6
+7,6-5,7 5,0-5,5 5,7-7,6 5,5-2,5 2,7-1,7 1,4-3,3 7,6-5,5 2,5-2,4
+7,8-7,6 1,2-1,5 9,6-7,4 2,4-1,4 5,5-4,3 1,5-7,5 9,5-8,4 1,4-1,7
+8,4-7,5 3,3-1,4 7,2-5,3 1,7-5,7 5,3-6,5 5,7-0,7 6,8-5,8 1,4-3,3
+9,3-8,4 3,3-1,4 3,2-3,1 1,4-1,3 5,6-4,6 3,3-1,2 4,3-3,5 1,6-1,5
+3,1-6,1 2,6-1,4 3,5-1,6 1,2-2,4 4,0-3,2 2,2-0,1 9,2-7,0 0,1-2,0
+1,7-1,8 2,4-3,2 4,2-4,3 0,1-1,3 6,3-7,3 3,0-4,0 6,3-3,6 1,5-3,5
+3,6-1,6 3,5-5,5 1,6-1,7 3,5-5,5 1,7-1,8 3,2-1,1 1,8-0,6 5,0-5,1
+6,6-5,6 3,3-2,1 6,5-6,6 2,1-3,3 7,7-7,1 3,3-2,1 8,7-7,6 2,1-2,0
+6,6-5,6 2,0-2,2 5,0-4,0 0,0-2,2 7,7-7,1 2,2-0,1 7,1-7,2 0,1-2,2
+8,8-7,6 2,2-1,0 9,7-7,8 0,1-2,0 7,8-5,7 2,0-0,1 7,0-6,0 0,1-2,2
+7,0-7,1 2,2-0,1 2,7-1,7 0,7-1,7 6,4-5,4 2,2-3,3 6,4-6,5 3,3-5,5
+7,1-7,4 5,5-5,3 6,4-5,4 5,3-4,1 5,4-4,4 1,7-4,7 4,4-4,5 6,3-7,5
+4,5-4,4 1,5-1,6 4,4-4,5 1,6-1,7 4,5-4,4 1,7-1,6 4,4-4,5 1,6-1,7
+4,5-4,4 1,7-1,6
+`.trim().split(/\s+/);
+
 const scenarios = [
     {
         name: 'middle cannon opening prefers horse development',
@@ -431,6 +452,93 @@ const scenarios = [
                 move => ['bR', 'bC', 'bH'].includes(move.piece) || move.captured,
                 4,
                 'advanced shortlist should keep same-lane pressure candidates near the top'
+            );
+        }
+    },
+    {
+        name: 'advanced replay keeps central soldier pressure candidate near the top',
+        sequence: pressureLineKeys.slice(0, 41),
+        timeBudgetMs: 3200,
+        check(state, result) {
+            const entries = debugEntries(state, 3200);
+            assertActiveMajorReply(result, `expected active continuation, got ${game.getMoveKey(result.move)}`);
+            assertTopEntriesContain(
+                entries,
+                move => game.getMoveKey(move) === '3,4-4,4',
+                8,
+                'advanced shortlist should keep central soldier pressure push near the top'
+            );
+        }
+    },
+    {
+        name: 'advanced replay keeps strategic cannon redeploy near the top',
+        customState() {
+            const board = createEmptyBoard();
+            board[0][4] = 'bG';
+            board[0][3] = 'bA';
+            board[0][5] = 'bA';
+            board[5][5] = 'bC';
+            board[3][4] = 'bS';
+            board[9][4] = 'rG';
+            board[8][3] = 'rA';
+            board[8][5] = 'rA';
+            board[7][5] = 'rR';
+            board[7][8] = 'rR';
+            board[6][8] = 'rS';
+            return {
+                board,
+                side: game.BLACK_COLOR,
+                history: [],
+                positionHistory: [game.getBoardKey(board, game.BLACK_COLOR)]
+            };
+        },
+        timeBudgetMs: 3600,
+        check(state, result) {
+            const entries = debugEntries(state, 3600);
+            assert(result.move, 'expected a move');
+            assertTopEntriesContain(
+                entries,
+                move => game.getMoveKey(move) === '5,5-5,8',
+                15,
+                'advanced shortlist should keep strategic cannon redeploy near the top'
+            );
+        }
+    },
+    {
+        name: 'advanced replay again prefers practical center soldier push',
+        customState() {
+            const board = createEmptyBoard();
+            board[0][4] = 'bG';
+            board[0][3] = 'bA';
+            board[0][5] = 'bA';
+            board[2][4] = 'bR';
+            board[2][7] = 'bC';
+            board[3][4] = 'bS';
+            board[3][6] = 'bS';
+            board[2][2] = 'bH';
+            board[9][4] = 'rG';
+            board[8][3] = 'rA';
+            board[8][5] = 'rA';
+            board[7][4] = 'rR';
+            board[7][7] = 'rC';
+            board[6][5] = 'rH';
+            board[6][4] = 'rS';
+            return {
+                board,
+                side: game.BLACK_COLOR,
+                history: [],
+                positionHistory: [game.getBoardKey(board, game.BLACK_COLOR)]
+            };
+        },
+        timeBudgetMs: 3200,
+        check(state, result) {
+            const entries = debugEntries(state, 3200);
+            assert(result.move, 'expected a move');
+            assertTopEntriesContain(
+                entries,
+                move => game.getMoveKey(move) === '3,4-4,4',
+                6,
+                'advanced shortlist should revisit the center soldier push in late pressure positions'
             );
         }
     }
