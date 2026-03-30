@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260330-search3';
+const ASSET_VERSION = '20260330-setup1';
 const GAME_MODES = {
     ai: 'ai',
     local: 'local'
@@ -3339,22 +3339,13 @@ function undoMove() {
         return;
     }
 
-    let steps = currentPlayer === humanColor ? 2 : 1;
-    if (!hasComputerOpponent()) {
-        steps = 1;
-    }
-    steps = Math.min(steps, moveHistory.length);
-
-    let snapshot = null;
-    while (steps > 0) {
-        snapshot = moveHistory.pop();
-        steps--;
-    }
+    const snapshot = moveHistory.pop();
+    const undoCountBefore = remainingUndos;
 
     if (snapshot) {
         restoreState(snapshot);
-        if (Number.isFinite(remainingUndos)) {
-            remainingUndos = Math.max(0, remainingUndos - 1);
+        if (Number.isFinite(undoCountBefore)) {
+            remainingUndos = Math.max(0, undoCountBefore - 1);
         }
         updateStatus();
     }
@@ -3531,6 +3522,86 @@ if (typeof module !== 'undefined') {
         shouldLockDifficulty,
         canUndoMove,
         drawMarker,
-        undoMove
+        undoMove,
+        __debug: {
+            getState() {
+                return {
+                    board: cloneBoard(board),
+                    currentPlayer,
+                    humanColor,
+                    computerColor,
+                    gameMode,
+                    aiLevel,
+                    gameActive,
+                    aiThinking,
+                    setupOpen,
+                    remainingUndos,
+                    moveHistory: moveHistory.map(snapshot => ({
+                        board: cloneBoard(snapshot.board),
+                        currentPlayer: snapshot.currentPlayer,
+                        lastMove: snapshot.lastMove ? { ...snapshot.lastMove } : null,
+                        gameActive: snapshot.gameActive,
+                        aiThinking: snapshot.aiThinking,
+                        remainingUndos: snapshot.remainingUndos,
+                        statusMessage: snapshot.statusMessage,
+                        moveLog: cloneMoveLog(snapshot.moveLog || []),
+                        moveSequence: cloneMoveSequence(snapshot.moveSequence || []),
+                        positionHistory: clonePositionHistory(snapshot.positionHistory || [])
+                    })),
+                    moveSequence: cloneMoveSequence(moveSequence),
+                    positionHistory: clonePositionHistory(positionHistory)
+                };
+            },
+            setState(nextState) {
+                if ('board' in nextState) {
+                    board = cloneBoard(nextState.board);
+                }
+                if ('currentPlayer' in nextState) {
+                    currentPlayer = nextState.currentPlayer;
+                }
+                if ('humanColor' in nextState) {
+                    humanColor = nextState.humanColor;
+                    computerColor = otherColor(humanColor);
+                }
+                if ('gameMode' in nextState) {
+                    gameMode = nextState.gameMode;
+                }
+                if ('aiLevel' in nextState) {
+                    aiLevel = nextState.aiLevel;
+                }
+                if ('gameActive' in nextState) {
+                    gameActive = nextState.gameActive;
+                }
+                if ('aiThinking' in nextState) {
+                    aiThinking = nextState.aiThinking;
+                }
+                if ('setupOpen' in nextState) {
+                    setupOpen = nextState.setupOpen;
+                }
+                if ('remainingUndos' in nextState) {
+                    remainingUndos = nextState.remainingUndos;
+                }
+                if ('moveHistory' in nextState) {
+                    moveHistory = nextState.moveHistory.map(snapshot => ({
+                        board: cloneBoard(snapshot.board),
+                        currentPlayer: snapshot.currentPlayer,
+                        lastMove: snapshot.lastMove ? { ...snapshot.lastMove } : null,
+                        gameActive: snapshot.gameActive,
+                        aiThinking: snapshot.aiThinking,
+                        remainingUndos: snapshot.remainingUndos,
+                        statusMessage: snapshot.statusMessage || '',
+                        moveLog: cloneMoveLog(snapshot.moveLog || []),
+                        moveSequence: cloneMoveSequence(snapshot.moveSequence || []),
+                        positionHistory: clonePositionHistory(snapshot.positionHistory || [])
+                    }));
+                }
+                if ('moveSequence' in nextState) {
+                    moveSequence = cloneMoveSequence(nextState.moveSequence);
+                }
+                if ('positionHistory' in nextState) {
+                    positionHistory = clonePositionHistory(nextState.positionHistory);
+                }
+            }
+        }
     };
 }

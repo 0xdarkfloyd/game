@@ -79,6 +79,7 @@ h1 {
 
 .setup-group {
     margin-top: 18px;
+    text-align: center;
 }
 
 .setup-group.hidden {
@@ -121,8 +122,11 @@ h1 {
 
 .side-picker {
     display: inline-flex;
+    justify-content: center;
     gap: 8px;
     margin-top: 14px;
+    margin-left: auto;
+    margin-right: auto;
     padding: 6px;
     border-radius: 999px;
     background: rgba(120, 53, 15, 0.08);
@@ -130,8 +134,11 @@ h1 {
 
 .difficulty-picker {
     display: inline-flex;
+    justify-content: center;
     gap: 8px;
     margin-top: 10px;
+    margin-left: auto;
+    margin-right: auto;
     padding: 6px;
     border-radius: 999px;
     background: rgba(120, 53, 15, 0.08);
