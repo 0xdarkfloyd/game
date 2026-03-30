@@ -77,6 +77,16 @@ function compute(state, timeBudgetMs = 900) {
     };
 }
 
+function debugEntries(state, timeBudgetMs = 900) {
+    return engine.debugRootEntries({
+        board: state.board,
+        currentPlayer: state.side,
+        history: state.history,
+        positionHistory: state.positionHistory,
+        timeBudgetMs
+    });
+}
+
 function createEmptyBoard() {
     return Array.from({ length: 10 }, () => Array(9).fill(''));
 }
@@ -125,6 +135,16 @@ function assertMoveNotationNotIn(state, result, forbiddenNotations, message) {
         !forbiddenNotations.includes(notation),
         message || `unexpected move ${notation}`
     );
+}
+
+function assertTopEntryNotPassive(entries, message) {
+    assert(entries.length > 0, 'expected root entries');
+    assert(!['bA', 'bE', 'bG'].includes(entries[0].move.piece), message || `unexpected passive top move: ${entries[0].move.piece}`);
+}
+
+function assertTopEntriesContain(entries, predicate, topN, message) {
+    const window = entries.slice(0, topN);
+    assert(window.some(entry => predicate(entry.move)), message || `expected matching move in top ${topN}`);
 }
 
 const scenarios = [
@@ -349,6 +369,69 @@ const scenarios = [
         check(state, result) {
             assertActiveMajorReply(result, `expected pressure-maintaining reply, got ${getMoveNotation(state, result.move)}`);
             assertMoveNotationNotIn(state, result, ['士5退6', '象3進1'], 'should keep the opened lane active');
+        }
+    },
+    {
+        name: 'late defense prefers rook or soldier block over king drift',
+        customState() {
+            const board = createEmptyBoard();
+            board[0][4] = 'bG';
+            board[0][3] = 'bA';
+            board[0][5] = 'bA';
+            board[2][4] = 'bR';
+            board[3][4] = 'bS';
+            board[2][7] = 'bC';
+            board[9][4] = 'rG';
+            board[7][4] = 'rR';
+            board[6][5] = 'rC';
+            board[6][3] = 'rH';
+            return {
+                board,
+                side: game.BLACK_COLOR,
+                history: [],
+                positionHistory: [game.getBoardKey(board, game.BLACK_COLOR)]
+            };
+        },
+        timeBudgetMs: 2600,
+        check(state, result) {
+            const entries = debugEntries(state, 2600);
+            assert(result.move, 'expected a move');
+            assert(['bR', 'bS', 'bC'].includes(result.move.piece), `expected practical defense, got ${game.getMoveKey(result.move)}`);
+            assertTopEntryNotPassive(entries, 'late defense should not start with a king/advisor drift');
+        }
+    },
+    {
+        name: 'opened file keeps same-lane pressure in advanced search',
+        customState() {
+            const board = createEmptyBoard();
+            board[0][4] = 'bG';
+            board[0][3] = 'bA';
+            board[0][5] = 'bA';
+            board[3][4] = 'bR';
+            board[2][2] = 'bC';
+            board[4][6] = 'bH';
+            board[9][4] = 'rG';
+            board[8][3] = 'rA';
+            board[8][5] = 'rA';
+            board[7][4] = 'rR';
+            board[7][2] = 'rC';
+            return {
+                board,
+                side: game.BLACK_COLOR,
+                history: [],
+                positionHistory: [game.getBoardKey(board, game.BLACK_COLOR)]
+            };
+        },
+        timeBudgetMs: 3000,
+        check(state, result) {
+            const entries = debugEntries(state, 3000);
+            assertActiveMajorReply(result, `expected continued pressure, got ${game.getMoveKey(result.move)}`);
+            assertTopEntriesContain(
+                entries,
+                move => ['bR', 'bC', 'bH'].includes(move.piece) || move.captured,
+                4,
+                'advanced shortlist should keep same-lane pressure candidates near the top'
+            );
         }
     }
 ];
