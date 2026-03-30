@@ -119,6 +119,23 @@ function assertActiveMajorReply(result, message) {
     assertNoPassiveMove(result, message);
 }
 
+function assertActiveOrPracticalOpeningReply(result, message) {
+    assert(result.move, 'expected a move');
+    const practicalSoldierPush =
+        result.move.piece === 'bS' &&
+        result.move.toCol === result.move.fromCol &&
+        [2, 4, 6].includes(result.move.fromCol);
+    assert(
+        practicalSoldierPush ||
+        result.move.captured ||
+        ['bR', 'bH', 'bC'].includes(result.move.piece),
+        message || `expected active major move or practical soldier push, got ${game.getMoveKey(result.move)}`
+    );
+    if (!practicalSoldierPush) {
+        assertNoPassiveMove(result, message);
+    }
+}
+
 function assertMoveNotationIn(state, result, expectedNotations, message) {
     assert(result.move, 'expected a move');
     const notation = getMoveNotation(state, result.move);
@@ -145,6 +162,16 @@ function assertTopEntryNotPassive(entries, message) {
 function assertTopEntriesContain(entries, predicate, topN, message) {
     const window = entries.slice(0, topN);
     assert(window.some(entry => predicate(entry.move)), message || `expected matching move in top ${topN}`);
+}
+
+function assertMoveKeyRanksAhead(entries, preferredKey, slowerKey, topN, message) {
+    const window = entries.slice(0, topN);
+    const preferredIndex = window.findIndex(entry => game.getMoveKey(entry.move) === preferredKey);
+    const slowerIndex = window.findIndex(entry => game.getMoveKey(entry.move) === slowerKey);
+    assert(preferredIndex !== -1, message || `expected ${preferredKey} in top ${topN}`);
+    if (slowerIndex !== -1) {
+        assert(preferredIndex < slowerIndex, message || `expected ${preferredKey} ahead of ${slowerKey}`);
+    }
 }
 
 const pressureLineKeys = `
@@ -181,7 +208,7 @@ const scenarios = [
         name: 'middle cannon after one horse should develop actively',
         sequence: ['7,7-7,4', '0,1-2,2', '9,7-7,6'],
         check(state, result) {
-            assertActiveMajorReply(result, `expected active development, got ${getMoveNotation(state, result.move)}`);
+            assertActiveOrPracticalOpeningReply(result, `expected active development, got ${getMoveNotation(state, result.move)}`);
         }
     },
     {
@@ -206,6 +233,94 @@ const scenarios = [
         check(state, result) {
             assert(result.move, 'expected a move');
             assert.notStrictEqual(result.move.piece, 'bC', `expected non-cannon reply, got ${getMoveNotation(state, result.move)}`);
+        }
+    },
+    {
+        name: 'opening semi-central rook shift outranks flat center rook drift',
+        notationSequence: [
+            '兵七進一', '馬2進3',
+            '傌二進一', '馬8進7',
+            '兵三進一', '車1進1',
+            '炮二平三', '車9平8',
+            '仕四進五'
+        ],
+        timeBudgetMs: 1800,
+        check(state, result) {
+            const entries = debugEntries(state, 1800);
+            assertMoveKeyRanksAhead(
+                entries,
+                '1,0-1,3',
+                '1,0-1,4',
+                6,
+                'opening should prefer a more practical semi-central rook file over a flat center drift'
+            );
+        }
+    },
+    {
+        name: 'opening practical flank soldier push outranks palace drift',
+        notationSequence: [
+            '兵七進一', '馬2進3',
+            '傌二進一', '馬8進7',
+            '兵三進一', '車1進1',
+            '炮二平三', '車9平8',
+            '仕四進五', '車1平5',
+            '傌八進七', '砲8進5',
+            '相七進五', '車5平4',
+            '兵一進一', '砲2退1',
+            '仕五退四', '砲2平3',
+            '傌七進八', '車4進4',
+            '仕六進五'
+        ],
+        timeBudgetMs: 2200,
+        check(state, result) {
+            const entries = debugEntries(state, 2200);
+            assertTopEntriesContain(
+                entries,
+                move => game.getMoveKey(move) === '3,2-4,2',
+                6,
+                'opening should keep practical 卒3進1 in the front shortlist'
+            );
+            assertMoveKeyRanksAhead(
+                entries,
+                '3,2-4,2',
+                '0,5-1,4',
+                8,
+                'opening practical soldier push should outrank quiet advisor development'
+            );
+        }
+    },
+    {
+        name: 'opening practical flank soldier push outranks idle second rook lift',
+        notationSequence: [
+            '兵七進一', '馬2進3',
+            '傌二進一', '馬8進7',
+            '兵三進一', '車1進1',
+            '炮二平三', '車9平8',
+            '仕四進五', '車1平5',
+            '傌八進七', '砲8進5',
+            '相七進五', '車5平4',
+            '兵一進一', '砲2退1',
+            '仕五退四', '砲2平3',
+            '傌七進八', '車4進4',
+            '仕六進五', '士6進5',
+            '俥一平二'
+        ],
+        timeBudgetMs: 2200,
+        check(state, result) {
+            const entries = debugEntries(state, 2200);
+            assertTopEntriesContain(
+                entries,
+                move => game.getMoveKey(move) === '3,2-4,2',
+                6,
+                'opening should still keep practical 卒3進1 ahead after the palace move'
+            );
+            assertMoveKeyRanksAhead(
+                entries,
+                '3,2-4,2',
+                '0,7-1,7',
+                8,
+                'opening practical soldier push should outrank an idle home-rook lift'
+            );
         }
     },
     {

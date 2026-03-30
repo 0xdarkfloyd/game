@@ -106,6 +106,10 @@
             return 'middlegame';
         }
 
+        function isOpeningLikeStage(stage, minShare = 0.22) {
+            return stage.opening >= minShare;
+        }
+
         function getPhaseConfig(board, history, overrideTimeBudgetMs) {
             const phase = getPhase(board, history);
             const stage = getStageProfile(board, history);
@@ -1312,16 +1316,36 @@
                 const coordinationAfter = evaluateAttackCoordination(nextBoard, color, stage);
                 const enemyDefenseAfter = getCompositeDefenseScore(nextBoard, opponent, stage);
                 const centralPush = move.fromCol === 4;
+                const openingFlankPush =
+                    isOpeningLikeStage(stage) &&
+                    move.fromRow === soldierRow(color) &&
+                    (move.fromCol === 2 || move.fromCol === 6);
                 const practicalGain =
                     threatAfter > threatBefore ||
                     pressureAfter > pressureBefore ||
                     coordinationAfter > coordinationBefore ||
                     enemyDefenseAfter < enemyDefenseBefore;
+                const practicalOpeningGain =
+                    openingFlankPush &&
+                    pressureAfter >= pressureBefore - stageWeight(stage, 12, 24, 8) &&
+                    coordinationAfter >= coordinationBefore - stageWeight(stage, 8, 18, 6) &&
+                    enemyDefenseAfter <= enemyDefenseBefore + stageWeight(stage, 10, 22, 8);
+                const stableOpeningFlankPush =
+                    openingFlankPush &&
+                    pressureAfter >= pressureBefore - stageWeight(stage, 18, 32, 12) &&
+                    coordinationAfter >= coordinationBefore - stageWeight(stage, 12, 26, 10);
+
+                if (openingFlankPush) {
+                    pushes.add(getMoveKey(move));
+                    continue;
+                }
 
                 if (
                     threatAfter >= threatBefore ||
                     hasCrossedRiver(color, move.toRow) ||
                     practicalGain ||
+                    practicalOpeningGain ||
+                    stableOpeningFlankPush ||
                     (centralPush && pressureAfter >= pressureBefore - stageWeight(stage, 4, 18, 8))
                 ) {
                     pushes.add(getMoveKey(move));
@@ -1721,7 +1745,8 @@
         }
 
         function getPracticalOpeningBias(board, nextBoard, move, color, history, openingContext) {
-            if (getPhase(board, history) !== 'opening') {
+            const stage = getStageProfile(board, history);
+            if (!isOpeningLikeStage(stage)) {
                 return 0;
             }
 
@@ -1850,10 +1875,30 @@
                     score -= 96;
                 }
             }
-            if (!move.captured && move.piece[1] === 'R' && move.fromRow !== homeRow(color) && undevelopedMajors >= 1) {
-                score -= undevelopedMajors >= 3 ? 34 : undevelopedMajors === 2 ? 24 : 14;
+            if (
+                !move.captured &&
+                move.piece[1] === 'R' &&
+                move.fromRow !== homeRow(color) &&
+                (undevelopedMajors >= 1 || history.length <= 10)
+            ) {
+                if (undevelopedMajors >= 1) {
+                    score -= undevelopedMajors >= 3 ? 34 : undevelopedMajors === 2 ? 24 : 14;
+                }
                 if (undevelopedHorses === 1 && !centralCannonPressure) {
                     score -= 34;
+                }
+                if (
+                    move.toRow === move.fromRow &&
+                    history.length <= 10 &&
+                    !centralCannonPressure
+                ) {
+                    const semiCenterDistance = Math.min(Math.abs(3 - move.toCol), Math.abs(5 - move.toCol));
+                    score += 28 - semiCenterDistance * 10;
+                    if (move.toCol === 4) {
+                        score -= 64;
+                    } else if (move.toCol === 3 || move.toCol === 5) {
+                        score += 28;
+                    }
                 }
                 const wasAttacked = isSquareAttacked(board, move.fromRow, move.fromCol, otherColor(color));
                 const nowAttacked = isSquareAttacked(nextBoard, move.toRow, move.toCol, otherColor(color));
@@ -1971,6 +2016,9 @@
                 }
                 if (isOpeningSideSoldierAdvance(move, color)) {
                     score += (undevelopedRooks >= 1 ? 42 : 24) + (centralCannonPressure ? 0 : 12);
+                    if (openingContext.practicalFlankSoldierPushes && openingContext.practicalFlankSoldierPushes.has(getMoveKey(move))) {
+                        score += 34 + openingContext.developedRooks * 8 + openingContext.developedHorses * 6;
+                    }
                 }
             }
 
@@ -2084,7 +2132,8 @@
         }
 
         function getOpeningSoftRestrictionBias(board, nextBoard, move, color, history, openingContext, stage, forcefulMove) {
-            if (getPhase(board, history) !== 'opening' || move.captured || forcefulMove) {
+            const openingStage = getStageProfile(board, history);
+            if (!isOpeningLikeStage(openingStage) || move.captured || forcefulMove) {
                 return 0;
             }
 
@@ -2123,6 +2172,15 @@
             if (move.piece[1] === 'S') {
                 if (move.fromRow === soldierRow(color) && soldierFocusFile) {
                     score += 36;
+                    if (openingContext.practicalFlankSoldierPushes && openingContext.practicalFlankSoldierPushes.has(getMoveKey(move))) {
+                        score += 48;
+                        if (openingContext.developedRooks >= 1) {
+                            score += 12;
+                        }
+                        if (openingContext.developedHorses >= 1) {
+                            score += 10;
+                        }
+                    }
                 } else if (move.fromRow === soldierRow(color) && move.fromCol === 4) {
                     score += 16;
                 } else if (isOpeningSideSoldierAdvance(move, color)) {
@@ -2139,6 +2197,14 @@
                 } else {
                     score += 6;
                 }
+                if (
+                    openingContext.practicalFlankSoldierPushes &&
+                    openingContext.practicalFlankSoldierPushes.size > 0 &&
+                    openingContext.safeGeneralMoves > 1 &&
+                    safetyDelta <= 0
+                ) {
+                    score -= move.piece[1] === 'A' ? 42 : 30;
+                }
                 return score;
             }
 
@@ -2147,6 +2213,15 @@
                     score += 18;
                 } else if (move.toRow !== move.fromRow && openingContext.undevelopedHorses >= 1) {
                     score -= 18;
+                }
+                if (
+                    openingContext.practicalFlankSoldierPushes &&
+                    openingContext.practicalFlankSoldierPushes.size > 0 &&
+                    move.fromRow === homeRow(color) &&
+                    move.toRow !== move.fromRow &&
+                    !move.captured
+                ) {
+                    score -= 34;
                 }
                 return score;
             }
@@ -3419,6 +3494,12 @@
             const urgentOverextendedCannonRepairs = getOverextendedCannonRepairMoves(board, color, searchConfig.stage, legalMoves);
             const urgentBackRankHorseReliefs = getBackRankHorseReliefMoves(board, color, legalMoves);
             const practicalSoldierPushes = getPracticalSoldierPushMoves(board, color, searchConfig.stage, legalMoves);
+            const practicalFlankSoldierPushes = new Set(
+                [...practicalSoldierPushes].filter(key => {
+                    const move = parseMoveKey(key);
+                    return move.fromRow === soldierRow(color) && (move.fromCol === 2 || move.fromCol === 6);
+                })
+            );
             const strategicCannonRedeployMoves = getStrategicCannonRedeployMoves(board, color, searchConfig.stage, legalMoves);
             const pressureContinuationMoves = getPressureContinuationMoveKeys(board, color, searchConfig.stage, legalMoves);
             const practicalDefenseMoves = getPracticalDefenseMoveKeys(board, color, searchConfig.stage, legalMoves);
@@ -3430,6 +3511,7 @@
                 undevelopedElephants: countUndevelopedElephants(board, color),
                 undevelopedAdvisors: countUndevelopedAdvisors(board, color),
                 developedHorses: countDevelopedHorses(board, color),
+                developedRooks: 2 - countUndevelopedRooks(board, color),
                 opponentDevelopedHorses: countDevelopedHorses(board, otherColor(color)),
                 rookMovesAvailable: countUndevelopedRooks(board, color) >= 1 && hasHomeRookDevelopment(board, color),
                 horizontalRookMovesAvailable: hasHomeHorizontalRookDevelopment(board, color),
@@ -3437,10 +3519,26 @@
                 opponentCenteredCannon: hasCenteredCannon(board, otherColor(color)),
                 safeGeneralMoves: countSafeGeneralMoves(board, color),
                 homeRookCannonExposures: getHomeRookCannonExposures(board, color),
+                practicalFlankSoldierPushes,
                 lastOwnMove: sameSideMoves[sameSideMoves.length - 1] || null,
                 previousOwnMove: sameSideMoves.length > 1 ? sameSideMoves[sameSideMoves.length - 2] : null
             };
-            const openingPlanMode = searchConfig.phase === 'opening'
+            const openingLikePhase = isOpeningLikeStage(searchConfig.stage);
+            const openingFlankSoldierMoves = openingLikePhase
+                ? new Set(
+                    legalMoves
+                        .filter(move =>
+                            move.piece === `${color}S` &&
+                            !move.captured &&
+                            move.toCol === move.fromCol &&
+                            move.fromRow === soldierRow(color) &&
+                            (move.fromCol === 2 || move.fromCol === 6) &&
+                            (color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow)
+                        )
+                        .map(getMoveKey)
+                )
+                : new Set();
+            const openingPlanMode = openingLikePhase
                 ? getOpeningPlanMode(openingContext)
                 : 'balanced';
             const quickEntries = legalMoves.map(move => {
@@ -3494,6 +3592,20 @@
                     centerGain > 0
                     ? Math.round(centerGain * stageWeight(searchConfig.stage, 10, 34, 12))
                     : 0;
+                const openingRookLaneBias = openingLikePhase &&
+                    !move.captured &&
+                    move.piece[1] === 'R' &&
+                    move.fromRow !== homeRow(color) &&
+                    move.toRow === move.fromRow &&
+                    history.length <= 10 &&
+                    !openingContext.ownCenteredCannon &&
+                    !openingContext.opponentCenteredCannon
+                    ? move.toCol === 4
+                        ? -Math.round(stageWeight(searchConfig.stage, 96, 32, 8))
+                        : (move.toCol === 3 || move.toCol === 5)
+                            ? Math.round(stageWeight(searchConfig.stage, 48, 18, 6))
+                            : 0
+                    : 0;
                 const cannonCenterBias = !move.captured &&
                     move.piece[1] === 'C' &&
                     move.fromRow !== cannonRow(color) &&
@@ -3504,6 +3616,15 @@
                 if (practicalSoldierPushes.size > 0) {
                     if (practicalSoldierPushes.has(moveKey)) {
                         soldierPressureBias += stageWeight(searchConfig.stage, 72, 124, 48);
+                        if (openingLikePhase && practicalFlankSoldierPushes.has(moveKey)) {
+                            soldierPressureBias += stageWeight(searchConfig.stage, 92, 68, 28);
+                            if (openingContext.developedRooks >= 1) {
+                                soldierPressureBias += stageWeight(searchConfig.stage, 28, 18, 8);
+                            }
+                            if (openingContext.developedHorses >= 1) {
+                                soldierPressureBias += stageWeight(searchConfig.stage, 22, 14, 6);
+                            }
+                        }
                         if (move.piece[1] === 'S' && move.fromCol === 4) {
                             soldierPressureBias += stageWeight(searchConfig.stage, 0, 94, 34);
                             if (pressureContinuationMoves.has(moveKey)) {
@@ -3517,6 +3638,31 @@
                         }
                     } else if (!move.captured && move.piece[1] === 'C') {
                         soldierPressureBias -= stageWeight(searchConfig.stage, 0, 52, 18);
+                    }
+                    if (
+                        openingLikePhase &&
+                        practicalFlankSoldierPushes.size > 0 &&
+                        !practicalFlankSoldierPushes.has(moveKey) &&
+                        !move.captured
+                    ) {
+                        if (move.piece[1] === 'A') {
+                            soldierPressureBias -= stageWeight(searchConfig.stage, 62, 26, 8);
+                        } else if (move.piece[1] === 'E') {
+                            soldierPressureBias -= stageWeight(searchConfig.stage, 48, 22, 8);
+                        } else if (move.piece[1] === 'R' && move.fromRow === homeRow(color) && move.toRow !== move.fromRow) {
+                            soldierPressureBias -= stageWeight(searchConfig.stage, 44, 18, 8);
+                        } else if (move.piece[1] === 'C' && move.toRow === move.fromRow) {
+                            soldierPressureBias -= stageWeight(searchConfig.stage, 34, 12, 4);
+                        }
+                    }
+                }
+                if (openingFlankSoldierMoves.has(moveKey)) {
+                    soldierPressureBias += stageWeight(searchConfig.stage, 176, 92, 24);
+                    if (openingContext.developedRooks >= 1) {
+                        soldierPressureBias += stageWeight(searchConfig.stage, 24, 14, 6);
+                    }
+                    if (openingContext.developedHorses >= 1) {
+                        soldierPressureBias += stageWeight(searchConfig.stage, 18, 10, 4);
                     }
                 }
                 let attackedRookReliefBias = 0;
@@ -3683,7 +3829,7 @@
                     }
                 }
                 const quietCenter = move.captured ? 0 : Math.max(0, 4 - Math.abs(4 - move.toCol)) * 3;
-                const openingFocusBias = searchConfig.phase === 'opening' && !move.captured
+                const openingFocusBias = openingLikePhase && !move.captured
                     ? focusMove
                         ? 28
                         : openingContext.undevelopedMajors >= 2
@@ -3702,8 +3848,8 @@
                     strategicCannonRedeployBias,
                     openingSoftBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + pressureRouteBias + practicalDefenseBias + strategicCannonRedeployBias + openingSoftBias + Math.round(pressureMaintenanceBias * 0.82) + Math.round(counterstrikeBias * 0.86) + Math.round(tacticalBias * 0.92) - Math.round(safetyPenalty * 0.52),
-                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(pressureRouteBias * 0.88) + Math.round(practicalDefenseBias * 0.88) + Math.round(strategicCannonRedeployBias * 0.86) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(openingSoftBias * 0.82) + Math.round(pressureMaintenanceBias * 0.76) + Math.round(counterstrikeBias * 0.78) + Math.round(tacticalBias * 0.6) - Math.round(safetyPenalty * 0.34)
+                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + openingRookLaneBias + cannonCenterBias + pressureRouteBias + practicalDefenseBias + strategicCannonRedeployBias + openingSoftBias + Math.round(pressureMaintenanceBias * 0.82) + Math.round(counterstrikeBias * 0.86) + Math.round(tacticalBias * 0.92) - Math.round(safetyPenalty * 0.52),
+                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(pressureRouteBias * 0.88) + Math.round(practicalDefenseBias * 0.88) + Math.round(strategicCannonRedeployBias * 0.86) + Math.round(rookCenterBias * 0.8) + Math.round(openingRookLaneBias * 0.9) + Math.round(cannonCenterBias * 0.85) + Math.round(openingSoftBias * 0.82) + Math.round(pressureMaintenanceBias * 0.76) + Math.round(counterstrikeBias * 0.78) + Math.round(tacticalBias * 0.6) - Math.round(safetyPenalty * 0.34)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
@@ -3721,6 +3867,7 @@
                 ...urgentOverextendedCannonRepairs,
                 ...urgentBackRankHorseReliefs,
                 ...practicalSoldierPushes,
+                ...openingFlankSoldierMoves,
                 ...strategicCannonRedeployMoves,
                 ...pressureContinuationMoves,
                 ...practicalDefenseMoves
@@ -3732,7 +3879,7 @@
                     }
                 }
             }
-            if (searchConfig.phase === 'opening') {
+            if (openingLikePhase) {
                 for (const entry of quickEntries) {
                     if (entry.move.captured ||
                         isInCheck(entry.nextBoard, otherColor(color)) ||
@@ -3768,7 +3915,7 @@
                     !isSquareAttacked(nextBoard, entry.move.toRow, entry.move.toCol, otherColor(color))) {
                     captureBias += Math.round(stageWeight(searchConfig.stage, 12, 36, 14));
                 }
-                if (searchConfig.phase === 'opening' && entry.move.captured) {
+                if (openingLikePhase && entry.move.captured) {
                     if (openingPlanMode === 'horizontal-rook' && entry.move.piece[1] !== 'R') {
                         captureBias -= 86;
                     } else if (openingPlanMode === 'second-horse' && entry.move.piece[1] !== 'H') {
@@ -3871,7 +4018,7 @@
             const minimumKeep = advancedRootSearch ? Math.min(6, entries.length) : Math.min(8, entries.length);
 
             for (const entry of entries) {
-                const slowOpeningMove = searchConfig.phase === 'opening' &&
+                const slowOpeningMove = openingLikePhase &&
                     !entry.move.captured &&
                     entry.policyBias < -70 &&
                     entry.sortScore < bestScore - 70;
