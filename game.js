@@ -7,7 +7,7 @@ const AI_WORKER_TIMEOUT_FLOOR_MS = 2600;
 const AI_WORKER_TIMEOUT_PADDING_MS = 900;
 const PONDER_TIMEOUT_PADDING_MS = 1200;
 const SEARCH_TIME_CHECK_INTERVAL = 32;
-const ASSET_VERSION = '20260330-setup1';
+const ASSET_VERSION = '20260330-undo2';
 const GAME_MODES = {
     ai: 'ai',
     local: 'local'
@@ -3339,12 +3339,17 @@ function undoMove() {
         return;
     }
 
-    const snapshot = moveHistory.pop();
     const undoCountBefore = remainingUndos;
+    const undoSteps = Math.min(2, moveHistory.length);
+    let snapshot = null;
+
+    for (let index = 0; index < undoSteps; index += 1) {
+        snapshot = moveHistory.pop();
+    }
 
     if (snapshot) {
         restoreState(snapshot);
-        if (Number.isFinite(undoCountBefore)) {
+        if (hasComputerOpponent() && Number.isFinite(undoCountBefore)) {
             remainingUndos = Math.max(0, undoCountBefore - 1);
         }
         updateStatus();

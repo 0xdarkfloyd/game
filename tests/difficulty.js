@@ -106,19 +106,31 @@ function createSnapshot(board, currentPlayer, remainingUndos, moveSequence, posi
     const move3 = game.createMove(board2, 6, 2, 5, 2);
     const board3 = game.applyMoveToBoard(board2, move3);
     const key3 = game.getMoveKey(move3);
+    const move4 = game.createMove(board3, 3, 2, 4, 2);
+    const board4 = game.applyMoveToBoard(board3, move4);
+    const key4 = game.getMoveKey(move4);
+    const move5 = game.createMove(board4, 9, 1, 7, 2);
+    const board5 = game.applyMoveToBoard(board4, move5);
+    const key5 = game.getMoveKey(move5);
+    const move6 = game.createMove(board5, 0, 1, 2, 2);
+    const board6 = game.applyMoveToBoard(board5, move6);
+    const key6 = game.getMoveKey(move6);
 
     const history0 = [game.getBoardKey(board0, game.RED_COLOR)];
     const history1 = history0.concat(game.getBoardKey(board1, game.BLACK_COLOR));
     const history2 = history1.concat(game.getBoardKey(board2, game.RED_COLOR));
     const history3 = history2.concat(game.getBoardKey(board3, game.BLACK_COLOR));
+    const history4 = history3.concat(game.getBoardKey(board4, game.RED_COLOR));
+    const history5 = history4.concat(game.getBoardKey(board5, game.BLACK_COLOR));
+    const history6 = history5.concat(game.getBoardKey(board6, game.RED_COLOR));
 
     game.setGameMode('ai');
     game.setAiLevel('intermediate');
     game.setHumanSide('r');
 
     debug.setState({
-        board: board3,
-        currentPlayer: game.BLACK_COLOR,
+        board: board6,
+        currentPlayer: game.RED_COLOR,
         humanColor: game.RED_COLOR,
         gameMode: game.GAME_MODES.ai,
         aiLevel: 'intermediate',
@@ -129,30 +141,33 @@ function createSnapshot(board, currentPlayer, remainingUndos, moveSequence, posi
         moveHistory: [
             createSnapshot(board0, game.RED_COLOR, 3, [], history0),
             createSnapshot(board1, game.BLACK_COLOR, 3, [key1], history1),
-            createSnapshot(board2, game.RED_COLOR, 3, [key1, key2], history2)
+            createSnapshot(board2, game.RED_COLOR, 3, [key1, key2], history2),
+            createSnapshot(board3, game.BLACK_COLOR, 3, [key1, key2, key3], history3),
+            createSnapshot(board4, game.RED_COLOR, 3, [key1, key2, key3, key4], history4),
+            createSnapshot(board5, game.BLACK_COLOR, 3, [key1, key2, key3, key4, key5], history5)
         ],
-        moveSequence: [key1, key2, key3],
-        positionHistory: history3
+        moveSequence: [key1, key2, key3, key4, key5, key6],
+        positionHistory: history6
     });
 
     game.undoMove();
     let state = debug.getState();
-    assert.deepStrictEqual(state.board, board2, 'first undo should revert one ply');
-    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'first undo should restore prior side to move');
+    assert.deepStrictEqual(state.board, board4, 'first AI undo should revert one full round');
+    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'first AI undo should return control to the human side');
     assert.strictEqual(state.remainingUndos, 2, 'first undo should consume one chance');
-    assert.strictEqual(state.moveHistory.length, 2, 'first undo should remove one snapshot');
+    assert.strictEqual(state.moveHistory.length, 4, 'first AI undo should remove two snapshots');
 
     game.undoMove();
     state = debug.getState();
-    assert.deepStrictEqual(state.board, board1, 'second undo should revert one more ply');
-    assert.strictEqual(state.currentPlayer, game.BLACK_COLOR, 'second undo should restore prior side to move');
+    assert.deepStrictEqual(state.board, board2, 'second AI undo should revert one more full round');
+    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'second AI undo should again return control to the human side');
     assert.strictEqual(state.remainingUndos, 1, 'second undo should consume one chance');
-    assert.strictEqual(state.moveHistory.length, 1, 'second undo should remove one snapshot');
+    assert.strictEqual(state.moveHistory.length, 2, 'second AI undo should remove two more snapshots');
 
     game.undoMove();
     state = debug.getState();
-    assert.deepStrictEqual(state.board, board0, 'third undo should revert one more ply');
-    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'third undo should restore initial side to move');
+    assert.deepStrictEqual(state.board, board0, 'third AI undo should revert to the initial position');
+    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'third AI undo should restore initial side to move');
     assert.strictEqual(state.remainingUndos, 0, 'third undo should consume final chance');
     assert.strictEqual(state.moveHistory.length, 0, 'third undo should remove final snapshot');
     assert.strictEqual(game.canUndoMove(), false, 'fourth undo should be unavailable');
@@ -161,6 +176,43 @@ function createSnapshot(board, currentPlayer, remainingUndos, moveSequence, posi
     state = debug.getState();
     assert.deepStrictEqual(state.board, board0, 'extra undo should not change board');
     assert.strictEqual(state.remainingUndos, 0, 'extra undo should not change remaining chances');
+
+    game.setGameMode('local');
+    debug.setState({
+        board: board6,
+        currentPlayer: game.RED_COLOR,
+        humanColor: game.RED_COLOR,
+        gameMode: game.GAME_MODES.local,
+        aiLevel: 'intermediate',
+        gameActive: true,
+        aiThinking: false,
+        setupOpen: false,
+        remainingUndos: Infinity,
+        moveHistory: [
+            createSnapshot(board0, game.RED_COLOR, Infinity, [], history0),
+            createSnapshot(board1, game.BLACK_COLOR, Infinity, [key1], history1),
+            createSnapshot(board2, game.RED_COLOR, Infinity, [key1, key2], history2),
+            createSnapshot(board3, game.BLACK_COLOR, Infinity, [key1, key2, key3], history3),
+            createSnapshot(board4, game.RED_COLOR, Infinity, [key1, key2, key3, key4], history4),
+            createSnapshot(board5, game.BLACK_COLOR, Infinity, [key1, key2, key3, key4, key5], history5)
+        ],
+        moveSequence: [key1, key2, key3, key4, key5, key6],
+        positionHistory: history6
+    });
+
+    game.undoMove();
+    state = debug.getState();
+    assert.deepStrictEqual(state.board, board4, 'local undo should revert one full round');
+    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'local undo should return control to the same side');
+    assert.strictEqual(state.moveHistory.length, 4, 'local undo should remove two snapshots');
+    assert.strictEqual(state.remainingUndos, Infinity, 'local undo should stay unlimited');
+
+    game.undoMove();
+    state = debug.getState();
+    assert.deepStrictEqual(state.board, board2, 'second local undo should revert one more full round');
+    assert.strictEqual(state.currentPlayer, game.RED_COLOR, 'second local undo should still return control to the same side');
+    assert.strictEqual(state.moveHistory.length, 2, 'second local undo should remove two more snapshots');
+    assert.strictEqual(state.remainingUndos, Infinity, 'local undo should remain unlimited');
 }
 
 console.log('difficulty budgets passed');
