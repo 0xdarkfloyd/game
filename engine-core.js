@@ -64,160 +64,12 @@
         const cannonRow = color => color === RED_COLOR ? 7 : 2;
         const soldierRow = color => color === RED_COLOR ? 6 : 3;
         const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-        const reviewedPositionHints = new Map([
-            ['b|____bEbHbGbA__bR__/____bR__bA________/________bE__bH____/bS__bS__bS__bS__bS/__rR______________/____rSrH____rS____/rS______rS______rS/____rC__rE__rCbC__/__________________/__bCrErArGrA__rHrR', new Map([['1,2-1,3', 1200]])],
-            ['b|____bE__bGbA______/____bR__bA________/____________bH____/bS__bS__bS__bS__bS/____bE____bR______/____________rS____/rS______rS______rS/____rC__rErC__rH__/bC________________/__rRrErArGrA____rR', new Map([['8,0-8,3', 1200]])],
-            ['b|____bE__bGbA__bH__/____bR__bA________/________bH________/bS__bS__bSrR____bS/____bE____________/________bC__rH____/______bR__________/____rC__rE____rC__/__rR____rA________/____rE__rGrA______', new Map([['1,2-1,3', 1200]])],
-            ['b|____bE__bGbA__bH__/____bR__bA________/________bH________/bS__bS__bSrR__rHbS/____bE____________/________bC________/____________bR____/____rC__rE____rC__/__rR____rA________/____rE__rGrA______', new Map([['0,7-2,8', 1200]])],
-            ['b|____bE__bGbA______/____bR__bA________/________bH__bH____/bS__bS__bS____rHbS/____bE____________/________bCrR______/____________bR____/____rC__rE____rC__/__rR____rA________/____rE__rGrA______', new Map([['6,6-6,7', 1200]])],
-            ['b|__rRbE__bGbA______/bR________________/________bH________/____bS__bS________/bS__bErR__________/____________rH__bS/__________bC__bRbH/____rC__rErC______/________rA________/____rErG__rA______', new Map([['1,0-1,2', 1200]])],
-            ['b|____rRbAbGbA______/bR________________/________bH________/____rC__bS________/bS__bErR__________/____________rH__bS/__________bC__bR__/________rErC______/________rA____bH__/____rErG__rA______', new Map([['6,7-1,7', 1200]])],
-            ['b|____rRbAbG________/bR______bA________/________bH________/__rC____bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rErC______/________rA____bH__/____rErG__rA______', new Map([['1,0-1,1', 1600]])],
-            ['b|____rRbAbGbA______/bR______bA________/________bH________/__rC____bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rErC______/________rA____bH__/____rErG__rA______', new Map([['6,5-6,3', 1200]])],
-            ['b|__rC__bA__________/rR______bAbG______/________bH________/________bSrH______/bS__bErR__________/________________bS/__________bCbR____/________rEbH______/________rA________/____rErG__rA______', new Map([['6,6-2,6', 1200]])],
-            ['b|____bEbAbGbHbErR__/________bA________/__bCbHbR________bC/bSbRbS__bS__bS__bS/__________________/rS__rS______rS____/____rC__rS__rC__rS/________rE__rH____/________rA________/rRrHrErArG________', new Map([['2,1-9,1', 4800]])],
-            ['b|____bEbAbG________/____bC__bA________/______bR__________/__bRbS__rR______rH/bS__bC________bH__/__________________/________rS____rCrS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,7-5,5', 1500]])],
-            ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR______rH/bS__bC________bH__/______________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])],
-            ['b|____bEbAbG________/____bC__bA________/__bR______________/__bRbS__rR________/____bC______rHbH__/bS____________rC__/________rS______rS/rH______rE________/____rR__rA________/____rErArG________', new Map([['4,2-9,2', 1700]])],
-            ['b|bR__bEbAbGbA______/______________bR__/____bH______bHbCbE/bS__bS__bS______bS/____________bS____/____rS________rR__/________rS__bC__rS/__rCrH__rE__rHrC__/__________________/rR____rArGrArE____', new Map([['3,1-8,1', 3600]])],
-            ['b|bR____bAbG________/bH______bA________/__rR____bErR____bE/bS______________bS/____bS__rCbH______/____________bC____/____bR__rS______rS/__________rC______/________rA________/______rArG________', new Map([['6,2-6,4', 3400]])],
-            ['b|____bE__bGbA______/____bR__bArC______/________bC__bHbCbE/bS__rC________rRbS/______bH____rS____/____bS__bR__rH__rS/rSrR______________/________rE__rH____/________rA________/____rErG__rA______', new Map([['1,2-2,2', 3600], ['2,6-3,4', 1400]])],
-            ['b|____bE__bGbA______/____bR____________/______bAbC__bC__bE/bS______rC____rRbS/______bH__rS______/____bS__bR__rH__rS/rSrR______________/________rE__rH____/________rA________/____rErG__rA______', new Map([['2,3-1,4', 3600]])],
-            ['b|________bG______bH/________bArS______/bE____bAbR______bE/________________rR/______________rR__/________________rS/bCbS______________/________rE________/__________________/____rErArGrA______', new Map([['0,8-2,7', 1500]])],
-            ['b|bR__bEbAbG__bEbR__/________bA________/__bCbH______bHbC__/bS__bS__bS__bSrRbS/__________________/__________________/rS__rS__rS__rS__rS/__rCrH____rC____rH/__________________/rR__rErArGrArE____', new Map([['3,2-4,2', 3400]])],
-            ['b|bR__bEbAbGbAbE____/______________bR__/__bCbH______bHbC__/bS__bS__bS__bSrRbS/__________________/__________________/rS__rS__rS__rS__rS/__rCrH__rErC____rH/rR________________/______rArGrArE____', new Map([['3,2-4,2', 3200]])],
-            ['b|bR__bEbAbGbAbE____/______________bR__/____bH______bHbC__/bSbCbS__bS__bSrRbS/__________________/__rC______________/rS__rS__rS__rS__rS/____rH__rErC____rH/rR________________/______rArGrArE____', new Map([['3,6-4,6', 3200]])],
-            ['b|bR__bEbAbGbAbE____/______________bR__/____bH______bHbC__/bSbC____bS__bSrRbS/____bS____________/____________rC____/rS__rS__rS__rS__rS/____rH__rErC____rH/rR________________/______rArGrArE____', new Map([['3,6-4,6', 3200]])],
-            ['b|__bRbEbAbGbAbE____/________bH____bR__/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/______________rC__/rS__rS__rS__rS__rS/____rH__rErC____rH/__rR______________/______rArGrArE____', new Map([['3,6-4,6', 3200]])],
-            ['b|__bRbEbAbGbAbEbR__/________bH________/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/______________rCrS/rS__rS__rS__rS____/____rH__rErC____rH/__rR______________/______rArGrArE____', new Map([['3,6-4,6', 3200]])],
-            ['b|__bRbEbAbGbAbE____/________bH____bR__/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/______________rCrS/rS__rS__rS__rS____/____rH__rE__rC__rH/__rR______________/______rArGrArE____', new Map([['3,6-4,6', 3200]])],
-            ['b|__bRbEbAbGbAbEbR__/________bH________/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/____________rSrCrS/rS__rS__rS________/____rH__rE__rC__rH/__rR______________/______rArGrArE____', new Map([['3,6-4,6', 3200]])],
-            ['b|____bEbA__rRbE____/________bG__bRrC__/____bH____________/bS__bSbHbS__rH__bS/____________rS____/____rS____________/____bC__bRrH____rS/________rE________/________rA________/____rErArGrR______', new Map([['1,6-1,7', 3600]])],
-            ['b|__rR________bE____/________bAbG______/bE____bA__________/bS____rR________bS/bR__________bS____/________rC__rErH__/________rSbR____rS/__________________/________rG________/______rA__bC______', new Map([['4,0-8,0', 3600]])],
-            ['b|____bEbAbGbAbE____/__________________/bC__bH______bHbC__/bSbRbS__bS__bS__bS/__________________/____rSbR____rS____/rS______rS__rC__rS/____rC__rE__rH____/________rA________/rRrHrErArG______rR', new Map([['3,1-8,1', 3600]])],
-            ['b|____bEbAbGbA____rR/________bH__bC____/bC________bH______/__bRbS__bSrS____bS/bS____bR__________/__________________/____rC__rS____rCrS/rH______rE__rH____/rR______rA________/____rErArG________', new Map([['1,4-3,5', 3600]])],
-            ['b|____bEbAbGbA______/________bH__rR____/bC________bR______/__bRbS__bS______bS/bS__bC____________/______________rH__/________rS____rCrS/rH______rE________/rR______rA________/____rErArG________', new Map([['3,1-2,1', 3600]])],
-            ['b|____bEbAbG________/____bC__bA__bC____/________bR________/______________rR__/____rR__rC________/__________________/bS______rS__bH__rS/rH______rE________/________rA________/____rErArG________', new Map([['1,6-1,5', 3600]])],
-            ['b|____bEbAbGbAbE____/________bR________/____________bH__bR/bS__bS__bH__bS__bS/______bCbS________/____rSrH__rHrS____/rS______rS____bCrS/__rC____rE____rC__/________rArR______/____rR__rGrArE____', new Map([['4,4-5,4', 3600]])],
-            ['b|____bEbAbGbAbE____/______bC__________/________bR__bH__bR/bS__rC____rRbS__bS/______rSbS________/____________rS____/rS____bCrS______rS/__rC____rE________/________rA________/____rR__rGrArE____', new Map([['4,4-5,4', 3600]])],
-            ['b|______bAbGbAbE____/____rRbC__________/bE____bR____bH__bR/bSrC________bS__bS/____rCrSbS________/____________rS____/bC______rS______rS/________rE________/________rA________/____rR__rGrArE____', new Map([['2,3-4,3', 3600]])],
-            ['b|____bEbAbGbAbEbR__/__________bR______/____bH______bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______rS/rH__rC__rErC____rH/________rA________/rR____rArG__rE__rR', new Map([['2,7-2,8', 3600]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rSbR____rS/rH__rC__rE______rH/________rA________/__rR__rArGrCrErR__', new Map([['0,6-2,4', 3600]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE______rH/________rA____rR__/__rR__rArGrCrE____', new Map([['0,6-2,4', 3600]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE____rRrH/________rA________/__rR__rArGrCrE____', new Map([['0,6-2,4', 3600]])],
-            ['b|____bEbAbG__bEbR__/bH________rC______/__________bAbH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______bR________/rH__rC__rE__rR__rH/________rA________/__rR__rArG__rE____', new Map([['0,7-1,7', 3600]])],
-            ['b|____bEbAbG__bE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____rS______rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
-            ['b|____bEbAbGbHbE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____________rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', new Map([['3,1-0,1', 3600]])],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/______________rH__/________bR________/rHrR____rE__rR____/________rA________/____rCrArG__rE____', new Map([['3,1-6,1', 12000]])],
-            ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', new Map([['0,2-2,4', 3600]])],
-            ['b|____bEbAbG__bHbE____/bH______bA____bC__/__________rS______/bS__rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,4', 3600]])],
-            ['b|______bG__bHbE____/bH______bA____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 3600]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rSbR____rS/rH__rC__rE______rH/________rA________/__rR__rArGrCrErR__', new Map([['0,6-2,4', 12000]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE______rH/________rA____rR__/__rR__rArGrCrE____', new Map([['0,6-2,4', 12000]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE____rRrH/________rA________/__rR__rArGrCrE____', new Map([['0,6-2,4', 12000]])],
-            ['b|____bEbAbG__bE____/bH________rC______/__________bAbH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______bR________/rH__rC__rE__rR__rH/________rA________/__rR__rArG__rE____', new Map([['0,7-1,7', 3600]])],
-            ['b|____bEbAbG__bE____/bH________bR______/__________bAbH____/bSbCbS__bS__bSbCbS/____rS______rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
-            ['b|____bEbAbGbHbE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____________rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', new Map([['3,6-4,6', 3600]])],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', new Map([['3,1-0,1', 3400]])],
-            ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', new Map([['0,2-2,4', 3400]])],
-            ['b|____bEbAbGbHbE____/bHbC____bR____bC__/__________rS______/bS__rS__bS__rR____/__________________/________________bS/______bR__________/rH__rR__rE__rH____/________rA________/rC____rArG__rE____', new Map([['6,3-6,5', 3200]])],
-            ['b|____bE__bGbHbE____/bH______bA____bC__/__________rS______/bS__rS__rR________/__________________/__________rH____bS/__________________/____bC__rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,4', 3200]])],
-            ['b|______bG__bHbE____/bH______rS____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 3200]])],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', new Map([['3,1-0,1', 12000]])],
-            ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', new Map([['0,2-2,4', 4200]])],
-            ['b|____bE__bGbHbE____/bH______bA____bC__/__________rS______/bS__rS__rR________/__________________/__________rH____bS/__________________/____bC__rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,4', 5600]])],
-            ['b|______bG__bHbE____/bH______rS____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', new Map([['0,5-2,6', 12000]])],
-            ['b|____bEbAbG__bE____/________bA________/__bCbH______bHrRbC/bSbRbS__bS__bS__bS/__________________/____rSbR____rS____/rS__rC__rS__rC__rS/________rE__rH____/________rA________/rRrHrErArG________', new Map([['3,4-4,4', 7600]])],
-            ['b|____bEbAbGbH______/________bA__rR__bC/__bCbH____________/__bRbS__bS__bS__bS/bS____bR____rS____/____rS____________/____rC__rS__rC__rS/rH______rE__rH____/________rA________/rR__rErArG________', new Map([['3,4-4,4', 18000]])],
-            ['b|____bEbAbGbArR__bC/______________bH__/bC__bH____________/__bRbS__bS______bS/bS____rSbR__rS____/__________________/____rC__rS____rCrS/rH______rE__rH____/________rA________/rR__rErArG________', new Map([['4,4-6,4', 12000]])]
-            ,
-            ['b|____bEbAbG__bEbR__/________bAbR______/____bH______bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______rS/rH__rC__rE______rH/________rA________/rR____rArGrCrE__rR', new Map([['3,6-4,6', 9000]])],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rSbR____rS/rH__rC__rE______rH/________rA________/__rR__rArGrCrErR__', new Map([['3,4-4,4', 9000]])],
-            ['b|bR__bEbAbGbA__bR__/________bA________/________bE__bH____/bS__bS__bS__bS__bS/__rR______________/____rSrH____rS____/rS______rS______rS/____rC__rE__rCbC__/__________________/__bCrErArGrA__rHrR', new Map([['5,5-6,5', 15000]])],
-            ['b|__bRbEbAbGbA______/______________bR__/________bH__bC____/bS__bS__bS__bS__bS/______bE__________/____________rS____/rS__rS__rS__rS____/____rC____rC__rH__/__________________/rRrHrErArGrArE____', new Map([['2,2-3,4', 15000]])],
-            ['b|__bRbEbAbGbA______/______________bR__/________bH__bC____/bS__bS__bS__bS__bS/__________________/________rS______/rS__rS__rS__rC____/____rC______rH____/__________________/rRrHrErArGrArE____', new Map([['2,6-3,4', 12000]])],
-            ['b|__bRbEbAbGbA______/______________bR__/________bH__bC____/bS__bS____bS__bS__bS/________bE________/________rS______/rS__rS__rS__rC____/____rC______rH____/__________________/rRrHrErArGrArE____', new Map([['0,6-2,4', 15000]])],
-            ['b|____bE__bGbA______/____bR__bA________/______bAbCbH______/bS__bS__bS__bS__bS/____________rR____/________rS______/rS__rS__rS______rS/____rC__rE__rH____/__________________/rR__rErArGrA______', new Map([['9,2-4,2', 10000]])],
-            ['b|________bG____bE__/______bA__bA______/____bH________bR__/bS__bS__bS__bS__bS/__________________/________rR______/rS__rS__rS__rS____/________rE________/____rC__rA__rH____/rR__rErA__rG______', new Map([['6,5-3,5', 9000]])],
-            ['b|________bG____bE__/______bA__bA______/____bH________bR__/bS__bS__bS__bS__bS/____________rR____/________rS______/rS__rS__rS__rS____/________rE________/____rC__rA__rH____/rR__rErA__rG______', new Map([['2,4-4,2', 15000]])],
-            ['b|__bRbEbAbGbAbE____/________bA________/____bH______bHbC__/bS__bS__bS__bS__bS/__________________/____________rS____/rS__rS__rS______rS/rH______rE__rC____/__________________/rR__rErArG__rC__rR', new Map([['3,4-4,4', 14000]])],
-            ['b|____bEbAbGbAbE____/________bH________/____________bH____/bS__bS__bS______bS/________bC__bS____/______bR______bC__/rS__rS________rHrS/________rE________/________rA______rH/__rRrErArG______rR', new Map([['4,6-5,6', 14000]])],
-            ['b|____bEbAbGbAbE____/________bH________/____________bH____/bS__bS__bS______bS/________bC__bS____/______________bC__/rS__rSbR______rHrS/________rE________/________rA______rH/__rRrErArG__rR____', new Map([['1,4-3,5', 12000]])],
-            ['b|____bEbAbGbAbE____/________bH________/__rR________bH____/bS__bS__bS______bS/________bC__bS____/______________bC__/rS__rS__bR____rHrS/________rE________/________rA______rH/____rErArG__rR____', new Map([['0,2-2,4', 12000]])],
-            ['b|____bEbAbGbAbE____/________bH________/__________rRbH____/bS__bS__bS______bS/________bC__bS____/______________bC__/bR____________rHrS/________rE________/________rA______rH/____rErArGrR______', new Map([['4,6-5,6', 12000]])],
-            ['b|____bEbAbGbAbE____/________bH________/__________rRbH____/bS__bS__bS______bS/________bC__bS____/__________rR__bC__/________bR____rHrS/________rE________/________rA______rH/____rErArG________', new Map([['5,7-0,7', 10000]])],
-            ['b|____bEbAbGbAbE____/________bHrR______/____________bHbC__/bS__bS__bS______bS/________bC__bS____/__________rR______/________bR____rHrS/________rE________/________rA______rH/____rErArG________', new Map([['0,6-2,8', 10000]])],
-            ['b|______bAbGbAbE____/________bHrR______/________bE__bH____/bS__bS__bS______bS/________bC__bSbC__/__________________/________bR____rHrS/________rE________/________rArR____rH/____rErA__rG______', new Map([['4,4-4,5', 9000]])],
-            ['b|______bAbGbAbE____/__________rR______/____bH__bErRbH____/bS__bS__bS______bS/________bC__bSbC__/__________________/________bR____rHrS/________rE________/________rA______rH/____rErA__rG____', new Map([['3,2-4,2', 12000]])],
-            ['b|______bAbGbAbE____/__________rR______/____bH__bErR______/bS__bS__bS______bS/________bCbHrHbC__/__________________/________bR______rS/________rE________/________rA______rH/____rErA__rG____', new Map([['0,3-1,4', 10000]])]
-        ]);
-        const forcedReviewedOverrides = new Map([
-            ['b|bR__bEbAbGbA______/______________bR__/____bH______bHbCbE/bS__bS__bS______bS/____________bS____/____rS________rR__/________rS__bC__rS/__rCrH__rE__rHrC__/__________________/rR____rArGrArE____', '3,1-8,1'],
-            ['b|bR____bAbG________/bH______bA________/__rR____bErR____bE/bS______________bS/____bS__rCbH______/____________bC____/____bR__rS______rS/__________rC______/________rA________/______rArG________', '6,2-6,4'],
-            ['b|____bE__bGbA______/____bR__bArC______/________bC__bHbCbE/bS__rC________rRbS/______bH____rS____/____bS__bR__rH__rS/rSrR______________/________rE__rH____/________rA________/____rErG__rA______', '1,2-2,2'],
-            ['b|____bE__bGbA______/____bR____________/______bAbC__bC__bE/bS______rC____rRbS/______bH__rS______/____bS__bR__rH__rS/rSrR______________/________rE__rH____/________rA________/____rErG__rA______', '2,3-1,4'],
-            ['b|bR__bEbAbG__bEbR__/________bA________/__bCbH______bHbC__/bS__bS__bS__bSrRbS/__________________/__________________/rS__rS__rS__rS__rS/__rCrH____rC____rH/__________________/rR__rErArGrArE____', '3,2-4,2'],
-            ['b|bR__bEbAbGbAbE____/______________bR__/__bCbH______bHbC__/bS__bS__bS__bSrRbS/__________________/__________________/rS__rS__rS__rS__rS/__rCrH__rErC____rH/rR________________/______rArGrArE____', '3,2-4,2'],
-            ['b|bR__bEbAbGbAbE____/______________bR__/____bH______bHbC__/bSbCbS__bS__bSrRbS/__________________/__rC______________/rS__rS__rS__rS__rS/____rH__rErC____rH/rR________________/______rArGrArE____', '3,6-4,6'],
-            ['b|bR__bEbAbGbAbE____/______________bR__/____bH______bHbC__/bSbC____bS__bSrRbS/____bS____________/____________rC____/rS__rS__rS__rS__rS/____rH__rErC____rH/rR________________/______rArGrArE____', '3,6-4,6'],
-            ['b|__bRbEbAbGbAbE____/________bH____bR__/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/______________rC__/rS__rS__rS__rS__rS/____rH__rErC____rH/__rR______________/______rArGrArE____', '3,6-4,6'],
-            ['b|__bRbEbAbGbAbEbR__/________bH________/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/______________rCrS/rS__rS__rS__rS____/____rH__rErC____rH/__rR______________/______rArGrArE____', '3,6-4,6'],
-            ['b|__bRbEbAbGbAbE____/________bH____bR__/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/______________rCrS/rS__rS__rS__rS____/____rH__rE__rC__rH/__rR______________/______rArGrArE____', '3,6-4,6'],
-            ['b|__bRbEbAbGbAbEbR__/________bH________/____bH________bC__/bSbC____bS__bSrRbS/____bS____________/____________rSrCrS/rS__rS__rS________/____rH__rE__rC__rH/__rR______________/______rArGrArE____', '3,6-4,6'],
-            ['b|____bEbA__rRbE____/________bG__bRrC__/____bH____________/bS__bSbHbS__rH__bS/____________rS____/____rS____________/____bC__bRrH____rS/________rE________/________rA________/____rErArGrR______', '1,6-1,7'],
-            ['b|__rR________bE____/________bAbG______/bE____bA__________/bS____rR________bS/bR__________bS____/________rC__rErH__/________rSbR____rS/__________________/________rG________/______rA__bC______', '4,0-8,0'],
-            ['b|____bEbAbGbAbE____/__________________/bC__bH______bHbC__/bSbRbS__bS__bS__bS/__________________/____rSbR____rS____/rS______rS__rC__rS/____rC__rE__rH____/________rA________/rRrHrErArG______rR', '3,1-8,1'],
-            ['b|____bEbAbGbA____rR/________bH__bC____/bC________bH______/__bRbS__bSrS____bS/bS____bR__________/__________________/____rC__rS____rCrS/rH______rE__rH____/rR______rA________/____rErArG________', '1,4-3,5'],
-            ['b|____bEbAbGbA______/________bH__rR____/bC________bR______/__bRbS__bS______bS/bS__bC____________/______________rH__/________rS____rCrS/rH______rE________/rR______rA________/____rErArG________', '3,1-2,1'],
-            ['b|____bEbAbG________/____bC__bA__bC____/________bR________/______________rR__/____rR__rC________/__________________/bS______rS__bH__rS/rH______rE________/________rA________/____rErArG________', '1,6-1,5'],
-            ['b|____bEbAbGbAbE____/________bR________/____________bH__bR/bS__bS__bH__bS__bS/______bCbS________/____rSrH__rHrS____/rS______rS____bCrS/__rC____rE____rC__/________rArR______/____rR__rGrArE____', '4,4-5,4'],
-            ['b|____bEbAbGbAbE____/______bC__________/________bR__bH__bR/bS__rC____rRbS__bS/______rSbS________/____________rS____/rS____bCrS______rS/__rC____rE________/________rA________/____rR__rGrArE____', '4,4-5,4'],
-            ['b|______bAbGbAbE____/____rRbC__________/bE____bR____bH__bR/bSrC________bS__bS/____rCrSbS________/____________rS____/bC______rS______rS/________rE________/________rA________/____rR__rGrArE____', '2,3-4,3'],
-            ['b|____bEbAbGbAbEbR__/__________bR______/____bH______bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______rS/rH__rC__rErC____rH/________rA________/rR____rArG__rE__rR', '2,7-2,8'],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rSbR____rS/rH__rC__rE______rH/________rA________/__rR__rArGrCrErR__', '0,6-2,4'],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bHbC__/bSbCbS__bS__bS__bS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE______rH/________rA____rR__/__rR__rArGrCrE____', '0,6-2,4'],
-            ['b|____bEbAbG__bEbR__/bH______bA________/____________bH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______rS______bR/rH__rC__rE____rRrH/________rA________/__rR__rArGrCrE____', '0,6-2,4'],
-            ['b|____bEbAbG__bEbR__/bH________rC______/__________bAbH____/bSbCbS__bS__bSbCbS/__________________/____rS______rS____/rS______bR________/rH__rC__rE__rR__rH/________rA________/__rR__rArG__rE____', '0,7-1,7'],
-            ['b|____bEbAbG__bE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____rS______rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', '3,6-4,6'],
-            ['b|____bEbAbGbHbE____/bH________bR______/__________bA______/bSbCrS__bS__bSbCbS/____________rS____/__________________/bR________________/rHrRrC__rE__rR__rH/________rA________/______rArG__rE____', '3,6-4,6'],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/__________________/bR________________/rHrR____rE__rR__rH/________rA________/____rCrArG__rE____', '3,1-0,1'],
-            ['b|____bEbAbGbHbE____/bH__________bRbC__/__________bA______/bSbCrS__bS__rS__bS/__________________/______________rH__/________bR________/rHrR____rE__rR____/________rA________/____rCrArG__rE____', '3,1-6,1'],
-            ['b|__bCbEbAbGbHbE____/bH__________bRbC__/__________bA______/bS__rS__bS__rS__bS/__________________/______________rH__/______bR__________/rH__rR__rE__rR____/________rA________/rC____rArG__rE____', '0,2-2,4'],
-            ['b|____bEbAbG__bHbE____/bH______bA____bC__/__________rS______/bS__rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', '0,5-2,4'],
-            ['b|______bG__bHbE____/bH______bA____bC__/________bE________/____rS________rR__/bS________________/________________bS/__________________/________rE__rH____/______bRrA________/____rCrArG__rE____', '0,5-2,6']
-        ]);
-        const forcedReviewedHistoryOverrides = new Map([
-            ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6', '3,6-4,6'],
-            ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6|2,6-0,5|4,2-3,2|1,5-1,6|4,6-3,6|3,7-1,7|7,2-9,2|6,0-6,4|7,8-5,7|6,4-6,3|7,1-7,2|3,1-0,1|9,2-9,0|1,6-1,4|3,6-2,6|0,1-1,1|2,6-2,5|3,8-4,8|7,6-3,6|4,8-5,8|5,7-7,6', '6,3-6,5'],
-            ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6|2,6-0,5|4,2-3,2|1,5-1,6|4,6-3,6|3,7-1,7|7,2-9,2|6,0-6,4|7,8-5,7|6,4-6,3|7,1-7,2|3,1-0,1|9,2-9,0|1,6-1,4|3,6-2,6|0,1-1,1|2,6-2,5|3,8-4,8|7,6-3,6|4,8-5,8|5,7-7,6|1,1-1,2|7,0-5,1|1,2-7,2|5,1-6,3|1,4-1,3|3,6-3,4|0,3-1,4|6,3-5,5|1,3-8,3|9,0-9,2', '0,5-2,4'],
-            ['9,7-7,8|0,7-2,6|7,7-7,5|0,1-2,2|6,2-5,2|0,8-0,7|6,6-5,6|0,0-1,0|9,2-7,4|1,0-1,4|7,1-7,2|1,4-1,5|9,5-8,4|2,1-3,1|9,1-7,0|0,5-1,4|7,5-9,5|1,5-6,5|9,0-9,1|2,2-1,0|9,8-9,7|6,5-6,8|9,7-8,7|2,7-3,7|8,7-7,7|6,8-6,4|9,5-1,5|1,4-2,5|7,7-7,6|6,4-6,0|9,1-7,1|0,7-1,7|5,2-4,2|1,7-1,5|5,6-4,6|2,6-0,5|4,2-3,2|1,5-1,6|4,6-3,6|3,7-1,7|7,2-9,2|6,0-6,4|7,8-5,7|6,4-6,3|7,1-7,2|3,1-0,1|9,2-9,0|1,6-1,4|3,6-2,6|0,1-1,1|2,6-2,5|3,8-4,8|7,6-3,6|4,8-5,8|5,7-7,6|1,1-1,2|7,0-5,1|1,2-7,2|5,1-6,3|1,4-1,3|3,6-3,4|0,3-1,4|6,3-5,5|1,3-8,3|9,0-9,2|0,2-2,4|2,5-1,5|7,2-7,6|5,5-7,6|0,4-0,3|1,5-1,4|3,0-4,0|3,4-3,7', '0,5-2,6']
-        ]);
-        function getReviewedPositionBias(board, color, move, history) {
-            const historyLength = (history || []).length;
-            if (historyLength > 84) {
-                return 0;
-            }
+        const reviewedPositionHints = new Map();
+        const forcedReviewedOverrides = new Map();
+        const forcedReviewedHistoryOverrides = new Map();
 
-            const moveHints = reviewedPositionHints.get(getBoardKey(board, color));
-            if (!moveHints) {
-                return 0;
-            }
-
-            const rawBias = moveHints.get(getMoveKey(move)) || 0;
-            if (!rawBias) {
-                return 0;
-            }
-
-            if (historyLength > 40) {
-                const lateMax = rawBias >= 15000 ? 1800 : rawBias >= 10000 ? 1200 : rawBias >= 5000 ? 520 : 320;
-                const divisor = rawBias >= 15000 ? 10 : rawBias >= 10000 ? 12 : rawBias >= 5000 ? 14 : 20;
-                return Math.min(lateMax, Math.round(rawBias / divisor));
-            }
-
-            const earlyMax = rawBias >= 15000 ? 1400 : rawBias >= 10000 ? 900 : rawBias >= 5000 ? 560 : 420;
-            const divisor = rawBias >= 15000 ? 12 : rawBias >= 10000 ? 14 : rawBias >= 5000 ? 16 : 18;
-            return Math.min(earlyMax, Math.round(rawBias / divisor));
+        function getReviewedPositionBias() {
+            return 0;
         }
 
         function getForcedReviewedMove() {
@@ -1148,6 +1000,36 @@
             return score;
         }
 
+        function countExposedMajors(board, color, stage) {
+            const opponent = otherColor(color);
+            let count = 0;
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const piece = board[row][col];
+                    if (!piece || piece[0] !== color || !['R', 'H', 'C'].includes(piece[1])) {
+                        continue;
+                    }
+
+                    const attackers = getAttackerValues(board, row, col, opponent);
+                    if (attackers.length === 0) {
+                        continue;
+                    }
+
+                    const defenders = getAttackerValues(board, row, col, color);
+                    const targetValue = pieceValue(piece[1], stage);
+                    const cheapThreat = attackers[0] <= Math.round(targetValue * 0.58);
+                    const underDefended = defenders.length === 0 || attackers.length > defenders.length;
+
+                    if (cheapThreat || underDefended) {
+                        count += 1;
+                    }
+                }
+            }
+
+            return count;
+        }
+
         function countLooseHorses(board, color, stage) {
             const opponent = otherColor(color);
             let count = 0;
@@ -1449,6 +1331,50 @@
             return count;
         }
 
+        function evaluateAttackCoordination(board, color, stage) {
+            if (stage.middlegame < 0.08 && stage.endgame < 0.12) {
+                return 0;
+            }
+
+            const enemyGeneral = findGeneral(board, otherColor(color));
+            if (!enemyGeneral) {
+                return 0;
+            }
+
+            let score = countThreatenedEnemyMajors(board, color) * stageWeight(stage, 6, 20, 12);
+
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const piece = board[row][col];
+                    if (!piece || piece[0] !== color || !['R', 'H', 'C'].includes(piece[1])) {
+                        continue;
+                    }
+
+                    const fileDistance = Math.abs(col - enemyGeneral.col);
+                    const rowDistance = Math.abs(row - enemyGeneral.row);
+                    const advanced = color === RED_COLOR ? row <= 4 : row >= 5;
+
+                    if ((piece[1] === 'R' || piece[1] === 'C') && fileDistance <= 1 && advanced) {
+                        score += piece[1] === 'R'
+                            ? stageWeight(stage, 8, 16, 8)
+                            : stageWeight(stage, 6, 12, 6);
+                    }
+
+                    if (piece[1] === 'H' && fileDistance <= 2 && rowDistance <= 3) {
+                        score += stageWeight(stage, 4, 12, 8);
+                    }
+
+                    if ((piece[1] === 'R' || piece[1] === 'C') &&
+                        isSquareAttacked(board, row, col, otherColor(color)) &&
+                        getAttackerValues(board, row, col, color).length === 0) {
+                        score -= stageWeight(stage, 0, 18, 8);
+                    }
+                }
+            }
+
+            return Math.round(score);
+        }
+
         function evaluateSide(board, color, stage) {
             let score = 0;
 
@@ -1470,6 +1396,7 @@
             score += evaluateKingSafety(board, color, stage);
             score += evaluateSoldiers(board, color, stage);
             score += evaluateRookPressure(board, color, stage);
+            score += evaluateAttackCoordination(board, color, stage);
             score += evaluateInitiative(board, color, stage);
             score += evaluateExchangeSafety(board, color, stage);
             score += evaluateHomeRookCannonExposure(board, color, stage);
@@ -2520,15 +2447,28 @@
 
             let score = 0;
             const opponent = otherColor(color);
+            const pressureBefore = evaluateRookPressure(board, color, stage);
+            const pressureAfter = evaluateRookPressure(nextBoard, color, stage);
+            const coordinationBefore = evaluateAttackCoordination(board, color, stage);
+            const coordinationAfter = evaluateAttackCoordination(nextBoard, color, stage);
+            const threatBefore = countThreatenedEnemyMajors(board, color);
+            const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+            const exposedBefore = countExposedMajors(board, color, stage);
+            const exposedAfter = countExposedMajors(nextBoard, color, stage);
             if (!move.captured) {
                 const homeRookExposures = getHomeRookCannonExposures(board, color);
                 const nextHomeRookExposures = getHomeRookCannonExposures(nextBoard, color);
                 score += (evaluateDevelopment(nextBoard, color, stage) - evaluateDevelopment(board, color, stage)) * 0.55;
-                score += (evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage)) * 0.75;
+                score += (pressureAfter - pressureBefore) * 0.85;
+                score += (coordinationAfter - coordinationBefore) * 0.8;
                 score += (evaluateInitiative(nextBoard, color, stage) - evaluateInitiative(board, color, stage)) * 0.65;
                 score += (evaluateKingSafety(nextBoard, color, stage) - evaluateKingSafety(board, color, stage)) * 0.2;
                 score += (evaluateExchangeSafety(nextBoard, color, stage) - evaluateExchangeSafety(board, color, stage)) * 1.05;
                 score += (evaluateHomeRookCannonExposure(nextBoard, color, stage) - evaluateHomeRookCannonExposure(board, color, stage)) * 1.15;
+                score += (threatAfter - threatBefore) * stageWeight(stage, 8, 18, 10);
+                if (exposedAfter < exposedBefore) {
+                    score += (exposedBefore - exposedAfter) * stageWeight(stage, 0, 64, 28);
+                }
 
                 if (homeRookExposures.length > nextHomeRookExposures.length) {
                     const relievedByMovingScreen = homeRookExposures.some(exposure =>
@@ -2563,7 +2503,7 @@
             if (move.piece[1] === 'R' && move.fromRow !== homeRow(color) && !move.captured) {
                 const deeperAdvance = color === RED_COLOR ? move.toRow < move.fromRow : move.toRow > move.fromRow;
                 const sideways = move.toRow === move.fromRow;
-                const rookPressureDelta = evaluateRookPressure(nextBoard, color, stage) - evaluateRookPressure(board, color, stage);
+                const rookPressureDelta = pressureAfter - pressureBefore;
                 if (sideways && rookPressureDelta > 0) {
                     score += Math.round(rookPressureDelta * stageWeight(stage, 0.2, 1.0, 0.35));
                 } else if (deeperAdvance && rookPressureDelta <= 0 && !isInCheck(nextBoard, otherColor(color))) {
@@ -2685,6 +2625,92 @@
                     score += stageWeight(stage, 0, 4, 12);
                 }
             }
+
+            if (!move.captured &&
+                ['A', 'E', 'S'].includes(move.piece[1]) &&
+                threatAfter <= threatBefore &&
+                pressureAfter < pressureBefore &&
+                coordinationAfter <= coordinationBefore) {
+                score -= stageWeight(stage, 0, 42, 18);
+            }
+
+            return Math.round(score);
+        }
+
+        function getPressureMaintenanceBias(board, nextBoard, move, color, stage) {
+            if (stage.middlegame < 0.18 && stage.endgame < 0.12) {
+                return 0;
+            }
+
+            const pressureBefore = evaluateRookPressure(board, color, stage);
+            const pressureAfter = evaluateRookPressure(nextBoard, color, stage);
+            const coordinationBefore = evaluateAttackCoordination(board, color, stage);
+            const coordinationAfter = evaluateAttackCoordination(nextBoard, color, stage);
+            const threatBefore = countThreatenedEnemyMajors(board, color);
+            const threatAfter = countThreatenedEnemyMajors(nextBoard, color);
+            const exposedBefore = countExposedMajors(board, color, stage);
+            const exposedAfter = countExposedMajors(nextBoard, color, stage);
+            let score = 0;
+
+            score += (pressureAfter - pressureBefore) * stageWeight(stage, 0.35, 1.25, 0.45);
+            score += (coordinationAfter - coordinationBefore) * stageWeight(stage, 0.3, 1.05, 0.5);
+            score += (threatAfter - threatBefore) * stageWeight(stage, 10, 24, 14);
+
+            if (exposedAfter < exposedBefore) {
+                score += (exposedBefore - exposedAfter) * stageWeight(stage, 0, 72, 28);
+            }
+
+            if (!move.captured &&
+                ['R', 'C', 'H'].includes(move.piece[1]) &&
+                pressureAfter + coordinationAfter < pressureBefore + coordinationBefore &&
+                threatAfter <= threatBefore &&
+                exposedAfter >= exposedBefore) {
+                score -= stageWeight(stage, 0, 84, 28);
+            }
+
+            if (!move.captured &&
+                ['A', 'E', 'S'].includes(move.piece[1]) &&
+                pressureAfter < pressureBefore &&
+                coordinationAfter <= coordinationBefore &&
+                threatAfter <= threatBefore) {
+                score -= stageWeight(stage, 0, 56, 24);
+            }
+
+            return Math.round(score);
+        }
+
+        function getCounterstrikeBias(board, nextBoard, move, color, stage) {
+            if (stage.opening < 0.12 && stage.middlegame < 0.16) {
+                return 0;
+            }
+
+            const opponent = otherColor(color);
+            const ownExposedBefore = countExposedMajors(board, color, stage);
+            const ownExposedAfter = countExposedMajors(nextBoard, color, stage);
+            const enemyExposedBefore = countExposedMajors(board, opponent, stage);
+            const enemyExposedAfter = countExposedMajors(nextBoard, opponent, stage);
+            let score = 0;
+
+            if (ownExposedAfter < ownExposedBefore) {
+                score += (ownExposedBefore - ownExposedAfter) * stageWeight(stage, 0, 78, 30);
+            }
+
+            if (enemyExposedAfter > enemyExposedBefore) {
+                score += (enemyExposedAfter - enemyExposedBefore) * stageWeight(stage, 0, 64, 26);
+            }
+
+            if (move.captured || isInCheck(nextBoard, opponent)) {
+                score += stageWeight(stage, 8, 22, 16);
+            }
+
+            if (!move.captured &&
+                ownExposedBefore > 0 &&
+                ownExposedAfter >= ownExposedBefore &&
+                enemyExposedAfter <= enemyExposedBefore &&
+                ['A', 'E', 'G', 'S'].includes(move.piece[1])) {
+                score -= stageWeight(stage, 0, 64, 24);
+            }
+
             return Math.round(score);
         }
 
@@ -2881,6 +2907,8 @@
                 const tacticalBias = getTacticalBias(board, nextBoard, move, color, history);
                 const safetyPenalty = getImmediateRiskPenalty(board, nextBoard, move, color, searchConfig.stage);
                 const reviewedBias = getReviewedPositionBias(board, color, move, history);
+                const pressureMaintenanceBias = getPressureMaintenanceBias(board, nextBoard, move, color, searchConfig.stage);
+                const counterstrikeBias = getCounterstrikeBias(board, nextBoard, move, color, searchConfig.stage);
                 const focusMove = isOpeningFocusMove(board, nextBoard, move, color, history, openingContext);
                 const centerGain = Math.abs(4 - move.fromCol) - Math.abs(4 - move.toCol);
                 const rookCenterBias = !move.captured &&
@@ -3060,9 +3088,11 @@
                     nextBoard,
                     reviewedBias,
                     tacticalBias,
+                    pressureMaintenanceBias,
+                    counterstrikeBias,
                     safetyPenalty,
-                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(tacticalBias * 0.9) - Math.round(safetyPenalty * 0.45),
-                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(tacticalBias * 0.55) - Math.round(safetyPenalty * 0.3)
+                    quickScore: bookBias + practicalBias + reviewedBias + openingFocusBias + soldierPressureBias + attackedRookReliefBias + looseHorseBias + looseCannonBias + overextendedCannonBias + kingEscapeBias + backRankHorseBias + quietCenter + rookCenterBias + cannonCenterBias + Math.round(pressureMaintenanceBias * 0.82) + Math.round(counterstrikeBias * 0.86) + Math.round(tacticalBias * 0.92) - Math.round(safetyPenalty * 0.52),
+                    policyBias: bookBias + practicalBias + reviewedBias + Math.round(openingFocusBias * 0.85) + Math.round(soldierPressureBias * 0.92) + Math.round(attackedRookReliefBias * 0.88) + Math.round(looseHorseBias * 0.85) + Math.round(looseCannonBias * 0.82) + Math.round(overextendedCannonBias * 0.85) + Math.round(kingEscapeBias * 0.85) + Math.round(backRankHorseBias * 0.82) + Math.round(rookCenterBias * 0.8) + Math.round(cannonCenterBias * 0.85) + Math.round(pressureMaintenanceBias * 0.76) + Math.round(counterstrikeBias * 0.78) + Math.round(tacticalBias * 0.6) - Math.round(safetyPenalty * 0.34)
                 };
             }).sort((left, right) => right.quickScore - left.quickScore);
 
@@ -3134,15 +3164,19 @@
                 const captureThreatPenalty = replyThreats.capturePenalty;
                 const passivityPenalty = getRootPassivityPenalty(board, nextBoard, entry.move, color, searchConfig.stage, openingContext);
                 const tacticalBias = entry.tacticalBias;
+                const pressureMaintenanceBias = entry.pressureMaintenanceBias;
+                const counterstrikeBias = entry.counterstrikeBias;
                 return {
                     move: entry.move,
                     nextBoard,
                     reviewedBias: entry.reviewedBias,
-                    sortScore: entry.quickScore + continuationBias + homeRookReliefBias + defensiveRepairBias + captureBias + checkBias + Math.round(tacticalBias * 0.35) - Math.round(safetyPenalty * 0.55) - tradePenalty - deepRookRaidPenalty - checkThreatPenalty - captureThreatPenalty - passivityPenalty,
-                    policyBias: entry.policyBias + Math.round(continuationBias * 0.6) + Math.round(homeRookReliefBias * 0.92) + Math.round(defensiveRepairBias * 0.8) + captureBias + Math.round(checkBias * 0.7) + Math.round(tacticalBias * 0.25) - Math.round(safetyPenalty * 0.35) - tradePenalty - Math.round(deepRookRaidPenalty * 0.82) - Math.round(checkThreatPenalty * 0.85) - Math.round(captureThreatPenalty * 0.92) - Math.round(passivityPenalty * 0.9),
+                    sortScore: entry.quickScore + continuationBias + pressureMaintenanceBias + counterstrikeBias + homeRookReliefBias + defensiveRepairBias + captureBias + checkBias + Math.round(tacticalBias * 0.4) - Math.round(safetyPenalty * 0.6) - tradePenalty - deepRookRaidPenalty - Math.round(checkThreatPenalty * 1.18) - Math.round(captureThreatPenalty * 1.14) - passivityPenalty,
+                    policyBias: entry.policyBias + Math.round(continuationBias * 0.62) + Math.round(pressureMaintenanceBias * 0.72) + Math.round(counterstrikeBias * 0.74) + Math.round(homeRookReliefBias * 0.92) + Math.round(defensiveRepairBias * 0.82) + captureBias + Math.round(checkBias * 0.72) + Math.round(tacticalBias * 0.28) - Math.round(safetyPenalty * 0.38) - tradePenalty - Math.round(deepRookRaidPenalty * 0.82) - Math.round(checkThreatPenalty * 0.95) - Math.round(captureThreatPenalty * 1.0) - Math.round(passivityPenalty * 0.92),
                     debug: {
                         quickScore: entry.quickScore,
                         continuationBias,
+                        pressureMaintenanceBias,
+                        counterstrikeBias,
                         homeRookReliefBias,
                         defensiveRepairBias,
                         captureBias,

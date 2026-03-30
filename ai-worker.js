@@ -1,4 +1,4 @@
-importScripts('engine-core.js?v=20260330-heuristics1', 'game.js?v=20260330-heuristics1');
+importScripts('engine-core.js?v=20260330-search2', 'game.js?v=20260330-search2');
 
 function getPonderMoveKey(move) {
     return move ? getMoveKey(move) : '';
